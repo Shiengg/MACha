@@ -1,10 +1,12 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import connectDB from './config/db.js';
 import { setupSwagger } from './docs/swagger.js';
 
 const app = express();
 dotenv.config();
 
+connectDB();
 setupSwagger(app);
 
 app.use(express.json());
