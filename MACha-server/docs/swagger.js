@@ -18,7 +18,23 @@ const option = {
                 url: "http://localhost:8887",
                 description: "Local development server",
             }
-        ]
+        ],
+        components: {
+            securitySchemes: {
+                cookieAuth: {
+                    type: "apiKey",
+                    in: "cookie",
+                    name: "jwt",
+                    description: "JWT token stored in HTTP-only cookie"
+                },
+                bearerAuth: {
+                    type: "http",
+                    scheme: "bearer",
+                    bearerFormat: "JWT",
+                    description: "JWT token in Authorization header"
+                }
+            }
+        }
     },
     apis: ["./server.js",'./routes/*.js'],
 };
