@@ -5,6 +5,7 @@ import commentRoutes from "./CommentRoute.js";
 import likeRoutes from "./LikeRoute.js";
 import campaignRoutes from "./CampaignRoute.js";
 import donationRoutes from "./DonationRoute.js";
+import notificationRoute from "./NotificationRoute.js";
 
 export {
     authRoutes,
@@ -13,5 +14,6 @@ export {
     commentRoutes,
     likeRoutes,
     campaignRoutes,
-    donationRoutes
+    donationRoutes,
+    notificationRoute
 }

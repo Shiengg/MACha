@@ -9,7 +9,8 @@ import {
     commentRoutes,
     likeRoutes,
     campaignRoutes,
-    donationRoutes
+    donationRoutes,
+    notificationRoute
 } from './routes/index.js';
 
 const app = express();
@@ -27,6 +28,7 @@ app.use("/api/comments", commentRoutes);
 app.use("/api/likes", likeRoutes);
 app.use("/api/campaigns", campaignRoutes);
 app.use("/api/donations", donationRoutes);
+app.use("/api/notifications", notificationRoute);
 
 // Example endpoint
 /**
