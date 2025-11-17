@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import cors from 'cors';
 import connectDB from './config/db.js';
 import { setupSwagger } from './docs/swagger.js';
 import {
@@ -18,6 +19,12 @@ dotenv.config();
 
 connectDB();
 setupSwagger(app);
+
+// CORS phải được cấu hình TRƯỚC tất cả các routes
+app.use(cors({
+    origin: process.env.ORIGIN_URL || 'http://localhost:3000',
+    credentials: true,
+}));
 
 app.use(express.json());
 
