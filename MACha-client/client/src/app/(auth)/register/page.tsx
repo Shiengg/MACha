@@ -1,54 +1,35 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { SIGNUP_ROUTE } from '@/constants/api';
 import apiClient from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 import Image from 'next/image';
 import Link from 'next/link';
 import Swal from 'sweetalert2';
+import { registerSchema, type RegisterFormData } from '@/schemas/auth.schema';
 
 export default function SignupPage() {
-    const [username, setUsername] = useState('')
-    const [email, setEmail] = useState('')
-    const [password, setPassword] = useState('')
-    const [confirmPassword, setConfirmPassword] = useState('')
-    const [loading, setLoading] = useState(false);
-    const {login, user} = useAuth();
+    const { login } = useAuth();
     const router = useRouter();
 
-    const validateSignup = () => {
-        if (!username || !email || !password || !confirmPassword) {
-            Swal.fire({
-                title: 'Signup failed!',
-                text: 'Please fill all fields',
-                icon: 'error',
-                confirmButtonText: 'OK'
-            });
-            return false;
-        }
-        if (password !== confirmPassword) {
-            Swal.fire({
-                title: 'Signup failed!',
-                text: 'Passwords do not match',
-                icon: 'error',
-                confirmButtonText: 'OK'
-            });
-            return false;
-        }
-        return true;
-    }
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isSubmitting },
+    } = useForm<RegisterFormData>({
+        resolver: zodResolver(registerSchema),
+        mode: 'onBlur', // Validate khi blur khỏi field
+    });
 
-    const handleSignup = async () => {
-        if (!validateSignup()) {
-            return;
-        }
+    const onSubmit = async (data: RegisterFormData) => {
         try {
-            setLoading(true);
+            const { confirmPassword, ...signupData } = data; // Loại bỏ confirmPassword
             const res = await apiClient.post(
                 SIGNUP_ROUTE,
-                { username, email, password },
+                signupData,
                 { withCredentials: true }
             );
             if (res.data.user?.id) {
@@ -69,14 +50,6 @@ export default function SignupPage() {
                 icon: 'error',
                 confirmButtonText: 'OK'
             });
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !loading) {
-            handleSignup();
         }
     }
 
@@ -91,6 +64,7 @@ export default function SignupPage() {
                             Already have an account? <Link href="/login" className="text-blue-600 hover:text-blue-700">Log in</Link>
                         </p>
                         
+                        <form onSubmit={handleSubmit(onSubmit)}>
                         {/* Username Input */}
                         <div className="mb-6">
                             <label htmlFor="username" className="block text-gray-900 font-medium mb-2">
@@ -99,13 +73,18 @@ export default function SignupPage() {
                             <input
                                 id="username"
                                 type="text"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                onKeyDown={handleKeyPress}
+                                {...register('username')}
                                 placeholder="Username"
-                                className="w-full px-6 py-4 border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 transition-colors text-gray-900"
-                                disabled={loading}
+                                className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${
+                                    errors.username 
+                                        ? 'border-red-500 focus:border-red-500' 
+                                        : 'border-gray-300 focus:border-blue-500'
+                                }`}
+                                disabled={isSubmitting}
                             />
+                            {errors.username && (
+                                <p className="mt-2 text-sm text-red-600">{errors.username.message}</p>
+                            )}
                         </div>
 
                         {/* Email Input */}
@@ -116,13 +95,18 @@ export default function SignupPage() {
                             <input
                                 id="email"
                                 type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                onKeyDown={handleKeyPress}
+                                {...register('email')}
                                 placeholder="Email"
-                                className="w-full px-6 py-4 border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 transition-colors text-gray-900"
-                                disabled={loading}
+                                className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${
+                                    errors.email 
+                                        ? 'border-red-500 focus:border-red-500' 
+                                        : 'border-gray-300 focus:border-blue-500'
+                                }`}
+                                disabled={isSubmitting}
                             />
+                            {errors.email && (
+                                <p className="mt-2 text-sm text-red-600">{errors.email.message}</p>
+                            )}
                         </div>
 
                         {/* Password Input */}
@@ -133,13 +117,18 @@ export default function SignupPage() {
                             <input
                                 id="password"
                                 type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                onKeyDown={handleKeyPress}
+                                {...register('password')}
                                 placeholder="Password"
-                                className="w-full px-6 py-4 border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 transition-colors text-gray-900"
-                                disabled={loading}
+                                className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${
+                                    errors.password 
+                                        ? 'border-red-500 focus:border-red-500' 
+                                        : 'border-gray-300 focus:border-blue-500'
+                                }`}
+                                disabled={isSubmitting}
                             />
+                            {errors.password && (
+                                <p className="mt-2 text-sm text-red-600">{errors.password.message}</p>
+                            )}
                         </div>
 
                         {/* Confirm Password Input */}
@@ -150,22 +139,27 @@ export default function SignupPage() {
                             <input
                                 id="confirmPassword"
                                 type="password"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                onKeyDown={handleKeyPress}
+                                {...register('confirmPassword')}
                                 placeholder="Confirm Password"
-                                className="w-full px-6 py-4 border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 transition-colors text-gray-900"
-                                disabled={loading}
+                                className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${
+                                    errors.confirmPassword 
+                                        ? 'border-red-500 focus:border-red-500' 
+                                        : 'border-gray-300 focus:border-blue-500'
+                                }`}
+                                disabled={isSubmitting}
                             />
+                            {errors.confirmPassword && (
+                                <p className="mt-2 text-sm text-red-600">{errors.confirmPassword.message}</p>
+                            )}
                         </div>
 
                         {/* Sign Up Button */}
                         <button
-                            onClick={handleSignup}
-                            disabled={loading}
+                            type="submit"
+                            disabled={isSubmitting}
                             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-2xl transition-all disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
-                            {loading && (
+                            {isSubmitting && (
                                 <svg 
                                     className="animate-spin h-5 w-5 text-white" 
                                     xmlns="http://www.w3.org/2000/svg" 
@@ -187,8 +181,9 @@ export default function SignupPage() {
                                     ></path>
                                 </svg>
                             )}
-                            <span>{loading ? 'Đang tạo tài khoản...' : 'Create an account'}</span>
+                            <span>{isSubmitting ? 'Creating account...' : 'Create an account'}</span>
                         </button>
+                        </form>
                     </div>
                 </div>
 

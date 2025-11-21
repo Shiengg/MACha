@@ -1,11 +1,15 @@
 'use client';
 
 import { useAuth } from "@/contexts/AuthContext";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { Search, Bell, MessageCircle } from "lucide-react";
+import { useState } from "react";
 
 export default function Header() {
     const { user, isAuthenticated, loading } = useAuth();
     const pathname = usePathname();
+    const router = useRouter();
+    const [searchQuery, setSearchQuery] = useState("");
 
     // Hide header on auth pages
     const authPages = ['/login', '/register', '/forgot-password'];
@@ -16,12 +20,180 @@ export default function Header() {
     }
 
     if (loading) {
-        return <div>Loading...</div>;
+        return (
+            <header className="bg-white shadow-sm border-b border-gray-200">
+                <div className="max-w-7xl mx-auto px-6 py-4">
+                    <div className="animate-pulse flex items-center justify-between">
+                        <div className="flex items-center gap-6 flex-1">
+                            <div className="w-32 h-8 bg-gray-200 rounded"></div>
+                            <div className="flex-1 max-w-lg h-10 bg-gray-200 rounded-full"></div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <div className="w-20 h-8 bg-gray-200 rounded"></div>
+                            <div className="w-20 h-8 bg-gray-200 rounded"></div>
+                            <div className="w-28 h-10 bg-gray-200 rounded-lg"></div>
+                            <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+        );
     }
 
-    return <header className="bg-white shadow-md">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-            <p>Hello, {user?.username}</p>
-        </div>
-    </header>;
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (searchQuery.trim()) {
+            // Navigate to search page or handle search
+            console.log("Search for:", searchQuery);
+            // router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+        }
+    };
+
+    return (
+        <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-6 py-3">
+                <div className="flex items-center justify-between gap-8">
+                    {/* Left side: Logo and Search */}
+                    <div className="flex items-center gap-6 flex-1">
+                        {/* Logo */}
+                        <button
+                            onClick={() => router.push('/')}
+                            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                        >
+                            <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-xl">M</span>
+                            </div>
+                            <span className="text-xl font-bold text-gray-800 hidden sm:block">
+                                MACha
+                            </span>
+                        </button>
+
+                        {/* Search Bar */}
+                        <form 
+                            onSubmit={handleSearch}
+                            className="flex-1 max-w-lg"
+                        >
+                            <div className="relative">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                                <input
+                                    type="text"
+                                    placeholder="Tìm kiếm chiến dịch, quỹ..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-12 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all"
+                                />
+                            </div>
+                        </form>
+                    </div>
+
+                    {/* Right side: Navigation buttons and user menu */}
+                    <div className="flex items-center gap-3">
+                        {/* Navigation Links */}
+                        <button
+                            onClick={() => router.push('/discover')}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all hidden md:block"
+                        >
+                            Khám phá
+                        </button>
+
+                        <button
+                            onClick={() => router.push('/create-fund')}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all hidden md:block"
+                        >
+                            Tạo quỹ
+                        </button>
+
+                        {/* Create Campaign Button - Highlighted */}
+                        <button
+                            onClick={() => router.push('/create-campaign')}
+                            className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hidden sm:block"
+                        >
+                            Tạo chiến dịch
+                        </button>
+
+                        {/* Icon Buttons */}
+                        <button
+                            onClick={() => router.push('/messages')}
+                            className="w-10 h-10 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all relative"
+                            aria-label="Messages"
+                        >
+                            <MessageCircle className="w-5 h-5" />
+                            {/* Notification badge example */}
+                            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                        </button>
+
+                        <button
+                            onClick={() => router.push('/notifications')}
+                            className="w-10 h-10 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all relative"
+                            aria-label="Notifications"
+                        >
+                            <Bell className="w-5 h-5" />
+                            {/* Notification badge example */}
+                            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                        </button>
+
+                        {/* User Avatar with Dropdown */}
+                        {isAuthenticated && user ? (
+                            <div className="relative group">
+                                <button
+                                    className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-semibold hover:ring-2 hover:ring-emerald-400 hover:ring-offset-2 transition-all"
+                                    aria-label="User menu"
+                                >
+                                    {user.username ? user.username.charAt(0).toUpperCase() : 'U'}
+                                </button>
+
+                                {/* Dropdown Menu */}
+                                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-2">
+                                    <div className="px-4 py-3 border-b border-gray-100">
+                                        <p className="text-sm font-semibold text-gray-900">
+                                            {user.username || 'User'}
+                                        </p>
+                                        <p className="text-xs text-gray-500 truncate">
+                                            {user.email}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => router.push('/profile')}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        Hồ sơ của tôi
+                                    </button>
+                                    <button
+                                        onClick={() => router.push('/my-campaigns')}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        Chiến dịch của tôi
+                                    </button>
+                                    <button
+                                        onClick={() => router.push('/settings')}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cài đặt
+                                    </button>
+                                    <div className="border-t border-gray-100 mt-2 pt-2">
+                                        <button
+                                            onClick={() => {
+                                                // Handle logout
+                                                router.push('/login');
+                                            }}
+                                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                        >
+                                            Đăng xuất
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => router.push('/login')}
+                                className="px-4 py-2 text-sm font-medium text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors"
+                            >
+                                Đăng nhập
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </header>
+    );
 }

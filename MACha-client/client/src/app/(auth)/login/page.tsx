@@ -1,27 +1,34 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { LOGIN_ROUTE } from '@/constants/api';
 import apiClient from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 import Image from 'next/image';
 import Link from 'next/link';
 import Swal from 'sweetalert2';
+import { loginSchema, type LoginFormData } from '@/schemas/auth.schema';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+  
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    mode: 'onBlur', 
+  });
 
-  const handleLogin = async () => {
-    setLoading(true);
+  const onSubmit = async (data: LoginFormData) => {
     try {
       const res = await apiClient.post(
         LOGIN_ROUTE,
-        { email, password },
+        data,
         { withCredentials: true }
       );
       if (res.data.success || res.data.user?.id) {
@@ -42,14 +49,6 @@ export default function LoginPage() {
         icon: 'error',
         confirmButtonText: 'OK'
       });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !loading) {
-      handleLogin();
     }
   }
   
@@ -80,6 +79,7 @@ export default function LoginPage() {
           <div className="max-w-md w-full mx-auto">
             <h2 className="text-4xl font-bold text-gray-900 mb-8">Log in</h2>
             
+            <form onSubmit={handleSubmit(onSubmit)}>
             {/* Email Input */}
             <div className="mb-6">
               <label htmlFor="email" className="block text-gray-900 font-medium mb-2">
@@ -88,13 +88,18 @@ export default function LoginPage() {
               <input
                 id="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={handleKeyPress}
+                {...register('email')}
                 placeholder="Email"
-                className="w-full px-6 py-4 border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 transition-colors text-gray-900"
-                disabled={loading}
+                className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${
+                  errors.email 
+                    ? 'border-red-500 focus:border-red-500' 
+                    : 'border-gray-300 focus:border-blue-500'
+                }`}
+                disabled={isSubmitting}
               />
+              {errors.email && (
+                <p className="mt-2 text-sm text-red-600">{errors.email.message}</p>
+              )}
             </div>
 
             {/* Password Input */}
@@ -105,13 +110,18 @@ export default function LoginPage() {
               <input
                 id="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={handleKeyPress}
+                {...register('password')}
                 placeholder="Password"
-                className="w-full px-6 py-4 border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 transition-colors text-gray-900"
-                disabled={loading}
+                className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${
+                  errors.password 
+                    ? 'border-red-500 focus:border-red-500' 
+                    : 'border-gray-300 focus:border-blue-500'
+                }`}
+                disabled={isSubmitting}
               />
+              {errors.password && (
+                <p className="mt-2 text-sm text-red-600">{errors.password.message}</p>
+              )}
             </div>
 
             {/* Forgot Password Link */}
@@ -123,11 +133,11 @@ export default function LoginPage() {
 
             {/* Login Button */}
             <button
-              onClick={handleLogin}
-              disabled={loading}
+              type="submit"
+              disabled={isSubmitting}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-2xl transition-all disabled:bg-blue-400 disabled:cursor-not-allowed mb-12 flex items-center justify-center gap-2"
             >
-              {loading && (
+              {isSubmitting && (
                 <svg 
                   className="animate-spin h-5 w-5 text-white" 
                   xmlns="http://www.w3.org/2000/svg" 
@@ -149,8 +159,9 @@ export default function LoginPage() {
                   ></path>
                 </svg>
               )}
-              <span>{loading ? 'Đang đăng nhập...' : 'Log in'}</span>
+              <span>{isSubmitting ? 'Logging in...' : 'Log in'}</span>
             </button>
+            </form>
 
             {/* Sign Up Section */}
             <div className="text-center w-full">
