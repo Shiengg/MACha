@@ -46,7 +46,11 @@ export const createPost = async (req, res) => {
 
 export const getPosts = async (req, res) => {
     try {
-        const posts = await Post.find().populate("user", "username avatar").sort({ createdAt: -1 });
+        const posts = await Post.find()
+            .populate("user", "username avatar")
+            .populate("hashtags", "name")
+            .populate("campaign_id", "title")
+            .sort({ createdAt: -1 });
         return res.status(HTTP_STATUS.OK).json(posts);
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
@@ -55,7 +59,10 @@ export const getPosts = async (req, res) => {
 
 export const getPostById = async (req, res) => {
     try {
-        const post = await Post.findById(req.params.id).populate("user", "username avatar");
+        const post = await Post.findById(req.params.id)
+            .populate("user", "username avatar")
+            .populate("hashtags", "name")
+            .populate("campaign_id", "title");
 
         if (!post) {
             return res.status(HTTP_STATUS.NOT_FOUND).json({ message: HTTP_STATUS_TEXT.NOT_FOUND })

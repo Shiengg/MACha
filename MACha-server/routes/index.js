@@ -6,6 +6,7 @@ import likeRoutes from "./LikeRoute.js";
 import campaignRoutes from "./CampaignRoute.js";
 import donationRoutes from "./DonationRoute.js";
 import notificationRoute from "./NotificationRoute.js";
+import hashtagRoutes from "./HashtagRoute.js";
 
 export {
     authRoutes,
@@ -15,5 +16,6 @@ export {
     likeRoutes,
     campaignRoutes,
     donationRoutes,
-    notificationRoute
+    notificationRoute,
+    hashtagRoutes
 }

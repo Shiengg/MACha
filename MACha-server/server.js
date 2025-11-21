@@ -12,7 +12,8 @@ import {
     likeRoutes,
     campaignRoutes,
     donationRoutes,
-    notificationRoute
+    notificationRoute,
+    hashtagRoutes
 } from './routes/index.js';
 
 const app = express();
@@ -38,6 +39,7 @@ app.use("/api/likes", likeRoutes);
 app.use("/api/campaigns", campaignRoutes);
 app.use("/api/donations", donationRoutes);
 app.use("/api/notifications", notificationRoute);
+app.use("/api/hashtags", hashtagRoutes);
 
 // Example endpoint
 /**
