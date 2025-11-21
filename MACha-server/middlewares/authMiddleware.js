@@ -4,15 +4,25 @@ import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 
 export const authMiddleware = async (req, res, next) => {
     try {
-        const authHeader = req.headers.authorization;
+        let token = null;
 
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        // Try to get token from Authorization header first
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            token = authHeader.split(" ")[1];
+        }
+
+        // If no token in header, try to get from cookie
+        if (!token && req.cookies && req.cookies.jwt) {
+            token = req.cookies.jwt;
+        }
+
+        if (!token) {
             return res
                 .status(HTTP_STATUS.UNAUTHORIZED)
                 .json({ message: HTTP_STATUS_TEXT.UNAUTHORIZED });
         }
 
-        const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         const user = await User.findById(decoded.id).select("-password");

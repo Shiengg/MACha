@@ -25,7 +25,7 @@ export default function LoginPage() {
         { withCredentials: true }
       );
       if (res.data.success || res.data.user?.id) {
-        login();
+        await login();
         Swal.fire({
           title: 'Login successful!',
           text: 'You are logged in',
@@ -90,7 +90,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyPress}
                 placeholder="Email"
                 className="w-full px-6 py-4 border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 transition-colors text-gray-900"
                 disabled={loading}
@@ -107,7 +107,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyPress}
                 placeholder="Password"
                 className="w-full px-6 py-4 border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 transition-colors text-gray-900"
                 disabled={loading}

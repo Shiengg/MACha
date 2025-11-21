@@ -75,6 +75,7 @@ export const login = async (req, res) => {
         res.cookie("jwt", createToken(user.id, user.username, user.role, user.fullname), {
             maxAgeMili,
             secure: true,
+            httpOnly: true,
             sameSite: "None"
         })
         return res.status(HTTP_STATUS.OK).json({
@@ -141,10 +142,10 @@ export const updateUser = async (req, res) => {
         // Kiểm tra các field không được phép
         const requestFields = Object.keys(req.body);
         const invalidFields = requestFields.filter(field => !allowedFields.includes(field));
-        
+
         if (invalidFields.length > 0) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                message: `Invalid fields: ${invalidFields.join(', ')}. Allowed fields are: ${allowedFields.join(', ')}` 
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: `Invalid fields: ${invalidFields.join(', ')}. Allowed fields are: ${allowedFields.join(', ')}`
             });
         }
 

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { getTokenFromCookie, getUserFromToken, isAuthenticated, clearAuthToken } from "@/lib/auth";
+import apiClient from "@/lib/api-client";
+import { GET_CURRENT_USER_ROUTE, LOGOUT_ROUTE } from "@/constants/api";
 
 interface User {
     id: string;
@@ -14,7 +15,7 @@ interface User {
 interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
-    login: () => void;
+    login: () => Promise<void>;
     logout: () => void;
     loading: boolean;
     setUser: (user: User | null) => void;
@@ -26,23 +27,28 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(()=>{
-        const userData = getUserFromToken();
-        if (userData) {
-            setUser(userData as User);
+    const fetchCurrentUser = async () => {
+        try {
+            const res = await apiClient.get(GET_CURRENT_USER_ROUTE, { withCredentials: true });
+            if (res.data?.user) {
+                setUser(res.data.user as User);
+            }
+        } catch (error) {
+            console.error("Failed to fetch user:", error);
+            setUser(null);
         }
-        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchCurrentUser().finally(() => setLoading(false));
     }, []);
 
-    const login = () => {
-        const userData = getUserFromToken();
-        if (userData) {
-            setUser(userData as User);
-        }
+    const login = async () => {
+        await fetchCurrentUser();
     }
 
     const logout = () => {
-        clearAuthToken();
+        apiClient.post(LOGOUT_ROUTE, { withCredentials: true });
         setUser(null);
     }
     
