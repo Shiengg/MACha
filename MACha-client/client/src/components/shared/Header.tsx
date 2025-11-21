@@ -6,7 +6,7 @@ import { Search, Bell, MessageCircle } from "lucide-react";
 import { useState } from "react";
 
 export default function Header() {
-    const { user, isAuthenticated, loading } = useAuth();
+    const { user, isAuthenticated, loading, logout } = useAuth();
     const pathname = usePathname();
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
@@ -172,8 +172,8 @@ export default function Header() {
                                     </button>
                                     <div className="border-t border-gray-100 mt-2 pt-2">
                                         <button
-                                            onClick={() => {
-                                                // Handle logout
+                                            onClick={async () => {
+                                                await logout();
                                                 router.push('/login');
                                             }}
                                             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"

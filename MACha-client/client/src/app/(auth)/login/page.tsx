@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LOGIN_ROUTE } from '@/constants/api';
@@ -10,10 +10,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import Swal from 'sweetalert2';
 import { loginSchema, type LoginFormData } from '@/schemas/auth.schema';
+import PublicRoute from '@/components/guards/PublicRoute';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   const {
     register,
@@ -39,7 +41,10 @@ export default function LoginPage() {
           icon: 'success',
           confirmButtonText: 'OK'
         });
-        router.push('/');
+        
+        // Redirect về returnUrl nếu có, hoặc về trang chủ
+        const returnUrl = searchParams.get('returnUrl') || '/';
+        router.push(returnUrl);
       }
     } catch (error: any) {
       const message = error?.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại.";
@@ -181,3 +186,10 @@ export default function LoginPage() {
   );
 }
 
+export default function LoginPage() {
+  return (
+    <PublicRoute>
+      <LoginPageContent />
+    </PublicRoute>
+  );
+}

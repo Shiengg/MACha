@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SIGNUP_ROUTE } from '@/constants/api';
@@ -10,10 +10,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import Swal from 'sweetalert2';
 import { registerSchema, type RegisterFormData } from '@/schemas/auth.schema';
+import PublicRoute from '@/components/guards/PublicRoute';
 
-export default function SignupPage() {
+function SignupPageContent() {
     const { login } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     const {
         register,
@@ -40,7 +42,10 @@ export default function SignupPage() {
                     icon: 'success',
                     confirmButtonText: 'OK'
                 });
-                router.push('/');
+                
+                // Redirect về returnUrl nếu có, hoặc về trang chủ
+                const returnUrl = searchParams.get('returnUrl') || '/';
+                router.push(returnUrl);
             }
         } catch (error: any) {
             const message = error?.response?.data?.message || "Signup failed. Please try again.";
@@ -211,3 +216,10 @@ export default function SignupPage() {
     );
 }
 
+export default function SignupPage() {
+    return (
+        <PublicRoute>
+            <SignupPageContent />
+        </PublicRoute>
+    );
+}

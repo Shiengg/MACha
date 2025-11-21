@@ -37,8 +37,9 @@ export const signup = async (req, res) => {
 
         const user = await User.create({ username, email, password });
         res.cookie("jwt", createToken(user.id, user.username, user.role, user.fullname), {
-            maxAgeMili,
+            maxAge: maxAgeMili,
             secure: true,
+            httpOnly: true,
             sameSite: "None"
         })
         return res.status(HTTP_STATUS.CREATED).json({
@@ -73,7 +74,7 @@ export const login = async (req, res) => {
             return res.status(HTTP_STATUS.UNAUTHORIZED).json({ message: HTTP_STATUS_TEXT.LOGIN_FAILED })
         }
         res.cookie("jwt", createToken(user.id, user.username, user.role, user.fullname), {
-            maxAgeMili,
+            maxAge: maxAgeMili,
             secure: true,
             httpOnly: true,
             sameSite: "None"

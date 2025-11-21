@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import apiClient from "@/lib/api-client";
 import { GET_CURRENT_USER_ROUTE, LOGOUT_ROUTE } from "@/constants/api";
 
@@ -16,7 +17,7 @@ interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
     login: () => Promise<void>;
-    logout: () => void;
+    logout: () => Promise<void>;
     loading: boolean;
     setUser: (user: User | null) => void;
 }
@@ -32,10 +33,13 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             const res = await apiClient.get(GET_CURRENT_USER_ROUTE, { withCredentials: true });
             if (res.data?.user) {
                 setUser(res.data.user as User);
+                return true;
             }
+            return false;
         } catch (error) {
             console.error("Failed to fetch user:", error);
             setUser(null);
+            return false;
         }
     };
 
@@ -47,9 +51,15 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
         await fetchCurrentUser();
     }
 
-    const logout = () => {
-        apiClient.post(LOGOUT_ROUTE, { withCredentials: true });
-        setUser(null);
+    const logout = async () => {
+        try {
+            await apiClient.post(LOGOUT_ROUTE, {}, { withCredentials: true });
+            setUser(null);
+        } catch (error) {
+            console.error("Logout failed:", error);
+            // Even if the API call fails, clear the user locally
+            setUser(null);
+        }
     }
     
     return (
