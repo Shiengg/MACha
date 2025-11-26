@@ -31,7 +31,7 @@ export const unlikePost = async (req, res) => {
 export const getPostLikes = async (req, res) => {
     try {
         const postId = req.params.postId;
-        const likes = await Like.find({ post: postId }).populate("user", "username avatar_url");
+        const likes = await Like.find({ post: postId }).populate("user", "username avatar");
 
         return res.status(HTTP_STATUS.OK).json({
             totalLikes: likes.length,

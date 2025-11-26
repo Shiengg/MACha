@@ -11,7 +11,6 @@ function HomeContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch posts từ API
   useEffect(() => {
     const fetchPosts = async () => {
       try {
@@ -30,20 +29,6 @@ function HomeContent() {
     fetchPosts();
   }, []);
 
-  const handleLike = (postId: string) => {
-    console.log('Liked post:', postId);
-    // TODO: Call API to like post
-  };
-
-  const handleComment = (postId: string) => {
-    console.log('Comment on post:', postId);
-    // TODO: Open comment modal or navigate to post detail
-  };
-
-  const handleShare = (postId: string) => {
-    console.log('Share post:', postId);
-    // TODO: Open share modal
-  };
 
   const handleDonate = (postId: string, campaignId?: string) => {
     console.log('Donate to post:', postId, 'Campaign:', campaignId);
@@ -118,9 +103,6 @@ function HomeContent() {
                   <PostCard
                     key={post._id}
                     post={post}
-                    onLike={handleLike}
-                    onComment={handleComment}
-                    onShare={handleShare}
                     onDonate={handleDonate}
                   />
                 ))}

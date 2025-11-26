@@ -15,3 +15,13 @@ export const GET_POSTS_BY_HASHTAG_ROUTE = (name: string) => `${POST_ROUTE}/hasht
 export const HASHTAG_ROUTE = "api/hashtags";
 export const GET_TRENDING_HASHTAGS_ROUTE = `${HASHTAG_ROUTE}/trending`;
 export const GET_ALL_HASHTAGS_ROUTE = `${HASHTAG_ROUTE}`;
+
+export const LIKE_ROUTE = "api/likes";
+export const LIKE_POST_ROUTE = (postId: string) => `${LIKE_ROUTE}/${postId}/like`;
+export const UNLIKE_POST_ROUTE = (postId: string) => `${LIKE_ROUTE}/${postId}/unlike`;
+export const GET_POST_LIKES_ROUTE = (postId: string) => `${LIKE_ROUTE}/${postId}/likes`;
+
+export const COMMENT_ROUTE = "api/comments";
+export const ADD_COMMENT_ROUTE = (postId: string) => `${COMMENT_ROUTE}/${postId}/comments`;
+export const GET_COMMENTS_ROUTE = (postId: string) => `${COMMENT_ROUTE}/${postId}/comments`;
+export const DELETE_COMMENT_ROUTE = (commentId: string) => `${COMMENT_ROUTE}/comments/${commentId}`;

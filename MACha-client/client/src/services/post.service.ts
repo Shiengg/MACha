@@ -6,12 +6,14 @@ import {
   DELETE_POST_ROUTE,
   SEARCH_POSTS_BY_HASHTAG_ROUTE,
   GET_POSTS_BY_HASHTAG_ROUTE,
+  LIKE_POST_ROUTE,
+  UNLIKE_POST_ROUTE,
 } from "@/constants/api";
 
 export interface User {
   _id: string;
   username: string;
-  avatar?: string; // Backend dùng 'avatar', không phải 'avatar_url'
+  avatar?: string; 
 }
 
 export interface Hashtag {
@@ -127,3 +129,20 @@ export const getPostsByHashtag = async (
   }
 };
 
+export const toggleLikePost = async (
+  postId: string,
+  isLiked: boolean
+): Promise<{ message: string }> => {
+  try {
+    const route = isLiked ? UNLIKE_POST_ROUTE(postId) : LIKE_POST_ROUTE(postId);
+    const response = await apiClient.post(route);
+    return response.data;
+  } catch (error: any) {
+    console.error(`Error toggling like for post ${postId}:`, error);
+    // Better error message
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
+    throw error;
+  }
+};

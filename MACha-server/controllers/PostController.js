@@ -34,11 +34,19 @@ export const createPost = async (req, res) => {
         });
 
         const populatedPost = await post.populate([
-            { path: "user", select: "username avatar_url" },
+            { path: "user", select: "username avatar" },
             { path: "hashtags", select: "name" },
+            { path: "campaign_id", select: "title" },
         ]);
 
-        return res.status(HTTP_STATUS.CREATED).json({ populatedPost })
+        const postWithCounts = {
+            ...populatedPost.toObject(),
+            likesCount: 0,
+            commentsCount: 0,
+            isLiked: false,
+        };
+
+        return res.status(HTTP_STATUS.CREATED).json({ populatedPost: postWithCounts })
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
     }
@@ -51,7 +59,28 @@ export const getPosts = async (req, res) => {
             .populate("hashtags", "name")
             .populate("campaign_id", "title")
             .sort({ createdAt: -1 });
-        return res.status(HTTP_STATUS.OK).json(posts);
+
+        const postsWithCounts = await Promise.all(
+            posts.map(async (post) => {
+                const likesCount = await Like.countDocuments({ post: post._id });
+                const commentsCount = await Comment.countDocuments({ post: post._id });
+                
+                let isLiked = false;
+                if (req.user) {
+                    const like = await Like.findOne({ post: post._id, user: req.user._id });
+                    isLiked = !!like;
+                }
+
+                return {
+                    ...post.toObject(),
+                    likesCount,
+                    commentsCount,
+                    isLiked,
+                };
+            })
+        );
+
+        return res.status(HTTP_STATUS.OK).json(postsWithCounts);
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
     }
@@ -68,7 +97,21 @@ export const getPostById = async (req, res) => {
             return res.status(HTTP_STATUS.NOT_FOUND).json({ message: HTTP_STATUS_TEXT.NOT_FOUND })
         }
 
-        return res.status(HTTP_STATUS.OK).json(post);
+        const likesCount = await Like.countDocuments({ post: post._id });
+        const commentsCount = await Comment.countDocuments({ post: post._id });
+        
+        let isLiked = false;
+        if (req.user) {
+            const like = await Like.findOne({ post: post._id, user: req.user._id });
+            isLiked = !!like;
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            ...post.toObject(),
+            likesCount,
+            commentsCount,
+            isLiked,
+        });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
     }
@@ -108,9 +151,30 @@ export const getPostsByHashtag = async (req, res) => {
         const posts = await Post.find({ hashtags: hashtag._id })
             .populate("user", "username avatar")
             .populate("hashtags", "name")
-            .sort({ created_at: -1 });
+            .populate("campaign_id", "title")
+            .sort({ createdAt: -1 });
 
-        return res.status(HTTP_STATUS.OK).json({ count: posts.length, posts });
+        const postsWithCounts = await Promise.all(
+            posts.map(async (post) => {
+                const likesCount = await Like.countDocuments({ post: post._id });
+                const commentsCount = await Comment.countDocuments({ post: post._id });
+                
+                let isLiked = false;
+                if (req.user) {
+                    const like = await Like.findOne({ post: post._id, user: req.user._id });
+                    isLiked = !!like;
+                }
+
+                return {
+                    ...post.toObject(),
+                    likesCount,
+                    commentsCount,
+                    isLiked,
+                };
+            })
+        );
+
+        return res.status(HTTP_STATUS.OK).json({ count: postsWithCounts.length, posts: postsWithCounts });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
     }
@@ -136,11 +200,32 @@ export const searchPostsByHashtag = async (req, res) => {
         const hashtagIds = matchingHashtags.map((h) => h._id);
 
         const posts = await Post.find({ hashtags: { $in: hashtagIds } })
-            .populate("user", "username avatar_url")
+            .populate("user", "username avatar")
             .populate("hashtags", "name")
-            .sort({ created_at: -1 });
+            .populate("campaign_id", "title")
+            .sort({ createdAt: -1 });
 
-        return res.status(HTTP_STATUS.OK).json({ count: posts.length, posts });
+        const postsWithCounts = await Promise.all(
+            posts.map(async (post) => {
+                const likesCount = await Like.countDocuments({ post: post._id });
+                const commentsCount = await Comment.countDocuments({ post: post._id });
+                
+                let isLiked = false;
+                if (req.user) {
+                    const like = await Like.findOne({ post: post._id, user: req.user._id });
+                    isLiked = !!like;
+                }
+
+                return {
+                    ...post.toObject(),
+                    likesCount,
+                    commentsCount,
+                    isLiked,
+                };
+            })
+        );
+
+        return res.status(HTTP_STATUS.OK).json({ count: postsWithCounts.length, posts: postsWithCounts });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
     }

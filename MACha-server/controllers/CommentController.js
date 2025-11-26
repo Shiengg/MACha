@@ -15,7 +15,9 @@ export const addComment = async (req, res) => {
             content_text
         })
 
-        return res.status(HTTP_STATUS.CREATED).json(comment);
+        const populatedComment = await comment.populate("user", "username avatar");
+
+        return res.status(HTTP_STATUS.CREATED).json(populatedComment);
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
     }
@@ -24,7 +26,7 @@ export const addComment = async (req, res) => {
 export const getComments = async (req, res) => {
     try {
         const comments = await Comment.find({ post: req.params.postId })
-            .populate("user", "username avatar_url")
+            .populate("user", "username avatar")
             .sort({ createdAt: -1 });
 
         return res.status(HTTP_STATUS.OK).json(comments);

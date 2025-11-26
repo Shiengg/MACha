@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { Heart, MessageCircle, Share2, DollarSign, MoreHorizontal } from 'lucide-react';
 import Image from 'next/image';
+import { toggleLikePost } from '@/services/post.service';
+import CommentModal from './CommentModal';
 
 interface PostCardProps {
   post: {
@@ -36,16 +38,46 @@ interface PostCardProps {
 export default function PostCard({ post, onLike, onComment, onShare, onDonate }: PostCardProps) {
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
   const [likesCount, setLikesCount] = useState(post.likesCount || 0);
+  const [commentsCount, setCommentsCount] = useState(post.commentsCount || 0);
   const [showFullText, setShowFullText] = useState(false);
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
 
-  const handleLike = () => {
+  const handleLike = async () => {
+    if (isLiking) return;
+    
+    const previousState = isLiked;
+    const previousCount = likesCount;
+    
+    // Optimistic update
     setIsLiked(!isLiked);
     setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
-    onLike?.(post._id);
+    
+    setIsLiking(true);
+    try {
+      await toggleLikePost(post._id, previousState);
+      onLike?.(post._id);
+    } catch (error: any) {
+      console.error('Error toggling like:', error);
+      // Revert on error
+      setIsLiked(previousState);
+      setLikesCount(previousCount);
+      
+      // Show error message to user
+      const errorMessage = error?.message || 'Có lỗi xảy ra khi thực hiện hành động này';
+      alert(errorMessage);
+    } finally {
+      setIsLiking(false);
+    }
   };
 
   const handleComment = () => {
+    setShowCommentModal(true);
     onComment?.(post._id);
+  };
+
+  const handleCommentAdded = () => {
+    setCommentsCount(commentsCount + 1);
   };
 
   const handleShare = () => {
@@ -213,9 +245,12 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
           )}
         </div>
         <div className="flex items-center gap-4">
-          {(post.commentsCount ?? 0) > 0 && (
-            <span className="cursor-pointer hover:underline">
-              {post.commentsCount} bình luận
+          {commentsCount > 0 && (
+            <span 
+              onClick={handleComment}
+              className="cursor-pointer hover:underline"
+            >
+              {commentsCount} bình luận
             </span>
           )}
         </div>
@@ -261,6 +296,14 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
           <span>Quyên góp</span>
         </button>
       </div>
+
+      {/* Comment Modal */}
+      <CommentModal
+        postId={post._id}
+        isOpen={showCommentModal}
+        onClose={() => setShowCommentModal(false)}
+        onCommentAdded={handleCommentAdded}
+      />
     </div>
   );
 }
