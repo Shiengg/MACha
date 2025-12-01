@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import connectDB from './config/db.js';
+import { connectRedis } from './config/redis.js';
 import { setupSwagger } from './docs/swagger.js';
 import {
     authRoutes,
@@ -23,6 +24,7 @@ dotenv.config();
 
 connectDB();
 setupSwagger(app);
+connectRedis();
 
 // CORS phải được cấu hình TRƯỚC tất cả các routes
 app.use(cors({
