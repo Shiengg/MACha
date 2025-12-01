@@ -154,8 +154,8 @@ export const incrementFailedLoginAttempts = async (email) => {
     // Nếu đạt 5 lần thất bại, khóa tài khoản
     if (attempts >= 5) {
         const lockKey = `login_lock:${email}`;
-        // Khóa tài khoản trong 10 giây
-        await redisClient.setEx(lockKey, 10, "locked");
+        // Khóa tài khoản trong 2 phút
+        await redisClient.setEx(lockKey, 120, "locked");
     }
     
     return attempts;
