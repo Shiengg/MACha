@@ -3,6 +3,8 @@ import { compare } from "bcryptjs";
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as authService from "../services/auth.service.js";
 import { redisClient } from "../config/redis.js";
+import * as trackingService from "../services/tracking.service.js";
+import * as queueService from "../services/queue.service.js";
 
 const maxAge = 3 * 24 * 60 * 60;
 const maxAgeMili = maxAge * 1000;
@@ -48,6 +50,10 @@ export const signup = async (req, res) => {
             httpOnly: true,
             sameSite: "None"
         });
+
+        await trackingService.publishSignUpEvent(user.id, {type:"SIGNUP", userId: user.id, timestamp: Date.now()});
+
+        await queueService.pushJob({type: "SIGNUP", userId: user.id, timestamp: Date.now()});
 
         return res.status(HTTP_STATUS.CREATED).json({
             user: {
