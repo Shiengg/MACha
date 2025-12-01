@@ -1,12 +1,13 @@
 import { Router } from "express";
-import { addComment, getComments, deleteComments } from "../controllers/commentController.js";
+import { addComment, getComments, deleteComment } from "../controllers/CommentController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 
 const commentRoutes = Router();
 
-commentRoutes.post('/:postId/comments', authMiddleware, addComment);
-commentRoutes.get('/:postId/comments', getComments);
-commentRoutes.delete('/comments/:commentId', authMiddleware, deleteComments);
+commentRoutes.post('/:postId/comments', authMiddleware, RateLimitMiddleware.rateLimitByUserId(10, 60), addComment);
+commentRoutes.get('/:postId/comments', RateLimitMiddleware.rateLimitByUserId(10, 60), getComments);
+commentRoutes.delete('/comments/:commentId', authMiddleware, RateLimitMiddleware.rateLimitByUserId(10, 60), deleteComment);
 
 /**
  * @swagger

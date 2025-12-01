@@ -118,17 +118,7 @@ export const login = async (req, res) => {
             });
         }
 
-        const rateKey = `rate_limit:${email}:auth`;
-        const rate = await redisClient.incr(rateKey);
-        const timeToLive = 10
-        if (rate === 1) {
-            await redisClient.expire(rateKey, timeToLive);
-        }
-        if (rate > 5 ) {
-            return res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({ 
-                message: `Đăng nhập quá nhiều lần. Vui lòng thử lại sau ${timeToLive} giây.`
-            });
-        }
+        // Reset failed login attempts khi đăng nhập thành công
         await authService.resetFailedLoginAttempts(email);
 
         res.cookie("jwt", createToken(user._id, user.username, user.role, user.fullname), {

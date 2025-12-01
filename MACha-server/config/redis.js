@@ -20,7 +20,7 @@ export const connectRedis = async () => {
 }
 
 //3 Create channel
-export const createChannel = async () => {
+export const createSubcriber = async () => {
     const sub = redisClient.duplicate();
     await sub.connect();
     return sub;

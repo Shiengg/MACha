@@ -28,10 +28,13 @@ async function processQueue() {
 
             console.log(`📦 Received job:`, job);
 
-            if (job.type === "SIGNUP") {
-                await handleSignUp(job);
-            } else {
-                console.log(`⚠️  Unknown job type: ${job.type}`);
+            switch (job.type) {
+                case "SIGNUP":
+                    await handleSignUp(job);
+                    break;
+                case "CAMPAIGN_CREATED":
+                    await handleCampaignCreated(job);
+                    break;
             }
         } catch (error) {
             console.error('❌ Error processing job:', error);
@@ -51,6 +54,19 @@ async function handleSignUp(job) {
         console.log(`✅ Signup job completed for user ${job.userId}\n`);
     } catch (error) {
         console.error('❌ Error processing signup job:', error);
+    }
+}
+
+async function handleCampaignCreated(job) {
+    try {
+        console.log(`✉️  Processing campaign created for campaign ${job.campaignId}...`);
+        
+        await sendEmail(job.userId, {
+            subject: "Campaign Created",
+            body: `Your campaign has been created successfully. You can now start fundraising.`
+        });
+    } catch (error) {
+        console.error('❌ Error processing campaign created job:', error);
     }
 }
 
