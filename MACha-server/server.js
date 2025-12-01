@@ -1,4 +1,6 @@
 import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -41,23 +43,29 @@ app.use("/api/donations", donationRoutes);
 app.use("/api/notifications", notificationRoute);
 app.use("/api/hashtags", hashtagRoutes);
 
-// Example endpoint
-/**
- * @swagger
- * /:
- *   get:
- *     summary: Welcome route
- *     description: Kiểm tra server hoạt động
- *     responses:
- *       200:
- *         description: Trả về thông báo chào mừng
- */
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: process.env.ORIGIN_URL || 'http://localhost:3000',
+    }
+});
+
 app.get('/', (req, res) => {
     res.send("MACha API is running");
 })
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log(`- Local:        http://localhost:${PORT}`)
-})
+server.listen(PORT, () => {
+    const cyan = '\x1b[36m';
+    const green = '\x1b[32m';
+    const reset = '\x1b[0m';
+    const bold = '\x1b[1m';
+
+    console.log('====================================================');
+    console.log(`${green}${bold}⚡  SERVER IS RUNNING!${reset}`);
+    console.log('====================================================');
+    console.log(`- Port:     ${bold}${PORT}${reset}`);
+    console.log(`- Local:    ${cyan}http://localhost:${PORT}${reset}`);
+    console.log(`- Time:     ${new Date().toLocaleString()}`);
+    console.log('====================================================');
+});
