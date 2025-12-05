@@ -63,7 +63,6 @@ const checkUserLiked = async (postId, userId) => {
     
     const likeKey = `post:liked:${postId}:${userId}`;
     
-    // Check cache
     const cached = await redisClient.get(likeKey);
     if (cached !== null) {
         return cached === 'true';

@@ -35,6 +35,19 @@ export const unlikePost = async (req, res) => {
         const unliked = await likeService.unlikePost(postId, req.user._id);
 
         if (!unliked) return res.status(HTTP_STATUS.NOT_FOUND).json({ message: "Like not found" });
+        try {
+            await trackingService.publishEvent("tracking:post:unliked", {
+                postId: postId,
+                userId: req.user._id,
+            });
+            await queueService.pushJob({
+                type: "POST_UNLIKED",
+                postId: postId,
+                userId: req.user._id
+            });
+        } catch (error) {
+            console.error('Error publishing event or pushing job:', error);
+        }
 
         return res.status(HTTP_STATUS.OK).json(unliked);
     } catch (error) {
