@@ -28,10 +28,16 @@ async function processQueue() {
 
             console.log(`📦 Received job:`, job);
 
-            if (job.type === "SIGNUP") {
-                await handleSignUp(job);
-            } else {
-                console.log(`⚠️  Unknown job type: ${job.type}`);
+            switch (job.type) {
+                case "SIGNUP":
+                    await handleSignUp(job);
+                    break;
+                case "CAMPAIGN_CREATED":
+                    await handleCampaignCreated(job);
+                    break;
+                case "POST_LIKED":
+                    await handlePostLiked(job);
+                    break;
             }
         } catch (error) {
             console.error('❌ Error processing job:', error);
@@ -42,16 +48,33 @@ async function processQueue() {
 async function handleSignUp(job) {
     try {
         console.log(`✉️  Processing signup for user ${job.userId}...`);
-        
+
         await sendEmail(job.userId, {
             subject: "Welcome to MACha!",
             body: `Welcome ${job.username || 'User'}! Thank you for signing up.`
         });
-        
+
         console.log(`✅ Signup job completed for user ${job.userId}\n`);
     } catch (error) {
         console.error('❌ Error processing signup job:', error);
     }
+}
+
+async function handleCampaignCreated(job) {
+    try {
+        console.log(`✉️  Processing campaign created for campaign ${job.campaignId}...`);
+
+        await sendEmail(job.userId, {
+            subject: "Campaign Created",
+            body: `Your campaign has been created successfully by ${job.userId}. You can now start fundraising.`
+        });
+    } catch (error) {
+        console.error('❌ Error processing campaign created job:', error);
+    }
+}
+
+async function handlePostLiked(job) {
+
 }
 
 async function sendEmail(userId, payload) {

@@ -19,6 +19,8 @@ import {
     hashtagRoutes
 } from './routes/index.js';
 
+import { initSubscribers } from './subscribers/initSubscriber.js';
+
 const app = express();
 dotenv.config();
 
@@ -55,6 +57,9 @@ const io = new Server(server, {
 app.get('/', (req, res) => {
     res.send("MACha API is running");
 })
+
+// Init subscribers (pass Socket.IO instance)
+initSubscribers(io);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

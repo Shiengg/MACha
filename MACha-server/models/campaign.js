@@ -35,6 +35,17 @@ const campaignSchema = new mongoose.Schema({
     },
     proof_documents_url: {
         type: String
+    },
+    media_url: [{
+        type: String
+    }],
+    cancellation_reason: {
+        type: String,
+        default: null
+    },
+    cancelled_at: {
+        type: Date,
+        default: null
     }
 },
     {
