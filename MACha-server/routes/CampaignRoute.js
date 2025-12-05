@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getAllCampaigns, getCampaignById, createCampaign, updateCampaign, deleteCampaign } from "../controllers/CampaignController.js";
+import { getAllCampaigns, getCampaignById, createCampaign, updateCampaign, deleteCampaign, cancelCampaign } from "../controllers/CampaignController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 
@@ -10,6 +10,7 @@ campaignRoutes.get('/:id', RateLimitMiddleware.rateLimitByIP(100, 60), getCampai
 campaignRoutes.post('/', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createCampaign);
 campaignRoutes.patch('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), updateCampaign);
 campaignRoutes.delete('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), deleteCampaign);
+campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), cancelCampaign);
 
 /**
  * @swagger

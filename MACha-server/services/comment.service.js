@@ -8,6 +8,12 @@ export const addComment = async (payload) => {
     // Populate user information
     await comment.populate("user", "username avatar");
     
+    // Invalidate related caches
+    await Promise.all([
+        redisClient.del(`comments:${payload.post}`),
+        redisClient.del(`post:counts:${payload.post}`),
+    ]);
+    
     return comment;
 }
 
@@ -26,15 +32,24 @@ export const getComments = async (postId) => {
     return comments;
 }
 
-export const deleteComment = async (commentId) => {
+export const deleteComment = async (commentId, userId) => {
     const comment = await Comment.findById(commentId);
     if (!comment) {
-        return null;
+        return { success: false, error: 'NOT_FOUND' };
     }
-
+    
+    // Check ownership in service
+    if (comment.user.toString() !== userId.toString()) {
+        return { success: false, error: 'FORBIDDEN' };
+    }
+    
     await comment.deleteOne();
-    console.log(`Deleted comment ${commentId}`);
-    await redisClient.del(`comments:${comment.post}`);
-    console.log(`Deleted comments cache for post ${comment.post}`);
-    return comment;
+    
+    // Invalidate related caches
+    await Promise.all([
+        redisClient.del(`comments:${comment.post}`),
+        redisClient.del(`post:counts:${comment.post}`),
+    ]);
+    
+    return { success: true };
 }

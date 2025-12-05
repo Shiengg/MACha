@@ -27,16 +27,16 @@ export const signup = async (req, res) => {
         }
 
         if (password.length < 6) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                message: "Password must be at least 6 characters long." 
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Password must be at least 6 characters long."
             });
         }
 
         // Kiểm tra user đã tồn tại
         const userExists = await authService.checkUserExists(username, email);
         if (userExists) {
-            return res.status(HTTP_STATUS.CONFLICT).json({ 
-                message: "User is existed" 
+            return res.status(HTTP_STATUS.CONFLICT).json({
+                message: "User is existed"
             });
         }
 
@@ -51,9 +51,9 @@ export const signup = async (req, res) => {
             sameSite: "None"
         });
 
-        await trackingService.publishSignUpEvent(user.id, {type:"SIGNUP", userId: user.id, timestamp: Date.now()});
+        await trackingService.publishSignUpEvent(user.id, { type: "SIGNUP", userId: user.id, timestamp: Date.now() });
 
-        await queueService.pushJob({type: "SIGNUP", userId: user.id, timestamp: Date.now()});
+        await queueService.pushJob({ type: "SIGNUP", userId: user.id, timestamp: Date.now() });
 
         return res.status(HTTP_STATUS.CREATED).json({
             user: {
@@ -64,8 +64,8 @@ export const signup = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
-            message: error.message 
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message
         });
     }
 }
@@ -76,15 +76,15 @@ export const login = async (req, res) => {
 
         // Validation
         if (!email || !password) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                message: "Email and password are required." 
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Email and password are required."
             });
         }
         // Kiểm tra xem tài khoản có bị khóa tạm thời không
         const isLocked = await authService.isAccountLocked(email);
         if (isLocked) {
-            return res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({ 
-                message: "Tài khoản tạm thời bị khóa do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 2 phút." 
+            return res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
+                message: "Tài khoản tạm thời bị khóa do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 2 phút."
             });
         }
 
@@ -93,8 +93,8 @@ export const login = async (req, res) => {
         if (!user) {
             const attempts = await authService.incrementFailedLoginAttempts(email);
             const remainingAttempts = 5 - attempts;
-            
-            return res.status(HTTP_STATUS.UNAUTHORIZED).json({ 
+
+            return res.status(HTTP_STATUS.UNAUTHORIZED).json({
                 message: HTTP_STATUS_TEXT.LOGIN_FAILED,
                 remainingAttempts: remainingAttempts > 0 ? remainingAttempts : 0
             });
@@ -104,15 +104,15 @@ export const login = async (req, res) => {
         if (!isPasswordValid) {
             const attempts = await authService.incrementFailedLoginAttempts(email);
             const remainingAttempts = 5 - attempts;
-            
+
             if (attempts >= 5) {
-                return res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({ 
+                return res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
                     message: "Bạn đã đăng nhập sai 5 lần. Tài khoản tạm thời bị khóa.",
                     remainingAttempts: 0
                 });
             }
-            
-            return res.status(HTTP_STATUS.UNAUTHORIZED).json({ 
+
+            return res.status(HTTP_STATUS.UNAUTHORIZED).json({
                 message: HTTP_STATUS_TEXT.LOGIN_FAILED,
                 remainingAttempts: remainingAttempts > 0 ? remainingAttempts : 0
             });
@@ -137,8 +137,8 @@ export const login = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
-            message: error.message 
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message
         });
     }
 }
@@ -186,8 +186,8 @@ export const updateUser = async (req, res) => {
 
         // Authorization: Chỉ cho phép user tự update hoặc admin
         if (req.user._id.toString() !== id && req.user.role !== "admin") {
-            return res.status(HTTP_STATUS.FORBIDDEN).json({ 
-                message: HTTP_STATUS_TEXT.FORBIDDEN 
+            return res.status(HTTP_STATUS.FORBIDDEN).json({
+                message: HTTP_STATUS_TEXT.FORBIDDEN
             });
         }
 
@@ -212,15 +212,15 @@ export const updateUser = async (req, res) => {
         const updatedUser = await authService.updateUserById(id, validation.updates);
 
         if (!updatedUser) {
-            return res.status(HTTP_STATUS.NOT_FOUND).json({ 
-                message: HTTP_STATUS_TEXT.NOT_FOUND 
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                message: HTTP_STATUS_TEXT.NOT_FOUND
             });
         }
 
         return res.status(HTTP_STATUS.OK).json({ user: updatedUser });
     } catch (error) {
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
-            message: error.message 
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message
         });
     }
 }

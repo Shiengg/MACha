@@ -33,17 +33,17 @@ export const getComments = async (req, res) => {
 
 export const deleteComment = async (req, res) => {
     try {
-        const comment = await commentService.deleteComment(req.params.commentId);
+        const result = await commentService.deleteComment(req.params.commentId, req.user._id);
 
-        if (!comment) {
-            return res.status(HTTP_STATUS.NOT_FOUND).json({ message: "Comment not found" });
+        if (!result.success) {
+            if (result.error === 'NOT_FOUND') {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({ message: "Comment not found" });
+            }
+            if (result.error === 'FORBIDDEN') {
+                return res.status(HTTP_STATUS.FORBIDDEN).json({ message: HTTP_STATUS_TEXT.FORBIDDEN });
+            }
         }
 
-        if (comment.user.toString() !== req.user._id.toString()) {
-            return res.status(HTTP_STATUS.FORBIDDEN).json({ message: HTTP_STATUS_TEXT.FORBIDDEN });
-        }
-
-        await comment.deleteOne();
         return res.status(HTTP_STATUS.OK).json({ message: "Comment deleted" });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })

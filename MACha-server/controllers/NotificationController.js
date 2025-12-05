@@ -1,9 +1,9 @@
-import Notification from "../models/notification.js";
 import { HTTP_STATUS } from "../utils/status.js";
+import * as notificationService from "../services/notification.service.js";
 
 export const createNotification = async ({ receiver, sender, type, message, post, campaign }) => {
     try {
-        await Notification.create({ receiver, sender, type, message, post, campaign });
+        await notificationService.createNotification({ receiver, sender, type, message, post, campaign });
     } catch (error) {
         console.error("Error creating notification:", error.message);
     }
@@ -11,13 +11,9 @@ export const createNotification = async ({ receiver, sender, type, message, post
 
 export const getNotifications = async (req, res) => {
     try {
-        const notifications = await Notification.find({ receiver: req.user._id })
-            .populate("sender", "username avatar")
-            .populate("post", "content_text")
-            .populate("campaign", "title")
-            .sort({ created_at: -1 });
+        const notifications = await notificationService.getNotifications(req.user._id);
 
-        return res.status(HTTP_STATUS.OK).json({ count: notifications.length, notifications });
+        return res.status(HTTP_STATUS.OK).json({ notifications });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
     }
@@ -25,16 +21,8 @@ export const getNotifications = async (req, res) => {
 
 export const markAsRead = async (req, res) => {
     try {
-        const notification = await Notification.findOneAndUpdate(
-            { _id: req.params.id, receiver: req.user._id },
-            { is_read: true },
-            { new: true });
-
-        if (!notification) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: "Notification not found" })
-        }
-
-        return res.status(HTTP_STATUS.OK).json({ message: "Marked as read", notification })
+        const notification = await notificationService.markAsRead(req.params.id, req.user._id);
+        return res.status(HTTP_STATUS.OK).json({ notification })
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
     }
@@ -44,15 +32,8 @@ export const markAllAsRead = async (req, res) => {
     try {
         const userId = req.user._id;
 
-        const result = await Notification.updateMany(
-            { receiver: userId, is_read: false },
-            { $set: { is_read: true } }
-        );
-
-        return res.status(HTTP_STATUS.OK).json({
-            message: "All notifications marked as read",
-            modifiedCount: result.modifiedCount
-        })
+        const result = await notificationService.markAllAsRead(userId);
+        return res.status(HTTP_STATUS.OK).json({ result })
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
     }
@@ -63,13 +44,11 @@ export const deleteNotification = async (req, res) => {
         const { id } = req.params;
         const userId = req.user._id;
 
-        const notification = await Notification.findOne({ _id: id, receiver: userId });
+        const notification = await notificationService.deleteNotification(id, userId);
 
         if (!notification) {
             return res.status(HTTP_STATUS.NOT_FOUND).json({ message: "Notification not found or not authorized" });
         }
-
-        await Notification.deleteOne({ _id: id });
 
         return res.status(HTTP_STATUS.OK).json({ message: "Notification deleted successfully" });
     } catch (error) {
