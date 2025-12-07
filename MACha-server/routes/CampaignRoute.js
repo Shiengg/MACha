@@ -1,11 +1,12 @@
 import { Router } from "express";
-import { getAllCampaigns, getCampaignById, createCampaign, updateCampaign, deleteCampaign, cancelCampaign } from "../controllers/CampaignController.js";
+import { getAllCampaigns, getCampaignById, getCampaignsByCategory, createCampaign, updateCampaign, deleteCampaign, cancelCampaign } from "../controllers/CampaignController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 
 const campaignRoutes = Router();
 
 campaignRoutes.get('/', RateLimitMiddleware.rateLimitByIP(100, 60), getAllCampaigns);
+campaignRoutes.get('/category', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignsByCategory);
 campaignRoutes.get('/:id', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignById);
 campaignRoutes.post('/', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createCampaign);
 campaignRoutes.patch('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), updateCampaign);
@@ -39,6 +40,7 @@ campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimit
  *         - goal_amount
  *         - current_amount
  *         - start_date
+ *         - category
  *       properties:
  *         title:
  *           type: string
@@ -71,6 +73,11 @@ campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimit
  *           enum: ["active", "completed", "cancelled"]
  *           description: Campaign status
  *           example: "active"
+ *         category:
+ *           type: string
+ *           enum: ["children", "elderly", "poverty", "disaster", "medical", "education", "disability", "animal", "environment", "community", "other"]
+ *           description: Campaign category
+ *           example: "medical"
  *         proof_documents_url:
  *           type: string
  *           description: URL to proof documents
@@ -156,6 +163,11 @@ campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimit
  *           enum: ["active", "completed", "cancelled"]
  *           description: Campaign status
  *           example: "active"
+ *         category:
+ *           type: string
+ *           enum: ["children", "elderly", "poverty", "disaster", "medical", "education", "disability", "animal", "environment", "community", "other"]
+ *           description: Campaign category
+ *           example: "medical"
  *         proof_documents_url:
  *           type: string
  *           description: URL to proof documents
@@ -191,6 +203,155 @@ campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimit
  *       properties:
  *         campaign:
  *           $ref: '#/components/schemas/CampaignResponse'
+ */
+
+/**
+ * @swagger
+ * /api/campaigns/category:
+ *   get:
+ *     summary: Get campaigns by category
+ *     description: Retrieves all active campaigns filtered by a specific category. Returns campaigns sorted by creation date (newest first) with populated creator information.
+ *     tags:
+ *       - Campaigns
+ *     parameters:
+ *       - in: query
+ *         name: category
+ *         required: true
+ *         description: Category to filter campaigns by
+ *         schema:
+ *           type: string
+ *           enum:
+ *             - children
+ *             - elderly
+ *             - poverty
+ *             - disaster
+ *             - medical
+ *             - education
+ *             - disability
+ *             - animal
+ *             - environment
+ *             - community
+ *             - other
+ *           example: "medical"
+ *     responses:
+ *       200:
+ *         description: Campaigns retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 category:
+ *                   type: string
+ *                   description: The category that was filtered
+ *                   example: "medical"
+ *                 count:
+ *                   type: number
+ *                   description: Number of campaigns found
+ *                   example: 3
+ *                 campaigns:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/CampaignResponse'
+ *             examples:
+ *               medical_campaigns:
+ *                 summary: Medical category campaigns
+ *                 value:
+ *                   category: "medical"
+ *                   count: 2
+ *                   campaigns:
+ *                     - _id: "64a7b8c9d1e2f3a4b5c6d7e8"
+ *                       creator:
+ *                         _id: "64a7b8c9d1e2f3a4b5c6d7e9"
+ *                         username: "dr_nguyen"
+ *                         avatar: "https://example.com/dr-nguyen.jpg"
+ *                       title: "Emergency Surgery Fund for Children"
+ *                       description: "Help children in need of urgent medical procedures"
+ *                       goal_amount: 100000000
+ *                       current_amount: 25000000
+ *                       start_date: "2023-08-01T00:00:00.000Z"
+ *                       end_date: "2023-12-31T23:59:59.000Z"
+ *                       status: "active"
+ *                       category: "medical"
+ *                       createdAt: "2023-07-25T14:30:00.000Z"
+ *                       updatedAt: "2023-07-25T14:30:00.000Z"
+ *                     - _id: "64a7b8c9d1e2f3a4b5c6d7ea"
+ *                       creator:
+ *                         _id: "64a7b8c9d1e2f3a4b5c6d7eb"
+ *                         username: "health_foundation"
+ *                         avatar: "https://example.com/foundation.jpg"
+ *                       title: "Cancer Treatment Support"
+ *                       description: "Supporting cancer patients with treatment costs"
+ *                       goal_amount: 200000000
+ *                       current_amount: 75000000
+ *                       start_date: "2023-07-15T00:00:00.000Z"
+ *                       end_date: "2024-01-15T23:59:59.000Z"
+ *                       status: "active"
+ *                       category: "medical"
+ *                       createdAt: "2023-07-15T10:20:00.000Z"
+ *                       updatedAt: "2023-07-20T16:45:00.000Z"
+ *               empty_category:
+ *                 summary: No campaigns in category
+ *                 value:
+ *                   category: "animal"
+ *                   count: 0
+ *                   campaigns: []
+ *               disaster_campaigns:
+ *                 summary: Disaster relief campaigns
+ *                 value:
+ *                   category: "disaster"
+ *                   count: 1
+ *                   campaigns:
+ *                     - _id: "64a7b8c9d1e2f3a4b5c6d7ec"
+ *                       creator:
+ *                         _id: "64a7b8c9d1e2f3a4b5c6d7ed"
+ *                         username: "relief_org"
+ *                         avatar: "https://example.com/relief.jpg"
+ *                       title: "Flood Relief for Central Vietnam"
+ *                       description: "Emergency aid for families affected by flooding"
+ *                       goal_amount: 500000000
+ *                       current_amount: 150000000
+ *                       start_date: "2023-08-10T00:00:00.000Z"
+ *                       end_date: "2023-09-30T23:59:59.000Z"
+ *                       status: "active"
+ *                       category: "disaster"
+ *                       createdAt: "2023-08-10T08:00:00.000Z"
+ *                       updatedAt: "2023-08-15T12:30:00.000Z"
+ *       400:
+ *         description: Bad request - Missing or invalid category
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Category parameter is required"
+ *                 validCategories:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   example: ["children", "elderly", "poverty", "disaster", "medical", "education", "disability", "animal", "environment", "community", "other"]
+ *             examples:
+ *               missing_category:
+ *                 summary: Category parameter not provided
+ *                 value:
+ *                   message: "Category parameter is required"
+ *               invalid_category:
+ *                 summary: Invalid category value
+ *                 value:
+ *                   message: "Invalid category"
+ *                   validCategories: ["children", "elderly", "poverty", "disaster", "medical", "education", "disability", "animal", "environment", "community", "other"]
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Internal server error occurred"
  */
 
 /**

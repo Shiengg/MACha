@@ -58,6 +58,29 @@ export const createCampaign = async (payload) => {
     return campaign;
 }
 
+export const getCampaignsByCategory = async (category) => {
+    const campaignKey = `campaigns:category:${category}`;
+
+    // Check cache
+    const cached = await redisClient.get(campaignKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+
+    // Query database with filters
+    const campaigns = await Campaign.find({ 
+        category,
+        status: 'active' // Only return active campaigns
+    })
+    .populate("creator", "username avatar")
+    .sort({ createdAt: -1 }); // Newest first
+
+    // Save to cache (TTL: 5 minutes)
+    await redisClient.setEx(campaignKey, 300, JSON.stringify(campaigns));
+
+    return campaigns;
+}
+
 /**
  * Update campaign with restrictions after donations
  */

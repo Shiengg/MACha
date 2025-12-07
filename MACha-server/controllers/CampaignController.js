@@ -27,6 +27,41 @@ export const getCampaignById = async (req, res) => {
     }
 }
 
+export const getCampaignsByCategory = async (req, res) => {
+    try {
+        const { category } = req.query;
+
+        // Validate category
+        if (!category) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: "Category parameter is required" 
+            });
+        }
+
+        const validCategories = [
+            'children', 'elderly', 'poverty', 'disaster', 'medical', 
+            'education', 'disability', 'animal', 'environment', 'community', 'other'
+        ];
+
+        if (!validCategories.includes(category)) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: "Invalid category",
+                validCategories 
+            });
+        }
+
+        const campaigns = await campaignService.getCampaignsByCategory(category);
+
+        res.status(HTTP_STATUS.OK).json({ 
+            category,
+            count: campaigns.length,
+            campaigns 
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
+    }
+}
+
 export const createCampaign = async (req, res) => {
     try {
         const campaign = await campaignService.createCampaign({ ...req.body, creator: req.user._id });
@@ -43,6 +78,7 @@ export const createCampaign = async (req, res) => {
                 end_date: campaign.end_date,
                 status: campaign.status,
                 proof_documents_url: campaign.proof_documents_url,
+                category: campaign.category,
             });
             await queueService.pushJob({ 
                 type: "CAMPAIGN_CREATED", 
@@ -100,6 +136,7 @@ export const updateCampaign = async (req, res) => {
                 goal_amount: result.campaign.goal_amount,
                 current_amount: result.campaign.current_amount,
                 status: result.campaign.status,
+                category: result.campaign.category,
             });
         } catch (error) {
             console.error('Error publishing event:', error);
@@ -139,6 +176,7 @@ export const deleteCampaign = async (req, res) => {
             await trackingService.publishEvent("tracking:campaign:deleted", { 
                 campaignId: req.params.id, 
                 userId: req.user._id,
+                category: result.campaign.category,
             });
         } catch (error) {
             console.error('Error publishing event:', error);
@@ -183,7 +221,8 @@ export const cancelCampaign = async (req, res) => {
             await trackingService.publishEvent("tracking:campaign:cancelled", { 
                 campaignId: result.campaign._id, 
                 userId: req.user._id,
-                reason: reason || 'No reason provided'
+                reason: reason || 'No reason provided',
+                category: result.campaign.category,
             });
         } catch (error) {
             console.error('Error publishing event:', error);

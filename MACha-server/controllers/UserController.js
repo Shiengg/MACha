@@ -1,6 +1,23 @@
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as userService from "../services/user.service.js";
 
+export const getUserById = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const user = await userService.getUserById(userId);
+
+        if (!user) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json({ 
+                message: "User not found" 
+            });
+        }
+
+        return res.status(HTTP_STATUS.OK).json({ user });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
 export const followUser = async (req, res) => {
     try {
         const targetUserId = req.params.id;

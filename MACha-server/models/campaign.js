@@ -33,6 +33,24 @@ const campaignSchema = new mongoose.Schema({
         enum: ["active", "completed", "cancelled"],
         default: "active"
     },
+    category: {
+        type: String,
+        enum: [
+            "children",           // Trẻ em
+            "elderly",            // Người già
+            "poverty",            // Người nghèo
+            "disaster",           // Thiên tai (lũ lụt, bão, hạn hán)
+            "medical",            // Y tế, bệnh hiểm nghèo
+            "education",          // Giáo dục
+            "disability",         // Người khuyết tật
+            "animal",             // Động vật
+            "environment",        // Môi trường
+            "community",          // Cộng đồng
+            "other"              // Khác
+        ],
+        required: true,
+        index: true  
+    },
     proof_documents_url: {
         type: String
     },

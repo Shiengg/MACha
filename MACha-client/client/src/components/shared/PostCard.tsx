@@ -7,6 +7,7 @@ import { toggleLikePost } from '@/services/post.service';
 import CommentModal from './CommentModal';
 import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface PostCardProps {
   post: {
@@ -46,8 +47,12 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
   const [showFullText, setShowFullText] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
-  
+  const [isCommenting, setIsCommenting] = useState(false);
+
   const justLikedRef = useRef(false);
+  const justCommentedRef = useRef(false);
+  const router = useRouter();
+
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -94,12 +99,55 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
       setLikesCount((prev) => prev - 1);
     }
 
+    const handleCommentAddedEvent = (event: any) => {
+      // Chỉ xử lý nếu là bài viết hiện tại
+      if (event.postId !== post._id) return;
+      
+      const currentUserId = (user as any)?._id || user?.id;
+      
+      // Nếu là chính mình vừa comment (optimistic update đã xử lý rồi)
+      if (event.userId === currentUserId) {
+        console.log('👤 Đó là bạn vừa comment (đã optimistic update)');
+        justCommentedRef.current = false;
+        return;
+      }
+      
+      console.log('💬 Có người comment bài viết này:', event.postId);
+      console.log('📦 Comment:', event.content_text);
+      
+      // Cập nhật comment count
+      setCommentsCount((prev) => prev + 1);
+    }
+
+    const handleCommentDeletedEvent = (event: any) => {
+      // Chỉ xử lý nếu là bài viết hiện tại
+      if (event.postId !== post._id) return;
+
+      const currentUserId = (user as any)?._id || user?.id;
+
+      // Nếu là chính mình vừa xóa (optimistic update đã giảm count rồi)
+      if (event.userId === currentUserId) {
+        console.log('👤 Đó là bạn vừa xóa comment (đã optimistic update)');
+        justCommentedRef.current = false;
+        return;
+      }
+      
+      console.log('🗑️ Có người xóa comment:', event.commentId);
+      
+      // Giảm count cho người khác
+      setCommentsCount((prev) => Math.max(0, prev - 1));
+    }
+
     socket.on('post:liked', handlePostLiked);
     socket.on('post:unliked', handlePostUnliked);
+    socket.on('comment:added', handleCommentAddedEvent);
+    socket.on('comment:deleted', handleCommentDeletedEvent);
 
     return () => {
       socket.off('post:liked', handlePostLiked);
       socket.off('post:unliked', handlePostUnliked);
+      socket.off('comment:added', handleCommentAddedEvent);
+      socket.off('comment:deleted', handleCommentDeletedEvent);
     };
   }, [socket, isConnected, post._id, user]);
 
@@ -140,6 +188,13 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
 
   const handleCommentAdded = () => {
     setCommentsCount(commentsCount + 1);
+  };
+
+  const handleCommentDeleted = () => {
+    // Set flag để skip socket event
+    justCommentedRef.current = true;
+    // Giảm count ngay (optimistic update)
+    setCommentsCount((prev) => Math.max(0, prev - 1));
   };
 
   const handleShare = () => {
@@ -213,7 +268,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
             )}
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white hover:underline cursor-pointer">
+            <h3 onClick={() => router.push(`/profile/${post.user._id}`)} className="font-semibold text-gray-900 dark:text-white hover:underline cursor-pointer">
               {post.user.username}
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -365,6 +420,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
         isOpen={showCommentModal}
         onClose={() => setShowCommentModal(false)}
         onCommentAdded={handleCommentAdded}
+        onCommentDeleted={handleCommentDeleted}
       />
     </div>
   );

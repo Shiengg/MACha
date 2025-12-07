@@ -25,3 +25,12 @@ export const COMMENT_ROUTE = "api/comments";
 export const ADD_COMMENT_ROUTE = (postId: string) => `${COMMENT_ROUTE}/${postId}/comments`;
 export const GET_COMMENTS_ROUTE = (postId: string) => `${COMMENT_ROUTE}/${postId}/comments`;
 export const DELETE_COMMENT_ROUTE = (commentId: string) => `${COMMENT_ROUTE}/comments/${commentId}`;
+
+export const NOTIFICATION_ROUTE = "api/notifications";
+export const GET_NOTIFICATIONS_ROUTE = `${NOTIFICATION_ROUTE}`;
+export const MARK_AS_READ_ROUTE = (notificationId: string) => `${NOTIFICATION_ROUTE}/${notificationId}/read`;
+export const MARK_ALL_AS_READ_ROUTE = `${NOTIFICATION_ROUTE}/read-all`;
+export const DELETE_NOTIFICATION_ROUTE = (notificationId: string) => `${NOTIFICATION_ROUTE}/${notificationId}`;
+
+export const USER_ROUTE = "api/users";
+export const GET_USER_BY_ID_ROUTE = (userId: string) => `${USER_ROUTE}/${userId}`;

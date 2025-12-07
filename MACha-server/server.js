@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import jwt from 'jsonwebtoken';
 import connectDB from './config/db.js';
 import { connectRedis } from './config/redis.js';
 import { setupSwagger } from './docs/swagger.js';
@@ -20,6 +21,7 @@ import {
 } from './routes/index.js';
 
 import { initSubscribers } from './subscribers/initSubscriber.js';
+import User from './models/user.js';
 
 const app = express();
 dotenv.config();
@@ -54,12 +56,77 @@ const io = new Server(server, {
     }
 });
 
+// Socket.IO Authentication Middleware
+io.use(async (socket, next) => {
+    try {
+        let token = null;
+        
+        // Lấy token từ auth hoặc cookie (giống authMiddleware)
+        if (socket.handshake.auth.token) {
+            token = socket.handshake.auth.token;
+        } else if (socket.handshake.headers.cookie) {
+            const cookies = socket.handshake.headers.cookie.split('; ');
+            const jwtCookie = cookies.find(c => c.startsWith('jwt='));
+            if (jwtCookie) {
+                token = jwtCookie.split('=')[1];
+            }
+        }
+        
+        if (!token) {
+            console.log('⚠️  Socket connection without token');
+            return next(new Error('Authentication error'));
+        }
+        
+        // Verify token (giống authMiddleware)
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        // Lấy user (giống authMiddleware)
+        const user = await User.findById(decoded.id).select('-password');
+        if (!user) {
+            return next(new Error('User not found'));
+        }
+        
+        // Lưu vào socket
+        socket.userId = user._id.toString();
+        socket.user = user;
+        
+        console.log(`🔐 Socket authenticated: ${user.username} (${socket.userId})`);
+        next();
+    } catch (err) {
+        console.error('❌ Socket auth failed:', err.message);
+        next(new Error('Authentication error'));
+    }
+});
+
+// Socket.IO Connection Handler
+io.on('connection', (socket) => {
+    const userId = socket.userId;
+    const username = socket.user?.username;
+    
+    console.log(`✅ Socket connected: ${socket.id} (User: ${username})`);
+    
+    if (userId) {
+        const userRoom = `user:${userId}`;
+        socket.join(userRoom);
+        console.log(`🏠 User ${username} joined room: ${userRoom}`);
+        
+        socket.emit('room-joined', { room: userRoom, userId });
+    }
+    
+    socket.on('disconnect', () => {
+        console.log(`❌ Socket disconnected: ${socket.id} (User: ${username})`);
+    });
+});
+
 app.get('/', (req, res) => {
     res.send("MACha API is running");
 })
 
 // Init subscribers (pass Socket.IO instance)
 initSubscribers(io);
+
+// Export io để worker có thể dùng
+export { io };
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

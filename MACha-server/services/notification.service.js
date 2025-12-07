@@ -11,7 +11,8 @@ export const getNotifications = async (userId) => {
         .populate("sender", "username avatar")
         .populate("post", "content_text")
         .populate("campaign", "title")
-        .sort({ created_at: -1 });
+        .sort({ createdAt: -1 })
+        .limit(50); // Giới hạn 50 notifications gần nhất
     return notifications;
 }
 
