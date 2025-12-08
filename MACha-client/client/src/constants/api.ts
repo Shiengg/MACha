@@ -34,3 +34,17 @@ export const DELETE_NOTIFICATION_ROUTE = (notificationId: string) => `${NOTIFICA
 
 export const USER_ROUTE = "api/users";
 export const GET_USER_BY_ID_ROUTE = (userId: string) => `${USER_ROUTE}/${userId}`;
+
+export const CAMPAIGN_ROUTE = "api/campaigns";
+export const GET_ALL_CAMPAIGNS_ROUTE = `${CAMPAIGN_ROUTE}`;
+export const GET_CAMPAIGN_BY_ID_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}`;
+export const GET_PENDING_CAMPAIGNS_ROUTE = `${CAMPAIGN_ROUTE}/pending`;
+export const APPROVE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/approve`;
+export const REJECT_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/reject`;
+
+export const KYC_ROUTE = `${USER_ROUTE}/kyc`;
+export const GET_PENDING_KYC_ROUTE = `${KYC_ROUTE}/pending`;
+export const GET_KYC_DETAILS_ROUTE = (userId: string) => `${KYC_ROUTE}/${userId}/details`;
+export const APPROVE_KYC_ROUTE = (userId: string) => `${KYC_ROUTE}/${userId}/approve`;
+export const REJECT_KYC_ROUTE = (userId: string) => `${KYC_ROUTE}/${userId}/reject`;
+export const SUBMIT_KYC_ROUTE = `${KYC_ROUTE}/submit`;

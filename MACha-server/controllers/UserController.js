@@ -1,6 +1,19 @@
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as userService from "../services/user.service.js";
 
+export const getAllUsers = async (req, res) => {
+    try {
+        const users = await userService.getAllUsers();
+        
+        return res.status(HTTP_STATUS.OK).json({ 
+            count: users.length,
+            users 
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
 export const getUserById = async (req, res) => {
     try {
         const userId = req.params.id;

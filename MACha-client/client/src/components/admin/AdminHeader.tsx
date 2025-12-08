@@ -1,6 +1,9 @@
 'use client';
 
+import { useAuth } from '@/contexts/AuthContext';
+
 export default function AdminHeader() {
+  const { user } = useAuth();
   return (
     <div className="h-16 bg-[#1a1f2e] border-b border-gray-700 fixed top-0 right-0 left-64 z-10">
       <div className="h-full px-6 flex items-center justify-between">
@@ -42,12 +45,22 @@ export default function AdminHeader() {
 
           <div className="flex items-center gap-3 pl-4 border-l border-gray-700">
             <div className="text-right">
-              <div className="text-white font-medium text-sm">Admin Name</div>
-              <div className="text-gray-400 text-xs">Super Admin</div>
+              <div className="text-white font-medium text-sm">
+                {user?.username || user?.email || 'Admin'}
+              </div>
+              <div className="text-gray-400 text-xs capitalize">{user?.role || 'Admin'}</div>
             </div>
-            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-              A
-            </div>
+            {user?.avatar ? (
+              <img 
+                src={user.avatar} 
+                alt={user.username || 'Admin'} 
+                className="w-10 h-10 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                {(user?.username?.[0] || user?.email?.[0] || 'A').toUpperCase()}
+              </div>
+            )}
           </div>
         </div>
       </div>

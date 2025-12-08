@@ -1,8 +1,10 @@
+import AdminRoute from '@/components/guards/AdminRoute';
+
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <AdminRoute>{children}</AdminRoute>;
 }
 

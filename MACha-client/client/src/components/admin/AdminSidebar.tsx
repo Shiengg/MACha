@@ -1,10 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
 
   const menuItems = [
     { icon: '📊', label: 'Dashboard', href: '/admin/dashboard' },
@@ -46,7 +54,10 @@ export default function AdminSidebar() {
       </nav>
 
       <div className="p-4 border-t border-gray-700">
-        <button className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white transition-all w-full">
+        <button 
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white transition-all w-full"
+        >
           <span className="text-xl">🚪</span>
           <span className="font-medium">Đăng xuất</span>
         </button>

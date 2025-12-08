@@ -11,6 +11,7 @@ const invalidateUserCaches = async (userId) => {
         `user:${userId}`,
         `user:followers:${userId}`,
         `user:following:${userId}`,
+        'users:all',
     ];
     
     await Promise.all(keys.map(key => redisClient.del(key)));
@@ -192,6 +193,23 @@ export const getFollowing = async (userId) => {
     return result;
 };
 
+export const getAllUsers = async () => {
+    const usersKey = 'users:all';
+    
+    const cached = await redisClient.get(usersKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+    
+    const users = await User.find()
+        .select('username email fullname avatar role kyc_status createdAt followers_count following_count')
+        .sort({ createdAt: -1 });
+    
+    await redisClient.setEx(usersKey, 300, JSON.stringify(users));
+    
+    return users;
+};
+
 /**
  * Search users with Cache-Aside Pattern
  */
@@ -202,13 +220,11 @@ export const searchUsers = async (searchQuery) => {
     
     const searchKey = `user:search:${searchQuery.toLowerCase()}`;
     
-    // 1. Check cache first
     const cached = await redisClient.get(searchKey);
     if (cached) {
         return { success: true, users: JSON.parse(cached) };
     }
     
-    // 2. Cache miss - Query database
     const users = await User.find({
         $or: [
             { username: { $regex: searchQuery, $options: "i" } },
@@ -216,7 +232,6 @@ export const searchUsers = async (searchQuery) => {
         ],
     }).select("username fullname avatar bio");
     
-    // 3. Cache the search results (TTL: 3 minutes)
     await redisClient.setEx(searchKey, 180, JSON.stringify(users));
     
     return { success: true, users };
@@ -317,7 +332,7 @@ export const getPendingKYCs = async () => {
     }
     
     const users = await User.find({ kyc_status: 'pending' })
-        .select('username email fullname identity_verified_name identity_card_last4 kyc_submitted_at kyc_documents address')
+        .select('username email fullname identity_verified_name identity_card_last4 kyc_status kyc_submitted_at kyc_documents address bank_account')
         .sort({ kyc_submitted_at: -1 });
     
     await redisClient.setEx(kycKey, 300, JSON.stringify(users));

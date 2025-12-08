@@ -1,15 +1,25 @@
 'use client';
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/guards/ProtectedRoute";
 import PostCard from "@/components/shared/PostCard";
 import TrendingHashtags from "@/components/shared/TrendingHashtags";
 import { getPosts, Post } from "@/services/post.service";
+import { useAuth } from "@/contexts/AuthContext";
 
 function HomeContent() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      router.push('/admin/dashboard');
+    }
+  }, [user, router]);
 
   useEffect(() => {
     const fetchPosts = async () => {

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { 
+    getAllUsers,
     getUserById, 
     followUser, 
     unfollowUser, 
@@ -19,6 +20,7 @@ import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 
 const userRoutes = Router();
 
+userRoutes.get('/', authMiddleware, checkRole('admin'), getAllUsers);
 userRoutes.get('/search', authMiddleware, searchUsers);
 userRoutes.get('/:id', authMiddleware, getUserById);
 userRoutes.post('/:id/follow', authMiddleware, followUser);
@@ -946,6 +948,74 @@ userRoutes.post('/kyc/:id/reject', authMiddleware, checkRole('admin'), rejectKYC
  *                 summary: Database or server error
  *                 value:
  *                   message: "Database connection failed"
+ */
+
+/**
+ * @swagger
+ * /api/users:
+ *   get:
+ *     summary: Get all users (Admin only)
+ *     description: Retrieve a list of all users in the system. Admin access required.
+ *     tags:
+ *       - Users
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Users retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: number
+ *                   example: 150
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                         example: "64a7b8c9d1e2f3a4b5c6d7e8"
+ *                       username:
+ *                         type: string
+ *                         example: "john_doe"
+ *                       email:
+ *                         type: string
+ *                         example: "john@example.com"
+ *                       fullname:
+ *                         type: string
+ *                         example: "John Doe"
+ *                       avatar:
+ *                         type: string
+ *                         example: "https://example.com/avatar.jpg"
+ *                       role:
+ *                         type: string
+ *                         enum: ["user", "admin"]
+ *                         example: "user"
+ *                       kyc_status:
+ *                         type: string
+ *                         enum: ["unverified", "pending", "verified", "rejected"]
+ *                         example: "verified"
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-01-15T10:30:00.000Z"
+ *                       followers_count:
+ *                         type: number
+ *                         example: 150
+ *                       following_count:
+ *                         type: number
+ *                         example: 75
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin only
+ *       500:
+ *         description: Internal server error
  */
 
 /**
