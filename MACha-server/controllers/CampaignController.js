@@ -64,6 +64,14 @@ export const getCampaignsByCategory = async (req, res) => {
 
 export const createCampaign = async (req, res) => {
     try {
+        if (req.user.kyc_status !== 'verified') {
+            return res.status(HTTP_STATUS.FORBIDDEN).json({ 
+                message: "You need to complete KYC verification before creating a campaign",
+                kyc_status: req.user.kyc_status,
+                kyc_rejection_reason: req.user.kyc_rejection_reason
+            });
+        }
+
         const campaign = await campaignService.createCampaign({ ...req.body, creator: req.user._id });
 
         // Publish event và push job (không block response nếu fail)
@@ -216,7 +224,6 @@ export const cancelCampaign = async (req, res) => {
             }
         }
 
-        // Publish tracking event
         try {
             await trackingService.publishEvent("tracking:campaign:cancelled", { 
                 campaignId: result.campaign._id, 
@@ -230,6 +237,126 @@ export const cancelCampaign = async (req, res) => {
 
         return res.status(HTTP_STATUS.OK).json({ 
             message: "Campaign cancelled successfully",
+            campaign: result.campaign 
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const getPendingCampaigns = async (req, res) => {
+    try {
+        const campaigns = await campaignService.getPendingCampaigns();
+        res.status(HTTP_STATUS.OK).json({ 
+            count: campaigns.length,
+            campaigns 
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const approveCampaign = async (req, res) => {
+    try {
+        const result = await campaignService.approveCampaign(
+            req.params.id,
+            req.user._id
+        );
+
+        if (!result.success) {
+            if (result.error === 'NOT_FOUND') {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({ 
+                    message: "Campaign not found" 
+                });
+            }
+            if (result.error === 'INVALID_STATUS') {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                    message: result.message 
+                });
+            }
+        }
+
+        try {
+            await trackingService.publishEvent("tracking:campaign:approved", { 
+                campaignId: result.campaign._id,
+                adminId: req.user._id,
+                creatorId: result.campaign.creator,
+                title: result.campaign.title,
+                category: result.campaign.category,
+                approved_at: result.campaign.approved_at
+            });
+
+            await queueService.pushJob({
+                type: "CAMPAIGN_APPROVED",
+                campaignId: result.campaign._id,
+                creatorId: result.campaign.creator,
+                adminId: req.user._id
+            });
+        } catch (eventError) {
+            console.error('Error publishing event or pushing job:', eventError);
+        }
+
+        return res.status(HTTP_STATUS.OK).json({ 
+            message: "Campaign approved successfully",
+            campaign: result.campaign 
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const rejectCampaign = async (req, res) => {
+    try {
+        const { reason } = req.body;
+
+        const result = await campaignService.rejectCampaign(
+            req.params.id,
+            req.user._id,
+            reason
+        );
+
+        if (!result.success) {
+            if (result.error === 'NOT_FOUND') {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({ 
+                    message: "Campaign not found" 
+                });
+            }
+            if (result.error === 'INVALID_STATUS') {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                    message: result.message 
+                });
+            }
+            if (result.error === 'MISSING_REASON') {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                    message: result.message 
+                });
+            }
+        }
+
+        try {
+            await trackingService.publishEvent("tracking:campaign:rejected", { 
+                campaignId: result.campaign._id,
+                adminId: req.user._id,
+                creatorId: result.campaign.creator,
+                title: result.campaign.title,
+                category: result.campaign.category,
+                rejection_reason: reason,
+                rejected_at: result.campaign.rejected_at
+            });
+
+            await queueService.pushJob({
+                type: "CAMPAIGN_REJECTED",
+                campaignId: result.campaign._id,
+                creatorId: result.campaign.creator,
+                adminId: req.user._id,
+                reason: reason
+            });
+        } catch (eventError) {
+            console.error('Error publishing event or pushing job:', eventError);
+        }
+
+        return res.status(HTTP_STATUS.OK).json({ 
+            message: "Campaign rejected successfully",
             campaign: result.campaign 
         });
     } catch (error) {

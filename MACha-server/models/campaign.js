@@ -30,8 +30,8 @@ const campaignSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["active", "completed", "cancelled"],
-        default: "active"
+        enum: ["pending", "active", "rejected", "completed", "cancelled"],
+        default: "pending"
     },
     category: {
         type: String,
@@ -62,6 +62,18 @@ const campaignSchema = new mongoose.Schema({
         default: null
     },
     cancelled_at: {
+        type: Date,
+        default: null
+    },
+    rejection_reason: {
+        type: String,
+        default: null
+    },
+    approved_at: {
+        type: Date,
+        default: null
+    },
+    rejected_at: {
         type: Date,
         default: null
     }

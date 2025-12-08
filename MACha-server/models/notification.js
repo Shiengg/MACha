@@ -19,6 +19,8 @@ const notificationSchema = new mongoose.Schema({
             "mention",
             "donation",
             "campaign_update",
+            "campaign_approved",
+            "campaign_rejected",
             "system"
         ],
         required: true
@@ -32,8 +34,10 @@ const notificationSchema = new mongoose.Schema({
         ref: "Campaign"
     },
     message: {
-        type: String,
-        required: true
+        type: String
+    },
+    content: {
+        type: String
     },
     is_read: {
         type: Boolean,

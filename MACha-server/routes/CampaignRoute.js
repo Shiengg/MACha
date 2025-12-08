@@ -1,17 +1,32 @@
 import { Router } from "express";
-import { getAllCampaigns, getCampaignById, getCampaignsByCategory, createCampaign, updateCampaign, deleteCampaign, cancelCampaign } from "../controllers/CampaignController.js";
+import { 
+    getAllCampaigns, 
+    getCampaignById, 
+    getCampaignsByCategory, 
+    createCampaign, 
+    updateCampaign, 
+    deleteCampaign, 
+    cancelCampaign,
+    getPendingCampaigns,
+    approveCampaign,
+    rejectCampaign
+} from "../controllers/CampaignController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { checkRole } from "../middlewares/checkRole.js";
 import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 
 const campaignRoutes = Router();
 
 campaignRoutes.get('/', RateLimitMiddleware.rateLimitByIP(100, 60), getAllCampaigns);
 campaignRoutes.get('/category', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignsByCategory);
+campaignRoutes.get('/pending', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), getPendingCampaigns);
 campaignRoutes.get('/:id', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignById);
 campaignRoutes.post('/', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createCampaign);
 campaignRoutes.patch('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), updateCampaign);
 campaignRoutes.delete('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), deleteCampaign);
 campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), cancelCampaign);
+campaignRoutes.post('/:id/approve', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), approveCampaign);
+campaignRoutes.post('/:id/reject', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), rejectCampaign);
 
 /**
  * @swagger
@@ -32,6 +47,10 @@ campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimit
  *           type: string
  *           description: Creator's avatar URL
  *           example: "https://example.com/avatar.jpg"
+ *         email:
+ *           type: string
+ *           description: Creator's email (only visible to admin)
+ *           example: "john@example.com"
  *     
  *     CreateCampaignRequest:
  *       type: object
@@ -70,9 +89,9 @@ campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimit
  *           example: "2023-12-31"
  *         status:
  *           type: string
- *           enum: ["active", "completed", "cancelled"]
+ *           enum: ["pending", "active", "rejected", "completed", "cancelled"]
  *           description: Campaign status
- *           example: "active"
+ *           example: "pending"
  *         category:
  *           type: string
  *           enum: ["children", "elderly", "poverty", "disaster", "medical", "education", "disability", "animal", "environment", "community", "other"]
@@ -110,9 +129,9 @@ campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimit
  *           example: "2024-03-31"
  *         status:
  *           type: string
- *           enum: ["active", "completed", "cancelled"]
+ *           enum: ["pending", "active", "rejected", "completed", "cancelled"]
  *           description: Campaign status
- *           example: "active"
+ *           example: "pending"
  *         proof_documents_url:
  *           type: string
  *           description: URL to proof documents
@@ -160,9 +179,9 @@ campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimit
  *           example: "2023-12-31T23:59:59.000Z"
  *         status:
  *           type: string
- *           enum: ["active", "completed", "cancelled"]
+ *           enum: ["pending", "active", "rejected", "completed", "cancelled"]
  *           description: Campaign status
- *           example: "active"
+ *           example: "pending"
  *         category:
  *           type: string
  *           enum: ["children", "elderly", "poverty", "disaster", "medical", "education", "disability", "animal", "environment", "community", "other"]
@@ -172,6 +191,35 @@ campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimit
  *           type: string
  *           description: URL to proof documents
  *           example: "https://example.com/documents/campaign-proof.pdf"
+ *         media_url:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: Array of media URLs
+ *           example: ["https://example.com/image1.jpg", "https://example.com/image2.jpg"]
+ *         cancellation_reason:
+ *           type: string
+ *           description: Reason for cancellation (if cancelled)
+ *           example: "Unable to continue due to unforeseen circumstances"
+ *         cancelled_at:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when campaign was cancelled
+ *           example: "2023-12-07T10:30:00.000Z"
+ *         rejection_reason:
+ *           type: string
+ *           description: Reason for rejection by admin (if rejected)
+ *           example: "Campaign lacks sufficient proof documents"
+ *         approved_at:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when campaign was approved by admin
+ *           example: "2023-12-07T09:00:00.000Z"
+ *         rejected_at:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when campaign was rejected by admin
+ *           example: "2023-12-07T09:00:00.000Z"
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -852,6 +900,241 @@ campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimit
  *                 summary: Unexpected server error
  *                 value:
  *                   message: "An unexpected error occurred while updating the campaign"
+ */
+
+/**
+ * @swagger
+ * /api/campaigns/{id}/cancel:
+ *   post:
+ *     summary: Cancel a campaign
+ *     description: Allows campaign creator to cancel their own campaign with a reason
+ *     tags:
+ *       - Campaigns
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Campaign ID
+ *         schema:
+ *           type: string
+ *           example: "64a7b8c9d1e2f3a4b5c6d7e8"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Reason for cancellation
+ *                 example: "Unable to continue due to unforeseen circumstances"
+ *     responses:
+ *       200:
+ *         description: Campaign cancelled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Campaign cancelled successfully"
+ *                 campaign:
+ *                   $ref: '#/components/schemas/CampaignResponse'
+ *       400:
+ *         description: Campaign already cancelled
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Not campaign creator
+ *       404:
+ *         description: Campaign not found
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /api/campaigns/pending:
+ *   get:
+ *     summary: Get all pending campaigns (Admin only)
+ *     description: Retrieves all campaigns awaiting admin approval
+ *     tags:
+ *       - Campaigns
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Pending campaigns retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: number
+ *                   example: 5
+ *                 campaigns:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/CampaignResponse'
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin only
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /api/campaigns/{id}/approve:
+ *   post:
+ *     summary: Approve a pending campaign (Admin only)
+ *     description: Admin approves a campaign, changing status from pending to active
+ *     tags:
+ *       - Campaigns
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Campaign ID to approve
+ *         schema:
+ *           type: string
+ *           example: "64a7b8c9d1e2f3a4b5c6d7e8"
+ *     responses:
+ *       200:
+ *         description: Campaign approved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Campaign approved successfully"
+ *                 campaign:
+ *                   $ref: '#/components/schemas/CampaignResponse'
+ *             examples:
+ *               success:
+ *                 value:
+ *                   message: "Campaign approved successfully"
+ *                   campaign:
+ *                     _id: "64a7b8c9d1e2f3a4b5c6d7e8"
+ *                     status: "active"
+ *                     approved_at: "2023-12-07T10:30:00.000Z"
+ *       400:
+ *         description: Invalid status - can only approve pending campaigns
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Cannot approve campaign with status: active. Only pending campaigns can be approved."
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin only
+ *       404:
+ *         description: Campaign not found
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /api/campaigns/{id}/reject:
+ *   post:
+ *     summary: Reject a pending campaign (Admin only)
+ *     description: Admin rejects a campaign with a reason, changing status from pending to rejected
+ *     tags:
+ *       - Campaigns
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Campaign ID to reject
+ *         schema:
+ *           type: string
+ *           example: "64a7b8c9d1e2f3a4b5c6d7e8"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Reason for rejection
+ *                 example: "Campaign lacks sufficient proof documents and verification"
+ *           examples:
+ *             insufficient_proof:
+ *               value:
+ *                 reason: "Campaign lacks sufficient proof documents and verification"
+ *             policy_violation:
+ *               value:
+ *                 reason: "Campaign violates community guidelines"
+ *     responses:
+ *       200:
+ *         description: Campaign rejected successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Campaign rejected successfully"
+ *                 campaign:
+ *                   $ref: '#/components/schemas/CampaignResponse'
+ *             examples:
+ *               success:
+ *                 value:
+ *                   message: "Campaign rejected successfully"
+ *                   campaign:
+ *                     _id: "64a7b8c9d1e2f3a4b5c6d7e8"
+ *                     status: "rejected"
+ *                     rejection_reason: "Campaign lacks sufficient proof documents"
+ *                     rejected_at: "2023-12-07T10:30:00.000Z"
+ *       400:
+ *         description: Invalid status or missing reason
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *             examples:
+ *               invalid_status:
+ *                 value:
+ *                   message: "Cannot reject campaign with status: active. Only pending campaigns can be rejected."
+ *               missing_reason:
+ *                 value:
+ *                   message: "Rejection reason is required"
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin only
+ *       404:
+ *         description: Campaign not found
+ *       500:
+ *         description: Internal server error
  */
 
 /**
