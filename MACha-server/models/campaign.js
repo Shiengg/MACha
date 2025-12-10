@@ -19,7 +19,8 @@ const campaignSchema = new mongoose.Schema({
     },
     current_amount: {
         type: Number,
-        required: true
+        required: true,
+        default: 0
     },
     start_date: {
         type: Date,

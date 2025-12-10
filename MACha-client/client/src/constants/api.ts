@@ -38,6 +38,11 @@ export const GET_USER_BY_ID_ROUTE = (userId: string) => `${USER_ROUTE}/${userId}
 export const CAMPAIGN_ROUTE = "api/campaigns";
 export const GET_ALL_CAMPAIGNS_ROUTE = `${CAMPAIGN_ROUTE}`;
 export const GET_CAMPAIGN_BY_ID_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}`;
+export const CREATE_CAMPAIGN_ROUTE = `${CAMPAIGN_ROUTE}`;
+export const UPDATE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}`;
+export const DELETE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}`;
+export const CANCEL_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/cancel`;
+export const GET_CAMPAIGNS_BY_CATEGORY_ROUTE = `${CAMPAIGN_ROUTE}/category`;
 export const GET_PENDING_CAMPAIGNS_ROUTE = `${CAMPAIGN_ROUTE}/pending`;
 export const APPROVE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/approve`;
 export const REJECT_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/reject`;
@@ -48,3 +53,4 @@ export const GET_KYC_DETAILS_ROUTE = (userId: string) => `${KYC_ROUTE}/${userId}
 export const APPROVE_KYC_ROUTE = (userId: string) => `${KYC_ROUTE}/${userId}/approve`;
 export const REJECT_KYC_ROUTE = (userId: string) => `${KYC_ROUTE}/${userId}/reject`;
 export const SUBMIT_KYC_ROUTE = `${KYC_ROUTE}/submit`;
+export const GET_KYC_STATUS_ROUTE = `${KYC_ROUTE}/status`;
