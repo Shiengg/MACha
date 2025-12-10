@@ -1,15 +1,39 @@
 import { Router } from "express";
-import { followUser, unfollowUser, getFollowers, getFollowing, searchUsers } from "../controllers/UserController.js";
+import { 
+    getAllUsers,
+    getUserById, 
+    followUser, 
+    unfollowUser, 
+    getFollowers, 
+    getFollowing, 
+    searchUsers,
+    submitKYC,
+    getKYCStatus,
+    getPendingKYCs,
+    getKYCDetails,
+    approveKYC,
+    rejectKYC
+} from "../controllers/UserController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { checkRole } from "../middlewares/checkRole.js";
+import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 
 const userRoutes = Router();
 
+userRoutes.get('/', authMiddleware, checkRole('admin'), getAllUsers);
+userRoutes.get('/search', authMiddleware, searchUsers);
+userRoutes.get('/:id', authMiddleware, getUserById);
 userRoutes.post('/:id/follow', authMiddleware, followUser);
 userRoutes.post('/:id/unfollow', authMiddleware, unfollowUser);
 userRoutes.get('/:id/follower', authMiddleware, getFollowers);
 userRoutes.get('/:id/following', authMiddleware, getFollowing);
-userRoutes.get('/search', authMiddleware, searchUsers);
+
+userRoutes.post('/kyc/submit', authMiddleware, RateLimitMiddleware.rateLimitByIP(5, 3600), submitKYC);
+userRoutes.get('/kyc/status', authMiddleware, getKYCStatus);
+userRoutes.get('/kyc/pending', authMiddleware, checkRole('admin'), getPendingKYCs);
+userRoutes.get('/kyc/:id/details', authMiddleware, checkRole('admin'), getKYCDetails);
+userRoutes.post('/kyc/:id/approve', authMiddleware, checkRole('admin'), approveKYC);
+userRoutes.post('/kyc/:id/reject', authMiddleware, checkRole('admin'), rejectKYC);
 
 /**
  * @swagger
@@ -154,6 +178,339 @@ userRoutes.get('/search', authMiddleware, searchUsers);
  *           items:
  *             $ref: '#/components/schemas/SearchUserResult'
  *           description: List of users matching the search query
+ */
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     KYCDocuments:
+ *       type: object
+ *       properties:
+ *         identity_front_url:
+ *           type: string
+ *           description: URL to identity card front image
+ *           example: "https://s3.amazonaws.com/bucket/user123/cccd_front.jpg"
+ *         identity_back_url:
+ *           type: string
+ *           description: URL to identity card back image
+ *           example: "https://s3.amazonaws.com/bucket/user123/cccd_back.jpg"
+ *         selfie_url:
+ *           type: string
+ *           description: URL to selfie with identity card
+ *           example: "https://s3.amazonaws.com/bucket/user123/selfie.jpg"
+ *         tax_document_url:
+ *           type: string
+ *           description: URL to tax document
+ *           example: "https://s3.amazonaws.com/bucket/user123/tax.pdf"
+ *         bank_statement_url:
+ *           type: string
+ *           description: URL to bank statement
+ *           example: "https://s3.amazonaws.com/bucket/user123/bank.pdf"
+ *     
+ *     SubmitKYCRequest:
+ *       type: object
+ *       required:
+ *         - identity_verified_name
+ *         - identity_card_last4
+ *       properties:
+ *         identity_verified_name:
+ *           type: string
+ *           description: Full name from identity card
+ *           example: "Nguyễn Văn A"
+ *         identity_card_last4:
+ *           type: string
+ *           description: Last 4 digits of identity card
+ *           example: "1234"
+ *         tax_code:
+ *           type: string
+ *           description: Tax identification number
+ *           example: "0123456789"
+ *         address:
+ *           type: object
+ *           properties:
+ *             city:
+ *               type: string
+ *               example: "Hà Nội"
+ *             district:
+ *               type: string
+ *               example: "Hoàn Kiếm"
+ *         bank_account:
+ *           type: object
+ *           properties:
+ *             bank_name:
+ *               type: string
+ *               example: "Vietcombank"
+ *             account_number_last4:
+ *               type: string
+ *               example: "5678"
+ *             account_holder_name:
+ *               type: string
+ *               example: "NGUYEN VAN A"
+ *         kyc_documents:
+ *           $ref: '#/components/schemas/KYCDocuments'
+ *     
+ *     KYCStatusResponse:
+ *       type: object
+ *       properties:
+ *         kyc_status:
+ *           type: string
+ *           enum: ["unverified", "pending", "verified", "rejected"]
+ *           example: "pending"
+ *         kyc_submitted_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2024-01-15T10:30:00.000Z"
+ *         kyc_verified_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2024-01-16T14:20:00.000Z"
+ *         kyc_rejection_reason:
+ *           type: string
+ *           example: "Identity card image is not clear"
+
+/**
+ * @swagger
+ * /api/users/kyc/submit:
+ *   post:
+ *     summary: Submit KYC verification
+ *     description: User submits KYC documents and information for admin verification. Rate limited to 5 submissions per hour.
+ *     tags:
+ *       - Users
+ *       - KYC
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/SubmitKYCRequest'
+ *     responses:
+ *       200:
+ *         description: KYC submitted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "KYC submitted successfully. Please wait for admin review."
+ *                 user:
+ *                   type: object
+ *       400:
+ *         description: Bad request - Already verified, pending, or missing fields
+ *       401:
+ *         description: Unauthorized
+ *       429:
+ *         description: Too many requests - Rate limit exceeded
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /api/users/kyc/status:
+ *   get:
+ *     summary: Get own KYC status
+ *     description: Retrieve the current KYC verification status for the authenticated user
+ *     tags:
+ *       - Users
+ *       - KYC
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: KYC status retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/KYCStatusResponse'
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /api/users/kyc/pending:
+ *   get:
+ *     summary: Get all pending KYC submissions (Admin only)
+ *     description: Retrieve list of all users with pending KYC verification
+ *     tags:
+ *       - Users
+ *       - KYC
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Pending KYCs retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: number
+ *                   example: 5
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin only
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /api/users/kyc/{id}/details:
+ *   get:
+ *     summary: Get KYC details for specific user (Admin only)
+ *     description: Retrieve detailed KYC information including documents for a specific user
+ *     tags:
+ *       - Users
+ *       - KYC
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *         example: "64a7b8c9d1e2f3a4b5c6d7e8"
+ *     responses:
+ *       200:
+ *         description: KYC details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                 kyc_info:
+ *                   type: object
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin only
+ *       404:
+ *         description: User not found or no KYC data
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /api/users/kyc/{id}/approve:
+ *   post:
+ *     summary: Approve KYC verification (Admin only)
+ *     description: Admin approves a pending KYC submission, allowing user to create campaigns
+ *     tags:
+ *       - Users
+ *       - KYC
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *         example: "64a7b8c9d1e2f3a4b5c6d7e8"
+ *     responses:
+ *       200:
+ *         description: KYC approved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "KYC approved successfully"
+ *                 user:
+ *                   type: object
+ *       400:
+ *         description: Invalid status - Can only approve pending KYCs
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin only
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /api/users/kyc/{id}/reject:
+ *   post:
+ *     summary: Reject KYC verification (Admin only)
+ *     description: Admin rejects a pending KYC submission with a reason
+ *     tags:
+ *       - Users
+ *       - KYC
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *         example: "64a7b8c9d1e2f3a4b5c6d7e8"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Reason for rejection
+ *                 example: "Identity card image is not clear, please upload again"
+ *     responses:
+ *       200:
+ *         description: KYC rejected successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "KYC rejected successfully"
+ *                 user:
+ *                   type: object
+ *       400:
+ *         description: Invalid status or missing reason
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin only
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Internal server error
  */
 
 /**
@@ -591,6 +948,74 @@ userRoutes.get('/search', authMiddleware, searchUsers);
  *                 summary: Database or server error
  *                 value:
  *                   message: "Database connection failed"
+ */
+
+/**
+ * @swagger
+ * /api/users:
+ *   get:
+ *     summary: Get all users (Admin only)
+ *     description: Retrieve a list of all users in the system. Admin access required.
+ *     tags:
+ *       - Users
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Users retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: number
+ *                   example: 150
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                         example: "64a7b8c9d1e2f3a4b5c6d7e8"
+ *                       username:
+ *                         type: string
+ *                         example: "john_doe"
+ *                       email:
+ *                         type: string
+ *                         example: "john@example.com"
+ *                       fullname:
+ *                         type: string
+ *                         example: "John Doe"
+ *                       avatar:
+ *                         type: string
+ *                         example: "https://example.com/avatar.jpg"
+ *                       role:
+ *                         type: string
+ *                         enum: ["user", "admin"]
+ *                         example: "user"
+ *                       kyc_status:
+ *                         type: string
+ *                         enum: ["unverified", "pending", "verified", "rejected"]
+ *                         example: "verified"
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-01-15T10:30:00.000Z"
+ *                       followers_count:
+ *                         type: number
+ *                         example: 150
+ *                       following_count:
+ *                         type: number
+ *                         example: 75
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin only
+ *       500:
+ *         description: Internal server error
  */
 
 /**

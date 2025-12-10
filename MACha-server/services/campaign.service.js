@@ -52,10 +52,35 @@ export const createCampaign = async (payload) => {
     const campaign = new Campaign(payload);
     await campaign.save();
 
-    // Invalidate campaigns list cache
-    await redisClient.del('campaigns:all');
+    await Promise.all([
+        redisClient.del('campaigns:all'),
+        redisClient.del('campaigns:pending'),
+    ]);
     
     return campaign;
+}
+
+export const getCampaignsByCategory = async (category) => {
+    const campaignKey = `campaigns:category:${category}`;
+
+    // Check cache
+    const cached = await redisClient.get(campaignKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+
+    // Query database with filters
+    const campaigns = await Campaign.find({ 
+        category,
+        status: 'active' // Only return active campaigns
+    })
+    .populate("creator", "username avatar")
+    .sort({ createdAt: -1 }); // Newest first
+
+    // Save to cache (TTL: 5 minutes)
+    await redisClient.setEx(campaignKey, 300, JSON.stringify(campaigns));
+
+    return campaigns;
 }
 
 /**
@@ -68,19 +93,19 @@ export const updateCampaign = async (campaignId, userId, payload) => {
         return { success: false, error: 'NOT_FOUND' };
     }
     
-    // 1. Check ownership
     if (campaign.creator.toString() !== userId.toString()) {
         return { success: false, error: 'FORBIDDEN' };
     }
     
-    // 2. Check if campaign has donations
+    const oldCategory = campaign.category;
+    const oldStatus = campaign.status;
+    
     if (campaign.current_amount > 0) {
-        // Only allow updating certain fields after donations
         const allowedFields = [
             'description',
             'media_url', 
             'proof_documents_url',
-            'status' // Only allow changing to 'completed' or 'cancelled'
+            'status'
         ];
         
         const updates = {};
@@ -90,7 +115,6 @@ export const updateCampaign = async (campaignId, userId, payload) => {
             }
         }
         
-        // Validate status change
         if (payload.status && !['completed', 'cancelled'].includes(payload.status)) {
             return { 
                 success: false, 
@@ -99,7 +123,6 @@ export const updateCampaign = async (campaignId, userId, payload) => {
             };
         }
         
-        // PREVENT changing critical fields
         const restrictedFields = ['goal_amount', 'end_date', 'title'];
         const attemptedRestrictedFields = restrictedFields.filter(field => payload[field] !== undefined);
         
@@ -112,34 +135,48 @@ export const updateCampaign = async (campaignId, userId, payload) => {
             };
         }
         
-        // Update with allowed fields only
         const updatedCampaign = await Campaign.findByIdAndUpdate(
             campaignId, 
             updates, 
             { new: true, runValidators: true }
         );
         
-        // Invalidate caches
-        await Promise.all([
+        const cachesToInvalidate = [
             redisClient.del(`campaign:${campaignId}`),
             redisClient.del('campaigns:all'),
-        ]);
+            redisClient.del(`campaigns:category:${oldCategory}`)
+        ];
+        
+        if (oldStatus === 'pending') {
+            cachesToInvalidate.push(redisClient.del('campaigns:pending'));
+        }
+        
+        await Promise.all(cachesToInvalidate);
         
         return { success: true, campaign: updatedCampaign };
     }
     
-    // 3. If no donations yet, allow updating all fields
     const updatedCampaign = await Campaign.findByIdAndUpdate(
         campaignId, 
         payload, 
         { new: true, runValidators: true }
     );
     
-    // Invalidate caches
-    await Promise.all([
+    const cachesToInvalidate = [
         redisClient.del(`campaign:${campaignId}`),
         redisClient.del('campaigns:all'),
-    ]);
+        redisClient.del(`campaigns:category:${oldCategory}`)
+    ];
+    
+    if (payload.category && payload.category !== oldCategory) {
+        cachesToInvalidate.push(redisClient.del(`campaigns:category:${payload.category}`));
+    }
+    
+    if (oldStatus === 'pending' || payload.status === 'pending') {
+        cachesToInvalidate.push(redisClient.del('campaigns:pending'));
+    }
+    
+    await Promise.all(cachesToInvalidate);
     
     return { success: true, campaign: updatedCampaign };
 }
@@ -154,12 +191,10 @@ export const deleteCampaign = async (campaignId, userId) => {
         return { success: false, error: 'NOT_FOUND' };
     }
     
-    // Check ownership
     if (campaign.creator.toString() !== userId.toString()) {
         return { success: false, error: 'FORBIDDEN' };
     }
     
-    // PREVENT deletion if has donations
     if (campaign.current_amount > 0) {
         return { 
             success: false, 
@@ -169,16 +204,24 @@ export const deleteCampaign = async (campaignId, userId) => {
         };
     }
     
-    // Only allow delete if no donations
+    const category = campaign.category;
+    const status = campaign.status;
+    
     await Campaign.findByIdAndDelete(campaignId);
     
-    // Invalidate caches
-    await Promise.all([
+    const cachesToInvalidate = [
         redisClient.del(`campaign:${campaignId}`),
         redisClient.del('campaigns:all'),
-    ]);
+        redisClient.del(`campaigns:category:${category}`)
+    ];
     
-    return { success: true };
+    if (status === 'pending') {
+        cachesToInvalidate.push(redisClient.del('campaigns:pending'));
+    }
+    
+    await Promise.all(cachesToInvalidate);
+    
+    return { success: true, campaign };
 }
 
 /**
@@ -191,12 +234,10 @@ export const cancelCampaign = async (campaignId, userId, reason) => {
         return { success: false, error: 'NOT_FOUND' };
     }
     
-    // Check ownership
     if (campaign.creator.toString() !== userId.toString()) {
         return { success: false, error: 'FORBIDDEN' };
     }
     
-    // Check if already cancelled
     if (campaign.status === 'cancelled') {
         return { 
             success: false, 
@@ -205,16 +246,98 @@ export const cancelCampaign = async (campaignId, userId, reason) => {
         };
     }
     
-    // Update status to cancelled
     campaign.status = 'cancelled';
     campaign.cancellation_reason = reason || 'No reason provided';
     campaign.cancelled_at = new Date();
     await campaign.save();
     
-    // Invalidate caches
     await Promise.all([
         redisClient.del(`campaign:${campaignId}`),
         redisClient.del('campaigns:all'),
+        redisClient.del(`campaigns:category:${campaign.category}`),
+    ]);
+    
+    return { success: true, campaign };
+}
+
+export const getPendingCampaigns = async () => {
+    const campaignKey = 'campaigns:pending';
+    
+    const cached = await redisClient.get(campaignKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+
+    const campaigns = await Campaign.find({ status: 'pending' })
+        .populate("creator", "username email avatar")
+        .sort({ createdAt: -1 });
+    
+    await redisClient.setEx(campaignKey, 300, JSON.stringify(campaigns));
+    return campaigns;
+}
+
+export const approveCampaign = async (campaignId, adminId) => {
+    const campaign = await Campaign.findById(campaignId);
+    
+    if (!campaign) {
+        return { success: false, error: 'NOT_FOUND' };
+    }
+    
+    if (campaign.status !== 'pending') {
+        return { 
+            success: false, 
+            error: 'INVALID_STATUS',
+            message: `Cannot approve campaign with status: ${campaign.status}. Only pending campaigns can be approved.`
+        };
+    }
+    
+    campaign.status = 'active';
+    campaign.approved_at = new Date();
+    await campaign.save();
+    
+    await Promise.all([
+        redisClient.del(`campaign:${campaignId}`),
+        redisClient.del('campaigns:all'),
+        redisClient.del('campaigns:pending'),
+        redisClient.del(`campaigns:category:${campaign.category}`),
+    ]);
+    
+    return { success: true, campaign };
+}
+
+export const rejectCampaign = async (campaignId, adminId, reason) => {
+    const campaign = await Campaign.findById(campaignId);
+    
+    if (!campaign) {
+        return { success: false, error: 'NOT_FOUND' };
+    }
+    
+    if (campaign.status !== 'pending') {
+        return { 
+            success: false, 
+            error: 'INVALID_STATUS',
+            message: `Cannot reject campaign with status: ${campaign.status}. Only pending campaigns can be rejected.`
+        };
+    }
+    
+    if (!reason || reason.trim().length === 0) {
+        return {
+            success: false,
+            error: 'MISSING_REASON',
+            message: 'Rejection reason is required'
+        };
+    }
+    
+    campaign.status = 'rejected';
+    campaign.rejection_reason = reason;
+    campaign.rejected_at = new Date();
+    await campaign.save();
+    
+    await Promise.all([
+        redisClient.del(`campaign:${campaignId}`),
+        redisClient.del('campaigns:all'),
+        redisClient.del('campaigns:pending'),
+        redisClient.del(`campaigns:category:${campaign.category}`),
     ]);
     
     return { success: true, campaign };

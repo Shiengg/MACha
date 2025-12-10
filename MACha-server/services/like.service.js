@@ -16,6 +16,7 @@ export const likePost = async (postId, userId) => {
         redisClient.del(`like:${postId}`),
         redisClient.del(`post:counts:${postId}`),
         redisClient.del(`post:liked:${postId}:${userId}`),
+        redisClient.del('posts:all'), // Invalidate posts list cache
     ]);
     
     return newLike;
@@ -32,6 +33,7 @@ export const unlikePost = async (postId, userId) => {
         redisClient.del(`like:${postId}`),
         redisClient.del(`post:counts:${postId}`),
         redisClient.del(`post:liked:${postId}:${userId}`),
+        redisClient.del('posts:all'), // Invalidate posts list cache
     ]);
     
     return like;

@@ -1,10 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Heart, MessageCircle, Share2, DollarSign, MoreHorizontal } from 'lucide-react';
 import Image from 'next/image';
 import { toggleLikePost } from '@/services/post.service';
 import CommentModal from './CommentModal';
+import { useSocket } from '@/contexts/SocketContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface PostCardProps {
   post: {
@@ -12,7 +15,7 @@ interface PostCardProps {
     user: {
       _id: string;
       username: string;
-      avatar?: string; // Backend dùng 'avatar'
+      avatar?: string;
     };
     content_text: string;
     media_url?: string[];
@@ -36,12 +39,117 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post, onLike, onComment, onShare, onDonate }: PostCardProps) {
+  const { socket, isConnected } = useSocket();
+  const { user } = useAuth();
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
   const [likesCount, setLikesCount] = useState(post.likesCount || 0);
   const [commentsCount, setCommentsCount] = useState(post.commentsCount || 0);
   const [showFullText, setShowFullText] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
+  const [isCommenting, setIsCommenting] = useState(false);
+
+  const justLikedRef = useRef(false);
+  const justCommentedRef = useRef(false);
+  const router = useRouter();
+
+
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handlePostLiked = (event: any) => {
+      if (event.postId !== post._id) return;
+      
+      const currentUserId = (user as any)?._id || user?.id;
+      
+      // Nếu là chính mình vừa like (optimistic update đã xử lý rồi)
+      if (event.userId === currentUserId) {
+        justLikedRef.current = false; // Reset flag
+        return;
+      }
+      
+      // Chỉ log nếu là chủ bài viết
+      if (post.user._id === currentUserId) {
+        console.log('🎉 Có người like bài viết của bạn:', event.postId);
+        console.log('👤 User ID:', event.userId);
+      }
+      
+      // Cập nhật count cho tất cả mọi người
+      setLikesCount((prev) => prev + 1);
+    };
+
+    const handlePostUnliked = (event: any) => {
+      if (event.postId !== post._id) return;
+      
+      const currentUserId = (user as any)?._id || user?.id;
+
+      // Nếu là chính mình vừa unlike (optimistic update đã xử lý rồi)
+      if (event.userId === currentUserId) {
+        justLikedRef.current = false;
+        return;
+      }
+      
+      // Chỉ log nếu là chủ bài viết
+      if (post.user._id === currentUserId) {
+        console.log('💔 Có người unlike bài viết của bạn:', event.postId);
+        console.log('👤 User ID:', event.userId);
+      }
+      
+      // Cập nhật count cho tất cả mọi người
+      setLikesCount((prev) => prev - 1);
+    }
+
+    const handleCommentAddedEvent = (event: any) => {
+      // Chỉ xử lý nếu là bài viết hiện tại
+      if (event.postId !== post._id) return;
+      
+      const currentUserId = (user as any)?._id || user?.id;
+      
+      // Nếu là chính mình vừa comment (optimistic update đã xử lý rồi)
+      if (event.userId === currentUserId) {
+        console.log('👤 Đó là bạn vừa comment (đã optimistic update)');
+        justCommentedRef.current = false;
+        return;
+      }
+      
+      console.log('💬 Có người comment bài viết này:', event.postId);
+      console.log('📦 Comment:', event.content_text);
+      
+      // Cập nhật comment count
+      setCommentsCount((prev) => prev + 1);
+    }
+
+    const handleCommentDeletedEvent = (event: any) => {
+      // Chỉ xử lý nếu là bài viết hiện tại
+      if (event.postId !== post._id) return;
+
+      const currentUserId = (user as any)?._id || user?.id;
+
+      // Nếu là chính mình vừa xóa (optimistic update đã giảm count rồi)
+      if (event.userId === currentUserId) {
+        console.log('👤 Đó là bạn vừa xóa comment (đã optimistic update)');
+        justCommentedRef.current = false;
+        return;
+      }
+      
+      console.log('🗑️ Có người xóa comment:', event.commentId);
+      
+      // Giảm count cho người khác
+      setCommentsCount((prev) => Math.max(0, prev - 1));
+    }
+
+    socket.on('post:liked', handlePostLiked);
+    socket.on('post:unliked', handlePostUnliked);
+    socket.on('comment:added', handleCommentAddedEvent);
+    socket.on('comment:deleted', handleCommentDeletedEvent);
+
+    return () => {
+      socket.off('post:liked', handlePostLiked);
+      socket.off('post:unliked', handlePostUnliked);
+      socket.off('comment:added', handleCommentAddedEvent);
+      socket.off('comment:deleted', handleCommentDeletedEvent);
+    };
+  }, [socket, isConnected, post._id, user]);
 
   const handleLike = async () => {
     if (isLiking) return;
@@ -49,7 +157,8 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
     const previousState = isLiked;
     const previousCount = likesCount;
     
-    // Optimistic update
+    justLikedRef.current = true;
+    
     setIsLiked(!isLiked);
     setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
     
@@ -62,6 +171,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
       // Revert on error
       setIsLiked(previousState);
       setLikesCount(previousCount);
+      justLikedRef.current = false; // Reset flag khi có lỗi
       
       // Show error message to user
       const errorMessage = error?.message || 'Có lỗi xảy ra khi thực hiện hành động này';
@@ -78,6 +188,13 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
 
   const handleCommentAdded = () => {
     setCommentsCount(commentsCount + 1);
+  };
+
+  const handleCommentDeleted = () => {
+    // Set flag để skip socket event
+    justCommentedRef.current = true;
+    // Giảm count ngay (optimistic update)
+    setCommentsCount((prev) => Math.max(0, prev - 1));
   };
 
   const handleShare = () => {
@@ -151,7 +268,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
             )}
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white hover:underline cursor-pointer">
+            <h3 onClick={() => router.push(`/profile/${post.user._id}`)} className="font-semibold text-gray-900 dark:text-white hover:underline cursor-pointer">
               {post.user.username}
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -303,6 +420,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
         isOpen={showCommentModal}
         onClose={() => setShowCommentModal(false)}
         onCommentAdded={handleCommentAdded}
+        onCommentDeleted={handleCommentDeleted}
       />
     </div>
   );

@@ -42,9 +42,15 @@ function LoginPageContent() {
           confirmButtonText: 'OK'
         });
         
-        // Redirect về returnUrl nếu có, hoặc về trang chủ
-        const returnUrl = searchParams.get('returnUrl') || '/';
-        router.push(returnUrl);
+        const userRole = res.data.user?.role;
+        const returnUrl = searchParams.get('returnUrl');
+        const redirectParam = searchParams.get('redirect');
+        
+        if (userRole === 'admin') {
+          router.push(redirectParam || '/admin/dashboard');
+        } else {
+          router.push(returnUrl || '/');
+        }
       }
     } catch (error: any) {
       const message = error?.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại.";

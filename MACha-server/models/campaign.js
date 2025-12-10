@@ -19,7 +19,8 @@ const campaignSchema = new mongoose.Schema({
     },
     current_amount: {
         type: Number,
-        required: true
+        required: true,
+        default: 0
     },
     start_date: {
         type: Date,
@@ -30,8 +31,26 @@ const campaignSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["active", "completed", "cancelled"],
-        default: "active"
+        enum: ["pending", "active", "rejected", "completed", "cancelled"],
+        default: "pending"
+    },
+    category: {
+        type: String,
+        enum: [
+            "children",           // Trẻ em
+            "elderly",            // Người già
+            "poverty",            // Người nghèo
+            "disaster",           // Thiên tai (lũ lụt, bão, hạn hán)
+            "medical",            // Y tế, bệnh hiểm nghèo
+            "education",          // Giáo dục
+            "disability",         // Người khuyết tật
+            "animal",             // Động vật
+            "environment",        // Môi trường
+            "community",          // Cộng đồng
+            "other"              // Khác
+        ],
+        required: true,
+        index: true  
     },
     proof_documents_url: {
         type: String
@@ -44,6 +63,18 @@ const campaignSchema = new mongoose.Schema({
         default: null
     },
     cancelled_at: {
+        type: Date,
+        default: null
+    },
+    rejection_reason: {
+        type: String,
+        default: null
+    },
+    approved_at: {
+        type: Date,
+        default: null
+    },
+    rejected_at: {
         type: Date,
         default: null
     }

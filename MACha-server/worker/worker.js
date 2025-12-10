@@ -1,7 +1,15 @@
 import { createClient } from "redis";
 import dotenv from "dotenv";
+import Post from "../models/post.js";
+import Notification from "../models/notification.js";
+import User from "../models/user.js";
+import connectDB from "../config/db.js";
+import * as notificationService from "../services/notification.service.js";
 
 dotenv.config();
+
+// Kết nối MongoDB
+connectDB();
 
 // Tạo Redis client riêng cho worker (không dùng chung với server)
 const workerRedisClient = createClient({
@@ -9,6 +17,13 @@ const workerRedisClient = createClient({
 });
 
 workerRedisClient.on("error", (err) => console.error("❌ Worker Redis Error:", err));
+
+// Tạo Redis Publisher để gửi notification events
+const notificationPublisher = createClient({
+    url: process.env.REDIS_URL || "redis://localhost:6379"
+});
+
+notificationPublisher.on("error", (err) => console.error("❌ Notification Publisher Error:", err));
 
 async function processQueue() {
     console.log('🔄 Worker started! Listening to job_queue...');
@@ -37,6 +52,9 @@ async function processQueue() {
                     break;
                 case "POST_LIKED":
                     await handlePostLiked(job);
+                    break;
+                case "COMMENT_ADDED":
+                    await handleCommentAdded(job);
                     break;
             }
         } catch (error) {
@@ -74,7 +92,123 @@ async function handleCampaignCreated(job) {
 }
 
 async function handlePostLiked(job) {
+    try {
+        console.log(`❤️  Processing POST_LIKED for post ${job.postId}...`);
+        
+        // 1. Lấy thông tin post để biết author
+        const post = await Post.findById(job.postId)
+            .populate('user', '_id username avatar')
+            .select('user content_text');
+        
+        if (!post) {
+            console.log('⚠️  Post not found');
+            return;
+        }
+        
+        // 2. Lấy thông tin người like
+        const liker = await User.findById(job.userId).select('username avatar');
+        
+        if (!liker) {
+            console.log('⚠️  Liker not found');
+            return;
+        }
+        
+        // 3. Không tạo notification nếu tự like bài viết của mình
+        if (post.user._id.toString() === job.userId) {
+            console.log('👤 User liked their own post, skip notification');
+            return;
+        }
+        
+        // 4. Tạo notification trong database
+        const notification = await notificationService.createNotification({
+            receiver: post.user._id,
+            sender: job.userId,
+            type: 'like',
+            post: job.postId,
+            message: `đã thích bài viết của bạn`,
+            is_read: false
+        });
+        
+        console.log(`✅ Notification created: ${notification._id}`);
+        
+        // 5. Publish event để server emit vào room
+        await notificationPublisher.publish('notification:new', JSON.stringify({
+            recipientId: post.user._id.toString(),
+            notification: {
+                _id: notification._id,
+                type: 'like',
+                message: `${liker.username} đã thích bài viết của bạn`,
+                sender: {
+                    _id: liker._id,
+                    username: liker.username,
+                    avatar: liker.avatar
+                },
+                post: {
+                    _id: post._id,
+                    content_text: post.content_text.substring(0, 50) + (post.content_text.length > 50 ? '...' : '')
+                },
+                is_read: false,
+                createdAt: notification.createdAt
+            }
+        }));
+        
+        console.log(`📬 Published notification event for user ${post.user._id}\n`);
+        
+    } catch (error) {
+        console.error('❌ Error processing POST_LIKED job:', error);
+    }
+}
 
+async function handleCommentAdded(job) {
+    try {
+        const post = await Post.findById(job.postId)
+            .populate('user', '_id username avatar')
+            .select('user content_text');
+        
+        if (!post) {
+            console.log('⚠️  Post not found');
+            return;
+        }
+        
+        const userComment = await User.findById(job.userId).select('username avatar');
+
+        if (!userComment) {
+            console.log('⚠️  User comment not found');
+            return;
+        }
+
+        const notification = await notificationService.createNotification({
+            receiver: post.user._id,
+            sender: job.userId,
+            type: 'comment',
+            post: job.postId,
+            message: `đã bình luận vào bài viết của bạn`,
+            is_read: false
+        });
+
+        await notificationPublisher.publish('notification:new', JSON.stringify({
+            recipientId: post.user._id.toString(),
+            notification: {
+                _id: notification._id,
+                type: 'comment',
+                message: ` đã bình luận vào bài viết của bạn`,
+                sender: {
+                    _id: userComment._id,
+                    username: userComment.username,
+                    avatar: userComment.avatar
+                },
+                post: {
+                    _id: post._id,
+                    content_text: post.content_text.substring(0, 50) + (post.content_text.length > 50 ? '...' : '')
+                },
+                is_read: false,
+                createdAt: notification.createdAt
+            }
+        }));
+
+    } catch (error) {
+        console.error('❌ Error processing COMMENT_ADDED job:', error);
+    }
 }
 
 async function sendEmail(userId, payload) {
@@ -88,7 +222,10 @@ async function startWorker() {
     try {
         console.log('🚀 Starting Worker...');
         await workerRedisClient.connect();
-        console.log('✅ Worker Redis connected successfully\n');
+        console.log('✅ Worker Redis connected successfully');
+        
+        await notificationPublisher.connect();
+        console.log('✅ Notification Publisher connected successfully\n');
 
         await processQueue();
     } catch (error) {
@@ -101,6 +238,7 @@ async function startWorker() {
 process.on('SIGINT', async () => {
     console.log('\n\n🛑 Worker shutting down gracefully...');
     await workerRedisClient.quit();
+    await notificationPublisher.quit();
     console.log('✅ Worker stopped');
     process.exit(0);
 });
@@ -108,6 +246,7 @@ process.on('SIGINT', async () => {
 process.on('SIGTERM', async () => {
     console.log('\n\n🛑 Worker shutting down gracefully...');
     await workerRedisClient.quit();
+    await notificationPublisher.quit();
     console.log('✅ Worker stopped');
     process.exit(0);
 });

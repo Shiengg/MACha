@@ -13,17 +13,20 @@ interface PublicRouteProps {
  * Nếu user đã authenticate, redirect về trang chủ hoặc returnUrl
  */
 export default function PublicRoute({ children }: PublicRouteProps) {
-    const { isAuthenticated, loading } = useAuth();
+    const { user, isAuthenticated, loading } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
 
     useEffect(() => {
         if (!loading && isAuthenticated) {
-            // Lấy returnUrl từ query params nếu có
+            if (user?.role === 'admin') {
+                router.push('/admin/dashboard');
+            } else {
             const returnUrl = searchParams.get('returnUrl') || '/';
             router.push(returnUrl);
+            }
         }
-    }, [isAuthenticated, loading, router, searchParams]);
+    }, [user, isAuthenticated, loading, router, searchParams]);
 
     // Show loading state while checking authentication
     if (loading) {

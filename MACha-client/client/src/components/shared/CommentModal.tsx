@@ -5,20 +5,23 @@ import { X, Send, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { getComments, addComment, deleteComment, Comment } from '@/services/comment.service';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSocket } from '@/contexts/SocketContext';
 
 interface CommentModalProps {
   postId: string;
   isOpen: boolean;
   onClose: () => void;
   onCommentAdded?: () => void;
+  onCommentDeleted?: () => void;
 }
 
-export default function CommentModal({ postId, isOpen, onClose, onCommentAdded }: CommentModalProps) {
+export default function CommentModal({ postId, isOpen, onClose, onCommentAdded, onCommentDeleted }: CommentModalProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
+  const { socket, isConnected } = useSocket();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -30,6 +33,61 @@ export default function CommentModal({ postId, isOpen, onClose, onCommentAdded }
       }, 100);
     }
   }, [isOpen, postId]);
+
+  useEffect(() => {
+    if (!socket || !isConnected || !isOpen) return;
+
+    const handleCommentAdded = (event: any) => {
+      if (event.postId !== postId) return;
+
+      const currentUserId = (user as any)?._id || user?.id;
+
+      if (event.userId === currentUserId) {
+        console.log('👤 Đó là bạn vừa comment (đã có trong list)');
+        return;
+      }
+
+      console.log('💬 Real-time: Có comment mới từ người khác');
+
+      const newCommentFromEvent: Comment = {
+        _id: event.commentId,
+        post: postId,
+        user: {
+          _id: event.userId,
+          username: event.username || 'Unknown',
+          avatar: event.avatar,
+        },
+        content_text: event.content_text,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Thêm vào đầu danh sách
+      setComments((prev) => {
+        // Check duplicate
+        const exists = prev.some((c) => c._id === newCommentFromEvent._id);
+        if (exists) return prev;
+        return [newCommentFromEvent, ...prev];
+      });
+    };
+
+    const handleCommentDeleted = (event: any) => {
+      if (event.postId !== postId) return;
+
+      console.log('🗑️ Real-time: Comment bị xóa:', event.commentId);
+
+      // Xóa comment khỏi danh sách
+      setComments((prev) => prev.filter((c) => c._id !== event.commentId));
+    };
+
+    socket.on('comment:added', handleCommentAdded);
+    socket.on('comment:deleted', handleCommentDeleted);
+
+    return () => {
+      socket.off('comment:added', handleCommentAdded);
+      socket.off('comment:deleted', handleCommentDeleted);
+    };
+  }, [socket, isConnected, isOpen, postId, user]);
 
   const fetchComments = async () => {
     setIsLoading(true);
@@ -64,7 +122,7 @@ export default function CommentModal({ postId, isOpen, onClose, onCommentAdded }
     try {
       await deleteComment(commentId);
       setComments(comments.filter((c) => c._id !== commentId));
-      onCommentAdded?.();
+      onCommentDeleted?.();
     } catch (error) {
       console.error('Error deleting comment:', error);
     }
