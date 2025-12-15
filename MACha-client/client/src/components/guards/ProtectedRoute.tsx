@@ -20,7 +20,10 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     useEffect(() => {
         if (!loading && !isAuthenticated) {
             // Lưu lại URL hiện tại để redirect lại sau khi login
-            const returnUrl = pathname !== '/login' ? `?returnUrl=${encodeURIComponent(pathname)}` : '';
+            // ✅ Không lưu returnUrl nếu đang ở profile page (vì sẽ là profile của người khác)
+            const isProfilePage = pathname.startsWith('/profile/');
+            const shouldSaveReturnUrl = pathname !== '/login' && !isProfilePage;
+            const returnUrl = shouldSaveReturnUrl ? `?returnUrl=${encodeURIComponent(pathname)}` : '';
             router.push(`/login${returnUrl}`);
         }
     }, [isAuthenticated, loading, router, pathname]);

@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import Post from "../models/post.js";
 import Notification from "../models/notification.js";
 import User from "../models/user.js";
+import Campaign from "../models/campaign.js";
 import connectDB from "../config/db.js";
 import * as notificationService from "../services/notification.service.js";
 
@@ -55,6 +56,9 @@ async function processQueue() {
                     break;
                 case "COMMENT_ADDED":
                     await handleCommentAdded(job);
+                    break;
+                case "CAMPAIGN_APPROVED":
+                    await handleCampaignApproved(job);
                     break;
             }
         } catch (error) {
@@ -208,6 +212,77 @@ async function handleCommentAdded(job) {
 
     } catch (error) {
         console.error('❌ Error processing COMMENT_ADDED job:', error);
+    }
+}
+
+async function handleCampaignApproved(job) {
+    try {
+        console.log(`✅ Processing CAMPAIGN_APPROVED for campaign ${job.campaignId}...`);
+        
+        // 1. Lấy thông tin campaign
+        const campaign = await Campaign.findById(job.campaignId)
+            .select('title creator');
+
+        if (!campaign) {
+            console.log('⚠️  Campaign not found');
+            return;
+        }
+
+        // 2. Lấy thông tin creator (người nhận notification)
+        const creator = await User.findById(job.creatorId)
+            .select('username avatar');
+
+        if (!creator) {
+            console.log('⚠️  Creator not found');
+            return;
+        }
+
+        // 3. Lấy thông tin admin (người gửi notification)
+        const admin = await User.findById(job.adminId)
+            .select('username avatar');
+
+        if (!admin) {
+            console.log('⚠️  Admin not found');
+            return;
+        }
+
+        // 4. Tạo notification trong database
+        const notification = await notificationService.createNotification({
+            receiver: creator._id,
+            sender: admin._id,
+            type: 'campaign_approved',
+            campaign: job.campaignId,
+            message: `Chiến dịch "${campaign.title}" của bạn đã được phê duyệt`,
+            is_read: false
+        });
+
+        console.log(`✅ Notification created: ${notification._id}`);
+
+        // 5. Publish event để server emit vào room
+        await notificationPublisher.publish('notification:new', JSON.stringify({
+            recipientId: creator._id.toString(),
+            notification: {
+                _id: notification._id,
+                type: 'campaign_approved',
+                message: `Chiến dịch "${campaign.title}" của bạn đã được phê duyệt`,
+                sender: {
+                    _id: admin._id,
+                    username: admin.username,
+                    avatar: admin.avatar
+                },
+                campaign: {
+                    _id: campaign._id,
+                    title: campaign.title,
+                },
+                is_read: false,
+                createdAt: notification.createdAt
+            },
+        }));
+
+        console.log(`📬 Published notification event for user ${creator._id}\n`);
+        
+    } catch (error) {
+        console.error('❌ Error processing CAMPAIGN_APPROVED job:', error);
     }
 }
 

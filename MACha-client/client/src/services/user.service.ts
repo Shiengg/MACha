@@ -5,8 +5,17 @@ export interface User {
   _id: string;
   username: string;
   email: string;
+  fullname?: string;
   avatar?: string;
   bio?: string;
+  role?: string;
+  kyc_status?: string;
+  followers_count?: number;
+  following_count?: number;
+  address?: {
+    city?: string;
+    district?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }

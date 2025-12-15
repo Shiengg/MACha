@@ -122,6 +122,10 @@ export default function NotificationDropdown() {
         return '👤';
       case 'donation':
         return '💰';
+      case 'campaign_approved':
+        return '✅';
+      case 'campaign_rejected':
+        return '❌';
       default:
         return '🔔';
     }
@@ -188,22 +192,25 @@ export default function NotificationDropdown() {
                   >
                     <div className="flex gap-3">
                       {/* Avatar */}
-                      <div className="relative w-12 h-12 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
-                        {notification.sender.avatar ? (
-                          <Image
-                            src={notification.sender.avatar}
-                            alt={notification.sender.username}
-                            fill
-                            className="object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 font-semibold text-lg">
-                            {notification.sender.username.charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                      <div className="relative flex-shrink-0">
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
+                          {notification.sender?.avatar ? (
+                            <Image
+                              src={notification.sender.avatar}
+                              alt={notification.sender.username || 'User'}
+                              width={48}
+                              height={48}
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 font-semibold text-lg">
+                              {notification.sender?.username?.charAt(0).toUpperCase() || '?'}
+                            </div>
+                          )}
+                        </div>
                         
-                        {/* Type Icon Badge */}
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center text-sm border-2 border-white dark:border-gray-800">
+                        {/* Type Icon Badge - Nằm góc trên bên phải */}
+                        <div className="absolute -top-1 -right-1 w-7 h-7 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center text-base border-2 border-white dark:border-gray-800 shadow-sm">
                           {getNotificationIcon(notification.type)}
                         </div>
                       </div>
@@ -211,17 +218,33 @@ export default function NotificationDropdown() {
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-gray-900 dark:text-white">
-                          <span className="font-semibold">{notification.sender.username}</span>
-                          {' '}
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {notification.message}
-                          </span>
+                          {/* Với campaign_approved/rejected, chỉ hiển thị message */}
+                          {notification.type === 'campaign_approved' || notification.type === 'campaign_rejected' ? (
+                            <span className="text-gray-700 dark:text-gray-300">
+                              {notification.message}
+                            </span>
+                          ) : (
+                            <>
+                              <span className="font-semibold">{notification.sender?.username || 'Unknown User'}</span>
+                              {' '}
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {notification.message}
+                              </span>
+                            </>
+                          )}
                         </p>
                         
                         {/* Post Preview */}
                         {notification.post && (
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
                             "{notification.post.content_text}"
+                          </p>
+                        )}
+                        
+                        {/* Campaign Preview */}
+                        {notification.campaign && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
+                            "{notification.campaign.title}"
                           </p>
                         )}
                         
