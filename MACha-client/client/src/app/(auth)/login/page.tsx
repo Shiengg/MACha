@@ -43,13 +43,25 @@ function LoginPageContent() {
         });
         
         const userRole = res.data.user?.role;
+        const userId = res.data.user?.id;
         const returnUrl = searchParams.get('returnUrl');
         const redirectParam = searchParams.get('redirect');
         
         if (userRole === 'admin') {
           router.push(redirectParam || '/admin/dashboard');
         } else {
-          router.push(returnUrl || '/');
+          // ✅ Check if returnUrl is a profile page
+          if (returnUrl && returnUrl.startsWith('/profile/')) {
+            const profileUserId = returnUrl.split('/profile/')[1];
+            // If returnUrl is someone else's profile, redirect to own profile
+            if (profileUserId && profileUserId !== userId) {
+              router.push(`/profile/${userId}`);
+            } else {
+              router.push(returnUrl);
+            }
+          } else {
+            router.push(returnUrl || '/');
+          }
         }
       }
     } catch (error: any) {
