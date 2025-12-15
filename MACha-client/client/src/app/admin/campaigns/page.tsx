@@ -339,18 +339,28 @@ export default function AdminCampaignApproval() {
                         <td className="px-6 py-4">{getStatusBadge(campaign.status)}</td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleApprove(campaign._id)}
-                              className="px-3 py-1 bg-green-900/30 text-green-500 rounded-lg text-sm hover:bg-green-900/50 transition-all"
-                            >
-                              Duyệt
-                            </button>
-                            <button
-                              onClick={() => handleReject(campaign._id)}
-                              className="px-3 py-1 bg-red-900/30 text-red-500 rounded-lg text-sm hover:bg-red-900/50 transition-all"
-                            >
-                              Từ chối
-                            </button>
+                            {campaign.status === 'pending' ? (
+                              <>
+                                <button
+                                  onClick={() => handleApprove(campaign._id)}
+                                  className="px-3 py-1 bg-green-900/30 text-green-500 rounded-lg text-sm hover:bg-green-900/50 transition-all"
+                                >
+                                  Duyệt
+                                </button>
+                                <button
+                                  onClick={() => handleReject(campaign._id)}
+                                  className="px-3 py-1 bg-red-900/30 text-red-500 rounded-lg text-sm hover:bg-red-900/50 transition-all"
+                                >
+                                  Từ chối
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                className="px-3 py-1 bg-blue-900/30 text-blue-400 rounded-lg text-sm hover:bg-blue-900/50 transition-all"
+                              >
+                                Xem chi tiết
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
