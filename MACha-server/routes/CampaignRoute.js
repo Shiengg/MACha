@@ -2,7 +2,8 @@ import { Router } from "express";
 import { 
     getAllCampaigns, 
     getCampaignById, 
-    getCampaignsByCategory, 
+    getCampaignsByCategory,
+    getActiveCategories,
     createCampaign, 
     updateCampaign, 
     deleteCampaign, 
@@ -18,6 +19,7 @@ import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 const campaignRoutes = Router();
 
 campaignRoutes.get('/', RateLimitMiddleware.rateLimitByIP(100, 60), getAllCampaigns);
+campaignRoutes.get('/categories/active', RateLimitMiddleware.rateLimitByIP(100, 60), getActiveCategories);
 campaignRoutes.get('/category', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignsByCategory);
 campaignRoutes.get('/pending', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), getPendingCampaigns);
 campaignRoutes.get('/:id', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignById);
@@ -60,6 +62,8 @@ campaignRoutes.post('/:id/reject', authMiddleware, checkRole('admin'), RateLimit
  *         - current_amount
  *         - start_date
  *         - category
+ *         - banner_image
+ *         - proof_documents_url
  *       properties:
  *         title:
  *           type: string
@@ -97,9 +101,19 @@ campaignRoutes.post('/:id/reject', authMiddleware, checkRole('admin'), RateLimit
  *           enum: ["children", "elderly", "poverty", "disaster", "medical", "education", "disability", "animal", "environment", "community", "other"]
  *           description: Campaign category
  *           example: "medical"
+ *         banner_image:
+ *           type: string
+ *           description: Main banner image URL (required)
+ *           example: "https://example.com/images/campaign-banner.jpg"
+ *         gallery_images:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: Additional gallery images (optional)
+ *           example: ["https://example.com/images/gallery1.jpg", "https://example.com/images/gallery2.jpg"]
  *         proof_documents_url:
  *           type: string
- *           description: URL to proof documents
+ *           description: URL to proof documents (required for verification)
  *           example: "https://example.com/documents/campaign-proof.pdf"
  *       additionalProperties: false
  *     
@@ -132,6 +146,16 @@ campaignRoutes.post('/:id/reject', authMiddleware, checkRole('admin'), RateLimit
  *           enum: ["pending", "active", "rejected", "completed", "cancelled"]
  *           description: Campaign status
  *           example: "pending"
+ *         banner_image:
+ *           type: string
+ *           description: Main banner image URL
+ *           example: "https://example.com/images/updated-banner.jpg"
+ *         gallery_images:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: Additional gallery images
+ *           example: ["https://example.com/images/gallery1.jpg", "https://example.com/images/gallery2.jpg"]
  *         proof_documents_url:
  *           type: string
  *           description: URL to proof documents
@@ -187,16 +211,20 @@ campaignRoutes.post('/:id/reject', authMiddleware, checkRole('admin'), RateLimit
  *           enum: ["children", "elderly", "poverty", "disaster", "medical", "education", "disability", "animal", "environment", "community", "other"]
  *           description: Campaign category
  *           example: "medical"
+ *         banner_image:
+ *           type: string
+ *           description: Main banner image URL
+ *           example: "https://example.com/images/campaign-banner.jpg"
+ *         gallery_images:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: Additional gallery images
+ *           example: ["https://example.com/images/gallery1.jpg", "https://example.com/images/gallery2.jpg"]
  *         proof_documents_url:
  *           type: string
  *           description: URL to proof documents
  *           example: "https://example.com/documents/campaign-proof.pdf"
- *         media_url:
- *           type: array
- *           items:
- *             type: string
- *           description: Array of media URLs
- *           example: ["https://example.com/image1.jpg", "https://example.com/image2.jpg"]
  *         cancellation_reason:
  *           type: string
  *           description: Reason for cancellation (if cancelled)

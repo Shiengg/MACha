@@ -43,6 +43,7 @@ export const UPDATE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}`;
 export const DELETE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}`;
 export const CANCEL_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/cancel`;
 export const GET_CAMPAIGNS_BY_CATEGORY_ROUTE = `${CAMPAIGN_ROUTE}/category`;
+export const GET_ACTIVE_CATEGORIES_ROUTE = `${CAMPAIGN_ROUTE}/categories/active`;
 export const GET_PENDING_CAMPAIGNS_ROUTE = `${CAMPAIGN_ROUTE}/pending`;
 export const APPROVE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/approve`;
 export const REJECT_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/reject`;

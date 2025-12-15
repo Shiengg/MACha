@@ -52,12 +52,17 @@ const campaignSchema = new mongoose.Schema({
         required: true,
         index: true  
     },
-    proof_documents_url: {
-        type: String
+    banner_image: {
+        type: String,
+        required: [true, 'Banner image is required'],
     },
-    media_url: [{
-        type: String
+    gallery_images: [{
+        type: String,
     }],
+    proof_documents_url: {
+        type: String,
+        //required: [true, 'Proof documents are required for verification']
+    },
     cancellation_reason: {
         type: String,
         default: null

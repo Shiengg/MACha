@@ -83,6 +83,40 @@ export const getCampaignsByCategory = async (category) => {
     return campaigns;
 }
 
+export const getActiveCategories = async () => {
+    const cacheKey = 'campaigns:active-categories';
+
+    // Check cache
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+
+    // Get distinct categories from active campaigns
+    const categories = await Campaign.distinct('category', { status: 'active' });
+
+    // Get count for each category
+    const categoriesWithCount = await Promise.all(
+        categories.map(async (category) => {
+            const count = await Campaign.countDocuments({ 
+                category, 
+                status: 'active' 
+            });
+            return { category, count };
+        })
+    );
+
+    // Filter out categories with 0 campaigns and sort by count
+    const result = categoriesWithCount
+        .filter(item => item.count > 0)
+        .sort((a, b) => b.count - a.count);
+
+    // Save to cache (TTL: 10 minutes)
+    await redisClient.setEx(cacheKey, 600, JSON.stringify(result));
+
+    return result;
+}
+
 /**
  * Update campaign with restrictions after donations
  */
@@ -103,7 +137,7 @@ export const updateCampaign = async (campaignId, userId, payload) => {
     if (campaign.current_amount > 0) {
         const allowedFields = [
             'description',
-            'media_url', 
+            'gallery_images',  // Changed from media_url
             'proof_documents_url',
             'status'
         ];
@@ -123,7 +157,7 @@ export const updateCampaign = async (campaignId, userId, payload) => {
             };
         }
         
-        const restrictedFields = ['goal_amount', 'end_date', 'title'];
+        const restrictedFields = ['goal_amount', 'end_date', 'title', 'banner_image'];
         const attemptedRestrictedFields = restrictedFields.filter(field => payload[field] !== undefined);
         
         if (attemptedRestrictedFields.length > 0) {

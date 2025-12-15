@@ -62,6 +62,15 @@ export const getCampaignsByCategory = async (req, res) => {
     }
 }
 
+export const getActiveCategories = async (req, res) => {
+    try {
+        const categories = await campaignService.getActiveCategories();
+        res.status(HTTP_STATUS.OK).json({ categories });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
+    }
+}
+
 export const createCampaign = async (req, res) => {
     try {
         if (req.user.kyc_status !== 'verified') {

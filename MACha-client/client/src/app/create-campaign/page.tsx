@@ -18,7 +18,8 @@ interface FormData {
   story: string;
   commitment: string;
   proof_documents: File[];
-  media_files: File[];
+  banner_image: File | null;
+  gallery_images: File[];
 }
 
 const CATEGORIES = [
@@ -53,15 +54,18 @@ function CreateCampaignContent() {
     story: '',
     commitment: '',
     proof_documents: [],
-    media_files: [],
+    banner_image: null,
+    gallery_images: [],
   });
 
   const [previewUrls, setPreviewUrls] = useState<{
     proof_documents: string[];
-    media_files: string[];
+    banner_image: string | null;
+    gallery_images: string[];
   }>({
     proof_documents: [],
-    media_files: [],
+    banner_image: null,
+    gallery_images: [],
   });
 
   const steps = [
@@ -127,7 +131,50 @@ function CreateCampaignContent() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleFileChange = (field: 'proof_documents' | 'media_files', files: FileList | null) => {
+  const handleBannerChange = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    
+    if (!file.type.startsWith('image/')) {
+      Swal.fire('Lỗi', 'Chỉ chấp nhận file ảnh', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      Swal.fire('Lỗi', `File quá lớn (max 5MB)`, 'error');
+      return;
+    }
+
+    if (previewUrls.banner_image) {
+      URL.revokeObjectURL(previewUrls.banner_image);
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      banner_image: file,
+    }));
+
+    setPreviewUrls(prev => ({
+      ...prev,
+      banner_image: URL.createObjectURL(file),
+    }));
+  };
+
+  const removeBanner = () => {
+    if (previewUrls.banner_image) {
+      URL.revokeObjectURL(previewUrls.banner_image);
+    }
+    setFormData(prev => ({
+      ...prev,
+      banner_image: null,
+    }));
+    setPreviewUrls(prev => ({
+      ...prev,
+      banner_image: null,
+    }));
+  };
+
+  const handleFileChange = (field: 'proof_documents' | 'gallery_images', files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     const fileArray = Array.from(files);
@@ -158,7 +205,7 @@ function CreateCampaignContent() {
     }));
   };
 
-  const removeFile = (field: 'proof_documents' | 'media_files', index: number) => {
+  const removeFile = (field: 'proof_documents' | 'gallery_images', index: number) => {
     setFormData(prev => ({
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index),
@@ -231,6 +278,10 @@ function CreateCampaignContent() {
           Swal.fire('Thiếu tài liệu', 'Vui lòng upload ít nhất 1 tài liệu chứng minh', 'warning');
           return false;
         }
+        if (!formData.banner_image) {
+          Swal.fire('Thiếu ảnh banner', 'Vui lòng upload ảnh banner cho chiến dịch', 'warning');
+          return false;
+        }
         return true;
 
       default:
@@ -263,7 +314,8 @@ function CreateCampaignContent() {
 
     if (result.isConfirmed) {
       previewUrls.proof_documents.forEach(url => URL.revokeObjectURL(url));
-      previewUrls.media_files.forEach(url => URL.revokeObjectURL(url));
+      if (previewUrls.banner_image) URL.revokeObjectURL(previewUrls.banner_image);
+      previewUrls.gallery_images.forEach(url => URL.revokeObjectURL(url));
       router.back();
     }
   };
@@ -306,23 +358,34 @@ function CreateCampaignContent() {
         },
       });
 
-      let proofDocUrl = '';
-      let mediaUrls: string[] = [];
-
-      if (formData.proof_documents.length > 0) {
-        const proofResults = await cloudinaryService.uploadMultipleImages(
-          formData.proof_documents,
-          'campaigns/proofs'
-        );
-        proofDocUrl = proofResults[0].secure_url;
+      // Upload proof documents
+      if (formData.proof_documents.length === 0) {
+        throw new Error('Vui lòng upload tài liệu chứng minh');
       }
+      const proofResults = await cloudinaryService.uploadMultipleImages(
+        formData.proof_documents,
+        'campaigns/proofs'
+      );
+      const proofDocUrl = proofResults[0].secure_url;
 
-      if (formData.media_files.length > 0) {
-        const mediaResults = await cloudinaryService.uploadMultipleImages(
-          formData.media_files,
-          'campaigns/media'
+      // Upload banner image (required)
+      if (!formData.banner_image) {
+        throw new Error('Vui lòng upload ảnh banner');
+      }
+      const bannerResult = await cloudinaryService.uploadMultipleImages(
+        [formData.banner_image],
+        'campaigns/banners'
+      );
+      const bannerImage = bannerResult[0].secure_url;
+
+      // Upload gallery images (optional)
+      let galleryImages: string[] = [];
+      if (formData.gallery_images.length > 0) {
+        const galleryResults = await cloudinaryService.uploadMultipleImages(
+          formData.gallery_images,
+          'campaigns/gallery'
         );
-        mediaUrls = mediaResults.map(r => r.secure_url);
+        galleryImages = galleryResults.map(r => r.secure_url);
       }
 
       const fullDescription = `${formData.description}\n\n--- Câu chuyện ---\n${formData.story}\n\n--- Cam kết ---\n${formData.commitment}`;
@@ -334,14 +397,16 @@ function CreateCampaignContent() {
         start_date: new Date().toISOString(),
         end_date: new Date(formData.end_date).toISOString(),
         category: formData.category,
+        banner_image: bannerImage,
+        gallery_images: galleryImages.length > 0 ? galleryImages : undefined,
         proof_documents_url: proofDocUrl,
-        media_url: mediaUrls,
       };
 
       await campaignService.createCampaign(payload);
 
       previewUrls.proof_documents.forEach(url => URL.revokeObjectURL(url));
-      previewUrls.media_files.forEach(url => URL.revokeObjectURL(url));
+      if (previewUrls.banner_image) URL.revokeObjectURL(previewUrls.banner_image);
+      previewUrls.gallery_images.forEach(url => URL.revokeObjectURL(url));
 
       await Swal.fire({
         icon: 'success',
@@ -549,27 +614,68 @@ function CreateCampaignContent() {
                   <p className="text-xs text-gray-500 mt-1">{formData.story.length}/5000 ký tự (tối thiểu 100)</p>
                 </div>
 
+                {/* Banner Image */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Ảnh minh họa (tùy chọn)
+                    Ảnh Banner <span className="text-red-500">*</span>
                   </label>
+                  <p className="text-xs text-gray-500 mb-2">Ảnh chính hiển thị đầu tiên cho chiến dịch (tỷ lệ 16:9 khuyến nghị)</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleBannerChange(e.target.files)}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Tối đa 5MB</p>
+                  
+                  {previewUrls.banner_image && (
+                    <div className="relative mt-4 w-full h-64">
+                      <img 
+                        src={previewUrls.banner_image} 
+                        alt="Banner preview" 
+                        className="w-full h-full object-cover rounded-lg border-2 border-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeBanner}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600 shadow-lg"
+                      >
+                        ×
+                      </button>
+                      <div className="absolute bottom-2 left-2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+                        Banner chính
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Gallery Images */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Ảnh Gallery (tùy chọn)
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">Thêm các ảnh minh họa khác cho chiến dịch</p>
                   <input
                     type="file"
                     accept="image/*"
                     multiple
-                    onChange={(e) => handleFileChange('media_files', e.target.files)}
+                    onChange={(e) => handleFileChange('gallery_images', e.target.files)}
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Tối đa 5MB mỗi ảnh</p>
+                  <p className="text-xs text-gray-500 mt-1">Tối đa 5MB mỗi ảnh, có thể chọn nhiều ảnh</p>
                   
-                  {previewUrls.media_files.length > 0 && (
+                  {previewUrls.gallery_images.length > 0 && (
                     <div className="grid grid-cols-3 gap-4 mt-4">
-                      {previewUrls.media_files.map((url, index) => (
+                      {previewUrls.gallery_images.map((url, index) => (
                         <div key={index} className="relative">
-                          <img src={url} alt={`Media ${index + 1}`} className="w-full h-32 object-cover rounded-lg" />
+                          <img 
+                            src={url} 
+                            alt={`Gallery ${index + 1}`} 
+                            className="w-full h-32 object-cover rounded-lg border border-gray-600"
+                          />
                           <button
                             type="button"
-                            onClick={() => removeFile('media_files', index)}
+                            onClick={() => removeFile('gallery_images', index)}
                             className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
                           >
                             ×
@@ -676,8 +782,12 @@ function CreateCampaignContent() {
                         <p className="text-gray-700 dark:text-gray-300 line-clamp-3">{formData.story}</p>
                       </div>
                       <div>
-                        <p className="font-medium mb-1">Ảnh minh họa:</p>
-                        <p className="text-gray-700 dark:text-gray-300">{formData.media_files.length} ảnh</p>
+                        <p className="font-medium mb-1">Hình ảnh:</p>
+                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                          <span>✅ Banner: {formData.banner_image ? '1 ảnh' : 'Chưa có'}</span>
+                          <span>•</span>
+                          <span>📷 Gallery: {formData.gallery_images.length} ảnh</span>
+                        </div>
                       </div>
                     </div>
                   </div>
