@@ -92,22 +92,15 @@ export default function Header() {
                         {/* Navigation Links */}
                         <button
                             onClick={() => router.push('/discover')}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all hidden md:block"
+                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all hidden md:block font-inter"
                         >
                             Khám phá
-                        </button>
-
-                        <button
-                            onClick={() => router.push('/create-fund')}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all hidden md:block"
-                        >
-                            Tạo quỹ
                         </button>
 
                         {/* Create Campaign Button - Highlighted */}
                         <button
                             onClick={() => router.push('/create-campaign')}
-                            className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hidden sm:block"
+                            className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hidden sm:block font-inter"
                         >
                             Tạo chiến dịch
                         </button>
@@ -137,7 +130,7 @@ export default function Header() {
                                 </button>
 
                                 {/* Dropdown Menu */}
-                                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-2">
+                                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-2 font-inter">
                                     <div className="px-4 py-3 border-b border-gray-100">
                                         <p className="text-sm font-semibold text-gray-900">
                                             {user.username || 'User'}
