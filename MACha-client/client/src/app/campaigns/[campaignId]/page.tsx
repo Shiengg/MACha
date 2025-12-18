@@ -1,0 +1,494 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import ProtectedRoute from '@/components/guards/ProtectedRoute';
+import { campaignService, Campaign } from '@/services/campaign.service';
+import Image from 'next/image';
+
+// Mock donors data - in real app, this would come from API
+const mockDonors = [
+    { id: 1, name: 'Nguyễn Văn A', amount: 2000000, time: '2 giờ trước', avatar: null, isRecent: true },
+    { id: 2, name: 'Trần Thị B', amount: 1500000, time: '3 giờ trước', avatar: null },
+    { id: 3, name: 'Lê Văn C', amount: 5000000, time: '5 giờ trước', avatar: null, isTop: true },
+    { id: 4, name: 'Phạm Thị D', amount: 1000000, time: '6 giờ trước', avatar: null },
+];
+
+function CampaignDetails() {
+    const params = useParams();
+    const router = useRouter();
+    const campaignId = params.campaignId as string;
+
+    const [campaign, setCampaign] = useState<Campaign | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'story' | 'updates' | 'supporters'>('story');
+
+    useEffect(() => {
+        const fetchCampaign = async () => {
+            try {
+                setLoading(true);
+                const data = await campaignService.getCampaignById(campaignId);
+                setCampaign(data);
+            } catch (err: any) {
+                setError(err.response?.data?.message || 'Không thể tải thông tin chiến dịch');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (campaignId) {
+            fetchCampaign();
+        }
+    }, [campaignId]);
+
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
+    };
+
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+        });
+    };
+
+    const calculateDaysLeft = (endDate: string) => {
+        const end = new Date(endDate);
+        const now = new Date();
+        const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return diff > 0 ? diff : 0;
+    };
+
+    if (loading) {
+        return (
+            <ProtectedRoute>
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-gray-600">Đang tải thông tin chiến dịch...</p>
+                    </div>
+                </div>
+            </ProtectedRoute>
+        );
+    }
+
+    if (error || !campaign) {
+        return (
+            <ProtectedRoute>
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="text-6xl mb-4">😔</div>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                            {error || 'Không tìm thấy chiến dịch'}
+                        </h2>
+                        <button
+                            onClick={() => router.back()}
+                            className="mt-4 px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition"
+                        >
+                            Quay lại
+                        </button>
+                    </div>
+                </div>
+            </ProtectedRoute>
+        );
+    }
+
+    const progress = Math.min((campaign.current_amount / campaign.goal_amount) * 100, 100);
+    const daysLeft = campaign.end_date ? calculateDaysLeft(campaign.end_date) : null;
+
+    return (
+        <ProtectedRoute>
+            <div className="min-h-screen bg-gray-50">
+                {/* Hero Section with Background */}
+                <div className="relative h-[200px]">
+                    {/* Background Image with Blur */}
+                    <div className="absolute inset-0 overflow-hidden">
+                        <div 
+                            className="absolute inset-0 bg-cover bg-center"
+                            style={{ 
+                                backgroundImage: `url(${campaign.banner_image})`,
+                                filter: 'blur(8px)',
+                                transform: 'scale(1.1)'
+                            }}
+                        />
+                        <div className="absolute inset-0 bg-black/40" />
+                    </div>
+
+                    {/* Hero Content */}
+                    <div className="relative max-w-6xl mx-auto px-4 pt-12">
+                        <h1 className="text-4xl md:text-5xl font-bold text-white mb-3 drop-shadow-lg">
+                            {campaign.title}
+                        </h1>
+                        <p className="text-white/80 text-sm">
+                            Tổ chức bởi <span className="text-orange-400 font-medium">{campaign.contact_info?.fullname || campaign.creator?.fullname}</span>
+                        </p>
+                    </div>
+                </div>
+
+                {/* Main Content */}
+                <div className="max-w-6xl mx-auto px-4 -mt-8 relative z-10 pb-12">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Left Column - Main Content */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {/* Progress Card */}
+                            <div className="bg-white rounded-2xl shadow-lg p-6">
+                                <div className="flex justify-between items-end mb-3">
+                                    <span className="text-3xl font-bold text-orange-500">
+                                        {formatCurrency(campaign.current_amount)}
+                                    </span>
+                                    <span className="text-gray-500">
+                                        Mục tiêu: {formatCurrency(campaign.goal_amount)}
+                                    </span>
+                                </div>
+
+                                {/* Progress Bar */}
+                                <div className="h-3 bg-gray-200 rounded-full overflow-hidden mb-6">
+                                    <div 
+                                        className="h-full rounded-full transition-all duration-500"
+                                        style={{ 
+                                            width: `${progress}%`,
+                                            background: 'linear-gradient(90deg, #f97316 0%, #fb923c 100%)'
+                                        }}
+                                    />
+                                </div>
+
+                                {/* Stats */}
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="text-center p-4 bg-gray-50 rounded-xl">
+                                        <div className="text-2xl font-bold text-orange-500">125</div>
+                                        <div className="text-gray-500 text-sm">Lượt ủng hộ</div>
+                                    </div>
+                                    <div className="text-center p-4 bg-gray-50 rounded-xl">
+                                        <div className="text-2xl font-bold text-green-500">
+                                            {daysLeft !== null ? daysLeft : '∞'}
+                                        </div>
+                                        <div className="text-gray-500 text-sm">Ngày còn lại</div>
+                                    </div>
+                                    <div className="text-center p-4 bg-gray-50 rounded-xl">
+                                        <div className="text-2xl font-bold text-blue-500">283</div>
+                                        <div className="text-gray-500 text-sm">Lượt chia sẻ</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tabs */}
+                            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                                <div className="flex border-b">
+                                    <button
+                                        onClick={() => setActiveTab('story')}
+                                        className={`flex-1 py-4 px-6 text-center font-medium transition ${
+                                            activeTab === 'story'
+                                                ? 'text-orange-500 border-b-2 border-orange-500 bg-orange-50/50'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                    >
+                                        <span className="flex items-center justify-center gap-2">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                            </svg>
+                                            Câu chuyện
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('updates')}
+                                        className={`flex-1 py-4 px-6 text-center font-medium transition ${
+                                            activeTab === 'updates'
+                                                ? 'text-orange-500 border-b-2 border-orange-500 bg-orange-50/50'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                    >
+                                        <span className="flex items-center justify-center gap-2">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                            </svg>
+                                            Cập nhật (5)
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('supporters')}
+                                        className={`flex-1 py-4 px-6 text-center font-medium transition ${
+                                            activeTab === 'supporters'
+                                                ? 'text-orange-500 border-b-2 border-orange-500 bg-orange-50/50'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                    >
+                                        <span className="flex items-center justify-center gap-2">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                            </svg>
+                                            Người ủng hộ (125)
+                                        </span>
+                                    </button>
+                                </div>
+
+                                {/* Tab Content */}
+                                <div className="p-6">
+                                    {activeTab === 'story' && (
+                                        <div className="space-y-6">
+                                            {/* Info Grid */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                {/* Location */}
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2 text-gray-500">
+                                                        <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                                                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                                                        </svg>
+                                                        <span className="font-medium">Địa điểm</span>
+                                                    </div>
+                                                    <p className="text-gray-700 text-sm leading-relaxed">
+                                                        {campaign.contact_info?.address || 'Chưa cập nhật địa chỉ'}
+                                                    </p>
+                                                </div>
+
+                                                {/* Organizer */}
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2 text-gray-500">
+                                                        <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                                                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                                                        </svg>
+                                                        <span className="font-medium">Người kêu gọi</span>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-gray-900 font-semibold">
+                                                            {campaign.contact_info?.fullname || 'Chưa cập nhật'}
+                                                        </p>
+                                                        <p className="text-gray-500 text-xs">Tổ chức từ thiện được xác thực</p>
+                                                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                                            <span className="flex items-center gap-1">
+                                                                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 24 24">
+                                                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                                                </svg>
+                                                                Đã thực hiện 25 chiến dịch thành công
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
+                                                            <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                                                                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                                                            </svg>
+                                                            Có 15,000+ người theo dõi
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Time Info */}
+                                            <div className="bg-gray-50 rounded-xl p-4">
+                                                <div className="flex items-center gap-2 text-gray-500 mb-2">
+                                                    <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <span className="font-medium">Thời gian</span>
+                                                </div>
+                                                <div className="text-sm text-gray-700 space-y-1">
+                                                    <p>Bắt đầu: {formatDate(campaign.start_date)}</p>
+                                                    <p>Kết thúc: {campaign.end_date ? formatDate(campaign.end_date) : 'Chưa xác định'}</p>
+                                                    {daysLeft !== null && daysLeft > 0 && (
+                                                        <p className="text-orange-500 font-medium">(Còn {daysLeft} ngày)</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Story */}
+                                            <div>
+                                                <h3 className="text-xl font-bold text-gray-900 mb-4">Hoàn cảnh</h3>
+                                                <div className="prose prose-gray max-w-none">
+                                                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                                                        {campaign.description || 'Chưa có mô tả chi tiết về chiến dịch này.'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Gallery Images */}
+                                            {campaign.gallery_images && campaign.gallery_images.length > 0 && (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    {campaign.gallery_images.slice(0, 4).map((img, index) => (
+                                                        <div key={index} className="relative aspect-video rounded-xl overflow-hidden">
+                                                            <img 
+                                                                src={img} 
+                                                                alt={`Gallery ${index + 1}`}
+                                                                className="w-full h-full object-cover hover:scale-105 transition duration-300"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Banner Image */}
+                                            {campaign.banner_image && (
+                                                <div className="relative aspect-video rounded-xl overflow-hidden">
+                                                    <img 
+                                                        src={campaign.banner_image} 
+                                                        alt="Campaign banner"
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Timeline */}
+                                            <div className="bg-gray-50 rounded-xl p-6">
+                                                <div className="flex items-center gap-2 mb-4">
+                                                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <h3 className="font-bold text-gray-900">Tiến độ dự kiến</h3>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                                        <span className="text-sm text-gray-700">Tháng 10/2025: Hoàn thành gây quỹ</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                                                        <span className="text-sm text-gray-700">Tháng 11/2025: Khởi công xây dựng</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-3 h-3 rounded-full bg-blue-400"></div>
+                                                        <span className="text-sm text-gray-700">Tháng 12/2025: Hoàn thiện cơ sở vật chất</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-3 h-3 rounded-full bg-blue-300"></div>
+                                                        <span className="text-sm text-gray-700">Tháng 01/2026: Khánh thành và bàn giao</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === 'updates' && (
+                                        <div className="text-center py-12 text-gray-500">
+                                            <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                            </svg>
+                                            <p>Chưa có cập nhật nào</p>
+                                        </div>
+                                    )}
+
+                                    {activeTab === 'supporters' && (
+                                        <div className="space-y-4">
+                                            {mockDonors.map((donor) => (
+                                                <div key={donor.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
+                                                    <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full flex items-center justify-center text-white font-bold">
+                                                        {donor.name.charAt(0)}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-semibold text-gray-900">{donor.name}</p>
+                                                            {donor.isTop && (
+                                                                <span className="text-yellow-500">⭐</span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-orange-500 font-medium">{formatCurrency(donor.amount)}</p>
+                                                        <p className="text-gray-400 text-xs">{donor.time}</p>
+                                                    </div>
+                                                    {donor.isRecent && (
+                                                        <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Column - Sidebar */}
+                        <div className="space-y-6">
+                            {/* Donate Card */}
+                            <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-6">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                        <svg className="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-gray-900">Chung tay ủng hộ</h3>
+                                        <p className="text-gray-500 text-sm">Mỗi đồng góp đều có ý nghĩa</p>
+                                    </div>
+                                </div>
+                                <button className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Ủng hộ ngay
+                                </button>
+                            </div>
+
+                            {/* Donors List */}
+                            <div className="bg-white rounded-2xl shadow-lg p-6">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                                    </svg>
+                                    <h3 className="font-bold text-gray-900">Danh sách ủng hộ</h3>
+                                </div>
+                                <div className="space-y-4">
+                                    {mockDonors.map((donor) => (
+                                        <div key={donor.id} className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                                {donor.name.charAt(0)}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-medium text-gray-900 text-sm truncate">{donor.name}</p>
+                                                    {donor.isTop && (
+                                                        <span className="text-yellow-500 text-xs">👑</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-orange-500 text-sm font-medium">{formatCurrency(donor.amount)}</p>
+                                                <p className="text-gray-400 text-xs">{donor.time}</p>
+                                            </div>
+                                            {donor.isRecent && (
+                                                <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0"></div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                <button className="w-full mt-4 py-2 text-gray-500 hover:text-gray-700 text-sm font-medium flex items-center justify-center gap-1">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                    </svg>
+                                    Xem tất cả
+                                </button>
+                            </div>
+
+                            {/* Share */}
+                            <div className="bg-white rounded-2xl shadow-lg p-6">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+                                    </svg>
+                                    <h3 className="font-bold text-gray-900">Chia sẻ chiến dịch</h3>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button className="flex-1 py-2 px-4 border border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50 transition flex items-center justify-center gap-2 text-sm font-medium">
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                                        </svg>
+                                        Facebook
+                                    </button>
+                                    <button className="flex-1 py-2 px-4 border border-sky-400 text-sky-400 rounded-lg hover:bg-sky-50 transition flex items-center justify-center gap-2 text-sm font-medium">
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+                                        </svg>
+                                        Twitter
+                                    </button>
+                                    <button className="flex-1 py-2 px-4 border border-red-400 text-red-400 rounded-lg hover:bg-red-50 transition flex items-center justify-center gap-2 text-sm font-medium">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
+                                        Email
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </ProtectedRoute>
+    );
+}
+
+export default CampaignDetails;

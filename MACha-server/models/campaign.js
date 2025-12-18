@@ -6,6 +6,31 @@ const campaignSchema = new mongoose.Schema({
         ref: "User",
         required: true
     },
+    // Contact Information
+    contact_info: {
+        fullname: {
+            type: String,
+            required: true
+        },
+        phone: {
+            type: String,
+            required: true
+        },
+        email: {
+            type: String,
+            required: true
+        },
+        social_links: {
+            facebook: String,
+            instagram: String,
+            twitter: String,
+            website: String
+        },
+        address: {
+            type: String,
+            required: true
+        }
+    },
     title: {
         type: String,
         required: true

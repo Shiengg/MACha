@@ -18,6 +18,18 @@ export interface Campaign {
     fullname?: string;
     avatar?: string;
   };
+  contact_info: {
+    fullname: string;
+    phone: string;
+    email: string;
+    social_links?: {
+      facebook?: string;
+      instagram?: string;
+      twitter?: string;
+      website?: string;
+    };
+    address: string;
+  };
   title: string;
   description?: string;
   goal_amount: number;
@@ -39,6 +51,18 @@ export interface Campaign {
 }
 
 export interface CreateCampaignPayload {
+  contact_info: {
+    fullname: string;
+    phone: string;
+    email: string;
+    social_links?: {
+      facebook?: string;
+      instagram?: string;
+      twitter?: string;
+      website?: string;
+    };
+    address: string;
+  };
   title: string;
   description?: string;
   goal_amount: number;
