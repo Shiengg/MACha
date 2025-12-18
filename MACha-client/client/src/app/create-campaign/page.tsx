@@ -10,15 +10,28 @@ import { kycService } from '@/services/kyc.service';
 import { cloudinaryService } from '@/services/cloudinary.service';
 
 interface FormData {
+  // Step 1: Contact Information
+  fullname: string;
+  phone: string;
+  email: string;
+  facebook: string;
+  instagram: string;
+  twitter: string;
+  website: string;
+  address: string;
+  // Step 2: Campaign Information (Basic + Detailed Content)
   title: string;
   category: string;
   goal_amount: string;
+  start_date: string;
   end_date: string;
   description: string;
   story: string;
+  // Step 3: Commitment & Documents
   commitment: string;
   proof_documents: File[];
-  media_files: File[];
+  banner_image: File | null;
+  gallery_images: File[];
 }
 
 const CATEGORIES = [
@@ -45,28 +58,43 @@ function CreateCampaignContent() {
   const totalSteps = 4;
 
   const [formData, setFormData] = useState<FormData>({
+    // Step 1: Contact Information
+    fullname: user?.fullname || '',
+    phone: '',
+    email: user?.email || '',
+    facebook: '',
+    instagram: '',
+    twitter: '',
+    website: '',
+    address: '',
+    // Step 2: Campaign Information
     title: '',
     category: '',
     goal_amount: '',
+    start_date: '',
     end_date: '',
     description: '',
     story: '',
+    // Step 3: Commitment & Documents
     commitment: '',
     proof_documents: [],
-    media_files: [],
+    banner_image: null,
+    gallery_images: [],
   });
 
   const [previewUrls, setPreviewUrls] = useState<{
     proof_documents: string[];
-    media_files: string[];
+    banner_image: string | null;
+    gallery_images: string[];
   }>({
     proof_documents: [],
-    media_files: [],
+    banner_image: null,
+    gallery_images: [],
   });
 
   const steps = [
-    { number: 1, title: 'Thông tin cơ bản' },
-    { number: 2, title: 'Nội dung chi tiết' },
+    { number: 1, title: 'Thông tin liên hệ' },
+    { number: 2, title: 'Thông tin chiến dịch' },
     { number: 3, title: 'Cam kết & Tài liệu' },
     { number: 4, title: 'Xem lại và gửi' },
   ];
@@ -127,7 +155,50 @@ function CreateCampaignContent() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleFileChange = (field: 'proof_documents' | 'media_files', files: FileList | null) => {
+  const handleBannerChange = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    
+    if (!file.type.startsWith('image/')) {
+      Swal.fire('Lỗi', 'Chỉ chấp nhận file ảnh', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      Swal.fire('Lỗi', `File quá lớn (max 5MB)`, 'error');
+      return;
+    }
+
+    if (previewUrls.banner_image) {
+      URL.revokeObjectURL(previewUrls.banner_image);
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      banner_image: file,
+    }));
+
+    setPreviewUrls(prev => ({
+      ...prev,
+      banner_image: URL.createObjectURL(file),
+    }));
+  };
+
+  const removeBanner = () => {
+    if (previewUrls.banner_image) {
+      URL.revokeObjectURL(previewUrls.banner_image);
+    }
+    setFormData(prev => ({
+      ...prev,
+      banner_image: null,
+    }));
+    setPreviewUrls(prev => ({
+      ...prev,
+      banner_image: null,
+    }));
+  };
+
+  const handleFileChange = (field: 'proof_documents' | 'gallery_images', files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     const fileArray = Array.from(files);
@@ -158,7 +229,7 @@ function CreateCampaignContent() {
     }));
   };
 
-  const removeFile = (field: 'proof_documents' | 'media_files', index: number) => {
+  const removeFile = (field: 'proof_documents' | 'gallery_images', index: number) => {
     setFormData(prev => ({
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index),
@@ -174,6 +245,37 @@ function CreateCampaignContent() {
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
+        // Contact Information
+        if (!formData.fullname.trim()) {
+          Swal.fire('Thiếu thông tin', 'Vui lòng nhập họ và tên', 'warning');
+          return false;
+        }
+        if (!formData.phone.trim()) {
+          Swal.fire('Thiếu thông tin', 'Vui lòng nhập số điện thoại', 'warning');
+          return false;
+        }
+        const phoneRegex = /^[0-9]{10,11}$/;
+        if (!phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
+          Swal.fire('Số điện thoại không hợp lệ', 'Vui lòng nhập số điện thoại hợp lệ (10-11 số)', 'warning');
+          return false;
+        }
+        if (!formData.email.trim()) {
+          Swal.fire('Thiếu thông tin', 'Vui lòng nhập email', 'warning');
+          return false;
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+          Swal.fire('Email không hợp lệ', 'Vui lòng nhập email hợp lệ', 'warning');
+          return false;
+        }
+        if (!formData.address.trim()) {
+          Swal.fire('Thiếu thông tin', 'Vui lòng nhập địa chỉ', 'warning');
+          return false;
+        }
+        return true;
+
+      case 2:
+        // Campaign Information (Basic + Detailed Content)
         if (!formData.title.trim()) {
           Swal.fire('Thiếu thông tin', 'Vui lòng nhập tiêu đề chiến dịch', 'warning');
           return false;
@@ -186,20 +288,29 @@ function CreateCampaignContent() {
           Swal.fire('Thiếu thông tin', 'Vui lòng nhập mục tiêu quyên góp hợp lệ', 'warning');
           return false;
         }
+        if (!formData.start_date) {
+          Swal.fire('Thiếu thông tin', 'Vui lòng chọn ngày bắt đầu', 'warning');
+          return false;
+        }
         if (!formData.end_date) {
           Swal.fire('Thiếu thông tin', 'Vui lòng chọn ngày kết thúc', 'warning');
           return false;
         }
+        const startDate = new Date(formData.start_date);
         const endDate = new Date(formData.end_date);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        if (endDate <= today) {
-          Swal.fire('Ngày không hợp lệ', 'Ngày kết thúc phải sau ngày hôm nay', 'warning');
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(0, 0, 0, 0);
+        
+        if (startDate < today) {
+          Swal.fire('Ngày không hợp lệ', 'Ngày bắt đầu không thể trước ngày hôm nay', 'warning');
           return false;
         }
-        return true;
-
-      case 2:
+        if (endDate <= startDate) {
+          Swal.fire('Ngày không hợp lệ', 'Ngày kết thúc phải sau ngày bắt đầu', 'warning');
+          return false;
+        }
         if (!formData.description.trim()) {
           Swal.fire('Thiếu thông tin', 'Vui lòng nhập mô tả ngắn', 'warning');
           return false;
@@ -219,6 +330,7 @@ function CreateCampaignContent() {
         return true;
 
       case 3:
+        // Commitment & Documents
         if (!formData.commitment.trim()) {
           Swal.fire('Thiếu thông tin', 'Vui lòng nhập cam kết sử dụng', 'warning');
           return false;
@@ -229,6 +341,10 @@ function CreateCampaignContent() {
         }
         if (formData.proof_documents.length === 0) {
           Swal.fire('Thiếu tài liệu', 'Vui lòng upload ít nhất 1 tài liệu chứng minh', 'warning');
+          return false;
+        }
+        if (!formData.banner_image) {
+          Swal.fire('Thiếu ảnh banner', 'Vui lòng upload ảnh banner cho chiến dịch', 'warning');
           return false;
         }
         return true;
@@ -263,7 +379,8 @@ function CreateCampaignContent() {
 
     if (result.isConfirmed) {
       previewUrls.proof_documents.forEach(url => URL.revokeObjectURL(url));
-      previewUrls.media_files.forEach(url => URL.revokeObjectURL(url));
+      if (previewUrls.banner_image) URL.revokeObjectURL(previewUrls.banner_image);
+      previewUrls.gallery_images.forEach(url => URL.revokeObjectURL(url));
       router.back();
     }
   };
@@ -306,42 +423,67 @@ function CreateCampaignContent() {
         },
       });
 
-      let proofDocUrl = '';
-      let mediaUrls: string[] = [];
-
-      if (formData.proof_documents.length > 0) {
-        const proofResults = await cloudinaryService.uploadMultipleImages(
-          formData.proof_documents,
-          'campaigns/proofs'
-        );
-        proofDocUrl = proofResults[0].secure_url;
+      // Upload proof documents
+      if (formData.proof_documents.length === 0) {
+        throw new Error('Vui lòng upload tài liệu chứng minh');
       }
+      const proofResults = await cloudinaryService.uploadMultipleImages(
+        formData.proof_documents,
+        'campaigns/proofs'
+      );
+      const proofDocUrl = proofResults[0].secure_url;
 
-      if (formData.media_files.length > 0) {
-        const mediaResults = await cloudinaryService.uploadMultipleImages(
-          formData.media_files,
-          'campaigns/media'
+      // Upload banner image (required)
+      if (!formData.banner_image) {
+        throw new Error('Vui lòng upload ảnh banner');
+      }
+      const bannerResult = await cloudinaryService.uploadMultipleImages(
+        [formData.banner_image],
+        'campaigns/banners'
+      );
+      const bannerImage = bannerResult[0].secure_url;
+
+      // Upload gallery images (optional)
+      let galleryImages: string[] = [];
+      if (formData.gallery_images.length > 0) {
+        const galleryResults = await cloudinaryService.uploadMultipleImages(
+          formData.gallery_images,
+          'campaigns/gallery'
         );
-        mediaUrls = mediaResults.map(r => r.secure_url);
+        galleryImages = galleryResults.map(r => r.secure_url);
       }
 
       const fullDescription = `${formData.description}\n\n--- Câu chuyện ---\n${formData.story}\n\n--- Cam kết ---\n${formData.commitment}`;
 
       const payload: CreateCampaignPayload = {
+        contact_info: {
+          fullname: formData.fullname,
+          phone: formData.phone,
+          email: formData.email,
+          social_links: {
+            facebook: formData.facebook || undefined,
+            instagram: formData.instagram || undefined,
+            twitter: formData.twitter || undefined,
+            website: formData.website || undefined,
+          },
+          address: formData.address,
+        },
         title: formData.title,
         description: fullDescription,
         goal_amount: parseFloat(formData.goal_amount),
-        start_date: new Date().toISOString(),
+        start_date: new Date(formData.start_date).toISOString(),
         end_date: new Date(formData.end_date).toISOString(),
         category: formData.category,
+        banner_image: bannerImage,
+        gallery_images: galleryImages.length > 0 ? galleryImages : undefined,
         proof_documents_url: proofDocUrl,
-        media_url: mediaUrls,
       };
 
       await campaignService.createCampaign(payload);
 
       previewUrls.proof_documents.forEach(url => URL.revokeObjectURL(url));
-      previewUrls.media_files.forEach(url => URL.revokeObjectURL(url));
+      if (previewUrls.banner_image) URL.revokeObjectURL(previewUrls.banner_image);
+      previewUrls.gallery_images.forEach(url => URL.revokeObjectURL(url));
 
       await Swal.fire({
         icon: 'success',
@@ -442,8 +584,136 @@ function CreateCampaignContent() {
             {currentStep === 1 && (
               <div className="space-y-6">
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
-                  Bước 1: Thông tin cơ bản
+                  Bước 1: Thông tin liên hệ
                 </h2>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  Thông tin này sẽ được sử dụng để liên hệ với bạn về chiến dịch
+                </p>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Họ và tên <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.fullname}
+                    onChange={(e) => handleInputChange('fullname', e.target.value)}
+                    placeholder="VD: Nguyễn Văn A"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Số điện thoại <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    placeholder="VD: 0901234567"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    placeholder="VD: example@email.com"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Địa chỉ <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={formData.address}
+                    onChange={(e) => handleInputChange('address', e.target.value)}
+                    placeholder="VD: 123 Đường ABC, Phường XYZ, Quận 1, TP.HCM"
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Liên kết mạng xã hội (tùy chọn)
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Facebook
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.facebook}
+                        onChange={(e) => handleInputChange('facebook', e.target.value)}
+                        placeholder="https://facebook.com/..."
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Instagram
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.instagram}
+                        onChange={(e) => handleInputChange('instagram', e.target.value)}
+                        placeholder="https://instagram.com/..."
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Twitter
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.twitter}
+                        onChange={(e) => handleInputChange('twitter', e.target.value)}
+                        placeholder="https://twitter.com/..."
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Website
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.website}
+                        onChange={(e) => handleInputChange('website', e.target.value)}
+                        placeholder="https://..."
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 2 && (
+              <div className="space-y-6">
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
+                  Bước 2: Thông tin chiến dịch
+                </h2>
+
+                {/* Basic Information */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+                  <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-2">📋 Thông tin cơ bản</h3>
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -488,7 +758,7 @@ function CreateCampaignContent() {
                     onChange={(e) => handleInputChange('goal_amount', e.target.value)}
                     placeholder="VD: 50000000"
                     min="0"
-                    step="100000"
+                    step="1"
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   {formData.goal_amount && (
@@ -498,26 +768,38 @@ function CreateCampaignContent() {
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Ngày kết thúc <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.end_date}
-                    onChange={(e) => handleInputChange('end_date', e.target.value)}
-                    min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-            )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Ngày bắt đầu <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.start_date}
+                      onChange={(e) => handleInputChange('start_date', e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
 
-            {currentStep === 2 && (
-              <div className="space-y-6">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
-                  Bước 2: Nội dung chi tiết
-                </h2>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Ngày kết thúc <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.end_date}
+                      onChange={(e) => handleInputChange('end_date', e.target.value)}
+                      min={formData.start_date || new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Detailed Content */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-8 mb-6">
+                  <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-2">📝 Nội dung chi tiết</h3>
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -548,37 +830,6 @@ function CreateCampaignContent() {
                   />
                   <p className="text-xs text-gray-500 mt-1">{formData.story.length}/5000 ký tự (tối thiểu 100)</p>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Ảnh minh họa (tùy chọn)
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => handleFileChange('media_files', e.target.files)}
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Tối đa 5MB mỗi ảnh</p>
-                  
-                  {previewUrls.media_files.length > 0 && (
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                      {previewUrls.media_files.map((url, index) => (
-                        <div key={index} className="relative">
-                          <img src={url} alt={`Media ${index + 1}`} className="w-full h-32 object-cover rounded-lg" />
-                          <button
-                            type="button"
-                            onClick={() => removeFile('media_files', index)}
-                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
@@ -590,12 +841,12 @@ function CreateCampaignContent() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Cam kết sử dụng <span className="text-red-500">*</span>
+                    Cam kết sử dụng quỹ <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={formData.commitment}
                     onChange={(e) => handleInputChange('commitment', e.target.value)}
-                    placeholder="Cam kết rõ ràng về việc sử dụng số tiền quyên góp: sẽ dùng vào việc gì, khi nào, như thế nào... (tối thiểu 50 ký tự)"
+                    placeholder="Cam kết cụ thể về việc sử dụng số tiền quyên góp (tối thiểu 50 ký tự)"
                     rows={6}
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     maxLength={2000}
@@ -603,6 +854,79 @@ function CreateCampaignContent() {
                   <p className="text-xs text-gray-500 mt-1">{formData.commitment.length}/2000 ký tự (tối thiểu 50)</p>
                 </div>
 
+                {/* Banner Image */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Ảnh Banner <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">Ảnh chính hiển thị đầu tiên cho chiến dịch (tỷ lệ 16:9 khuyến nghị)</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleBannerChange(e.target.files)}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Tối đa 5MB</p>
+                  
+                  {previewUrls.banner_image && (
+                    <div className="relative mt-4 w-full h-64">
+                      <img 
+                        src={previewUrls.banner_image} 
+                        alt="Banner preview" 
+                        className="w-full h-full object-cover rounded-lg border-2 border-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeBanner}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600 shadow-lg"
+                      >
+                        ×
+                      </button>
+                      <div className="absolute bottom-2 left-2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+                        Banner chính
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Gallery Images */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Ảnh Gallery (tùy chọn)
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">Thêm các ảnh minh họa khác cho chiến dịch</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => handleFileChange('gallery_images', e.target.files)}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Tối đa 5MB mỗi ảnh, có thể chọn nhiều ảnh</p>
+                  
+                  {previewUrls.gallery_images.length > 0 && (
+                    <div className="grid grid-cols-3 gap-4 mt-4">
+                      {previewUrls.gallery_images.map((url, index) => (
+                        <div key={index} className="relative">
+                          <img 
+                            src={url} 
+                            alt={`Gallery ${index + 1}`} 
+                            className="w-full h-32 object-cover rounded-lg border border-gray-600"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeFile('gallery_images', index)}
+                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Proof Documents */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Tài liệu chứng minh <span className="text-red-500">*</span>
@@ -655,11 +979,33 @@ function CreateCampaignContent() {
 
                 <div className="space-y-4">
                   <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Thông tin liên hệ</h3>
+                    <div className="space-y-2 text-sm">
+                      <p><span className="font-medium">Họ và tên:</span> {formData.fullname}</p>
+                      <p><span className="font-medium">Số điện thoại:</span> {formData.phone}</p>
+                      <p><span className="font-medium">Email:</span> {formData.email}</p>
+                      <p><span className="font-medium">Địa chỉ:</span> {formData.address}</p>
+                      {(formData.facebook || formData.instagram || formData.twitter || formData.website) && (
+                        <div>
+                          <p className="font-medium mb-1">Mạng xã hội:</p>
+                          <div className="space-y-1 ml-4">
+                            {formData.facebook && <p>• Facebook: {formData.facebook}</p>}
+                            {formData.instagram && <p>• Instagram: {formData.instagram}</p>}
+                            {formData.twitter && <p>• Twitter: {formData.twitter}</p>}
+                            {formData.website && <p>• Website: {formData.website}</p>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
                     <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Thông tin cơ bản</h3>
                     <div className="space-y-2 text-sm">
                       <p><span className="font-medium">Tiêu đề:</span> {formData.title}</p>
                       <p><span className="font-medium">Danh mục:</span> {CATEGORIES.find(c => c.value === formData.category)?.label}</p>
                       <p><span className="font-medium">Mục tiêu:</span> {parseFloat(formData.goal_amount).toLocaleString('vi-VN')} VNĐ</p>
+                      <p><span className="font-medium">Ngày bắt đầu:</span> {new Date(formData.start_date).toLocaleDateString('vi-VN')}</p>
                       <p><span className="font-medium">Ngày kết thúc:</span> {new Date(formData.end_date).toLocaleDateString('vi-VN')}</p>
                     </div>
                   </div>
@@ -676,8 +1022,12 @@ function CreateCampaignContent() {
                         <p className="text-gray-700 dark:text-gray-300 line-clamp-3">{formData.story}</p>
                       </div>
                       <div>
-                        <p className="font-medium mb-1">Ảnh minh họa:</p>
-                        <p className="text-gray-700 dark:text-gray-300">{formData.media_files.length} ảnh</p>
+                        <p className="font-medium mb-1">Hình ảnh:</p>
+                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                          <span>✅ Banner: {formData.banner_image ? '1 ảnh' : 'Chưa có'}</span>
+                          <span>•</span>
+                          <span>📷 Gallery: {formData.gallery_images.length} ảnh</span>
+                        </div>
                       </div>
                     </div>
                   </div>

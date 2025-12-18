@@ -6,6 +6,31 @@ const campaignSchema = new mongoose.Schema({
         ref: "User",
         required: true
     },
+    // Contact Information
+    contact_info: {
+        fullname: {
+            type: String,
+            required: true
+        },
+        phone: {
+            type: String,
+            required: true
+        },
+        email: {
+            type: String,
+            required: true
+        },
+        social_links: {
+            facebook: String,
+            instagram: String,
+            twitter: String,
+            website: String
+        },
+        address: {
+            type: String,
+            required: true
+        }
+    },
     title: {
         type: String,
         required: true
@@ -52,12 +77,17 @@ const campaignSchema = new mongoose.Schema({
         required: true,
         index: true  
     },
-    proof_documents_url: {
-        type: String
+    banner_image: {
+        type: String,
+        required: [true, 'Banner image is required'],
     },
-    media_url: [{
-        type: String
+    gallery_images: [{
+        type: String,
     }],
+    proof_documents_url: {
+        type: String,
+        //required: [true, 'Proof documents are required for verification']
+    },
     cancellation_reason: {
         type: String,
         default: null

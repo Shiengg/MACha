@@ -17,14 +17,14 @@ const workerRedisClient = createClient({
     url: process.env.REDIS_URL || "redis://localhost:6379"
 });
 
-workerRedisClient.on("error", (err) => console.error("❌ Worker Redis Error:", err));
+workerRedisClient.on("error", (err) => console.error("Worker Redis Error:", err));
 
 // Tạo Redis Publisher để gửi notification events
 const notificationPublisher = createClient({
     url: process.env.REDIS_URL || "redis://localhost:6379"
 });
 
-notificationPublisher.on("error", (err) => console.error("❌ Notification Publisher Error:", err));
+notificationPublisher.on("error", (err) => console.error("Notification Publisher Error:", err));
 
 async function processQueue() {
     console.log('🔄 Worker started! Listening to job_queue...');
@@ -62,7 +62,7 @@ async function processQueue() {
                     break;
             }
         } catch (error) {
-            console.error('❌ Error processing job:', error);
+            console.error('Error processing job:', error);
         }
     }
 }
@@ -78,7 +78,7 @@ async function handleSignUp(job) {
 
         console.log(`✅ Signup job completed for user ${job.userId}\n`);
     } catch (error) {
-        console.error('❌ Error processing signup job:', error);
+        console.error('Error processing signup job:', error);
     }
 }
 
@@ -91,7 +91,7 @@ async function handleCampaignCreated(job) {
             body: `Your campaign has been created successfully by ${job.userId}. You can now start fundraising.`
         });
     } catch (error) {
-        console.error('❌ Error processing campaign created job:', error);
+        console.error('Error processing campaign created job:', error);
     }
 }
 
@@ -105,7 +105,7 @@ async function handlePostLiked(job) {
             .select('user content_text');
         
         if (!post) {
-            console.log('⚠️  Post not found');
+            console.log('Post not found');
             return;
         }
         
@@ -113,7 +113,7 @@ async function handlePostLiked(job) {
         const liker = await User.findById(job.userId).select('username avatar');
         
         if (!liker) {
-            console.log('⚠️  Liker not found');
+            console.log('Liker not found');
             return;
         }
         
@@ -121,7 +121,7 @@ async function handlePostLiked(job) {
         if (post.user._id.toString() === job.userId) {
             console.log('👤 User liked their own post, skip notification');
             return;
-        }
+        }   
         
         // 4. Tạo notification trong database
         const notification = await notificationService.createNotification({
@@ -159,7 +159,7 @@ async function handlePostLiked(job) {
         console.log(`📬 Published notification event for user ${post.user._id}\n`);
         
     } catch (error) {
-        console.error('❌ Error processing POST_LIKED job:', error);
+        console.error('Error processing POST_LIKED job:', error);
     }
 }
 
@@ -170,14 +170,14 @@ async function handleCommentAdded(job) {
             .select('user content_text');
         
         if (!post) {
-            console.log('⚠️  Post not found');
+            console.log('Post not found');
             return;
         }
         
         const userComment = await User.findById(job.userId).select('username avatar');
 
         if (!userComment) {
-            console.log('⚠️  User comment not found');
+            console.log('User comment not found');  
             return;
         }
 
@@ -211,7 +211,7 @@ async function handleCommentAdded(job) {
         }));
 
     } catch (error) {
-        console.error('❌ Error processing COMMENT_ADDED job:', error);
+        console.error('Error processing COMMENT_ADDED job:', error);
     }
 }
 
@@ -224,7 +224,7 @@ async function handleCampaignApproved(job) {
             .select('title creator');
 
         if (!campaign) {
-            console.log('⚠️  Campaign not found');
+            console.log('Campaign not found');
             return;
         }
 
@@ -233,7 +233,7 @@ async function handleCampaignApproved(job) {
             .select('username avatar');
 
         if (!creator) {
-            console.log('⚠️  Creator not found');
+            console.log('Creator not found');
             return;
         }
 
@@ -242,7 +242,7 @@ async function handleCampaignApproved(job) {
             .select('username avatar');
 
         if (!admin) {
-            console.log('⚠️  Admin not found');
+            console.log('Admin not found');
             return;
         }
 
@@ -282,7 +282,7 @@ async function handleCampaignApproved(job) {
         console.log(`📬 Published notification event for user ${creator._id}\n`);
         
     } catch (error) {
-        console.error('❌ Error processing CAMPAIGN_APPROVED job:', error);
+        console.error('Error processing CAMPAIGN_APPROVED job:', error);
     }
 }
 
@@ -295,7 +295,7 @@ async function sendEmail(userId, payload) {
 
 async function startWorker() {
     try {
-        console.log('🚀 Starting Worker...');
+        console.log('Starting Worker...');
         await workerRedisClient.connect();
         console.log('✅ Worker Redis connected successfully');
         
@@ -304,25 +304,25 @@ async function startWorker() {
 
         await processQueue();
     } catch (error) {
-        console.error('❌ Error starting worker:', error);
+        console.error('Error starting worker:', error);
         process.exit(1);
     }
 }
 
 // Xử lý graceful shutdown
 process.on('SIGINT', async () => {
-    console.log('\n\n🛑 Worker shutting down gracefully...');
+    console.log('\n\nWorker shutting down gracefully...');
     await workerRedisClient.quit();
     await notificationPublisher.quit();
-    console.log('✅ Worker stopped');
+    console.log('Worker stopped');
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-    console.log('\n\n🛑 Worker shutting down gracefully...');
+    console.log('\n\nWorker shutting down gracefully...');
     await workerRedisClient.quit();
     await notificationPublisher.quit();
-    console.log('✅ Worker stopped');
+    console.log('Worker stopped');
     process.exit(0);
 });
 

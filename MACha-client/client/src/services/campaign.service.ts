@@ -7,6 +7,7 @@ import {
   DELETE_CAMPAIGN_ROUTE,
   CANCEL_CAMPAIGN_ROUTE,
   GET_CAMPAIGNS_BY_CATEGORY_ROUTE,
+  GET_ACTIVE_CATEGORIES_ROUTE,
 } from '@/constants/api';
 
 export interface Campaign {
@@ -17,6 +18,18 @@ export interface Campaign {
     fullname?: string;
     avatar?: string;
   };
+  contact_info: {
+    fullname: string;
+    phone: string;
+    email: string;
+    social_links?: {
+      facebook?: string;
+      instagram?: string;
+      twitter?: string;
+      website?: string;
+    };
+    address: string;
+  };
   title: string;
   description?: string;
   goal_amount: number;
@@ -25,8 +38,9 @@ export interface Campaign {
   end_date?: string;
   status: 'pending' | 'active' | 'rejected' | 'completed' | 'cancelled';
   category: string;
-  proof_documents_url?: string;
-  media_url?: string[];
+  banner_image: string;
+  gallery_images?: string[];
+  proof_documents_url: string;
   rejection_reason?: string;
   approved_at?: string;
   rejected_at?: string;
@@ -37,14 +51,27 @@ export interface Campaign {
 }
 
 export interface CreateCampaignPayload {
+  contact_info: {
+    fullname: string;
+    phone: string;
+    email: string;
+    social_links?: {
+      facebook?: string;
+      instagram?: string;
+      twitter?: string;
+      website?: string;
+    };
+    address: string;
+  };
   title: string;
   description?: string;
   goal_amount: number;
   start_date: string;
   end_date?: string;
   category: string;
-  proof_documents_url?: string;
-  media_url?: string[];
+  banner_image: string;
+  gallery_images?: string[];
+  proof_documents_url: string;
 }
 
 export interface UpdateCampaignPayload {
@@ -53,8 +80,14 @@ export interface UpdateCampaignPayload {
   goal_amount?: number;
   end_date?: string;
   category?: string;
+  banner_image?: string;
+  gallery_images?: string[];
   proof_documents_url?: string;
-  media_url?: string[];
+}
+
+export interface CategoryWithCount {
+  category: string;
+  count: number;
 }
 
 export const campaignService = {
@@ -78,6 +111,11 @@ export const campaignService = {
       params: { category },
     });
     return response.data.campaigns;
+  },
+
+  async getActiveCategories(): Promise<CategoryWithCount[]> {
+    const response = await apiClient.get(GET_ACTIVE_CATEGORIES_ROUTE);
+    return response.data.categories;
   },
 
   async updateCampaign(id: string, payload: UpdateCampaignPayload): Promise<Campaign> {

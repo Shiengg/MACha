@@ -1,18 +1,20 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { Share2 } from 'lucide-react';
 
 interface Campaign {
   _id: string;
   title: string;
-  description: string;
+  description?: string;
   goal_amount: number;
   current_amount: number;
   status: string;
   category: string;
-  media_url?: string[];
+  banner_image?: string;
+  gallery_images?: string[];
   createdAt: string;
-  end_date: string;
+  end_date?: string;
   creator?: {
     _id: string;
     username: string;
@@ -40,108 +42,137 @@ export default function CampaignCard({ campaign, showCreator = false }: Campaign
     return icons[category] || '❤️';
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <span className="px-2 py-1 bg-green-900/30 text-green-400 rounded text-xs font-medium">Đang hoạt động</span>;
-      case 'pending':
-        return <span className="px-2 py-1 bg-yellow-900/30 text-yellow-400 rounded text-xs font-medium">Chờ duyệt</span>;
-      case 'completed':
-        return <span className="px-2 py-1 bg-blue-900/30 text-blue-400 rounded text-xs font-medium">Hoàn thành</span>;
-      case 'cancelled':
-        return <span className="px-2 py-1 bg-gray-900/30 text-gray-400 rounded text-xs font-medium">Đã hủy</span>;
-      case 'rejected':
-        return <span className="px-2 py-1 bg-red-900/30 text-red-400 rounded text-xs font-medium">Từ chối</span>;
-      default:
-        return null;
-    }
+  const getCategoryLabel = (category: string) => {
+    const labels: { [key: string]: string } = {
+      'education': 'Giáo dục',
+      'health': 'Y tế',
+      'environment': 'Môi trường',
+      'disaster': 'Thiên tai',
+      'community': 'Cộng đồng',
+      'animal': 'Động vật',
+    };
+    return labels[category] || category;
   };
 
   const progressPercentage = Math.min((campaign.current_amount / campaign.goal_amount) * 100, 100);
-  const daysLeft = Math.ceil((new Date(campaign.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+  const daysLeft = campaign.end_date 
+    ? Math.ceil((new Date(campaign.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+
+  const formatAmount = (amount: number) => {
+    if (amount >= 1000000) {
+      return `${(amount / 1000000).toFixed(0)}tr`;
+    }
+    return `${amount.toLocaleString('vi-VN')}`;
+  };
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Share functionality
+    if (navigator.share) {
+      navigator.share({
+        title: campaign.title,
+        text: campaign.description,
+        url: `/campaigns/${campaign._id}`,
+      });
+    }
+  };
 
   return (
     <div
-      className="bg-[#1a1f2e] rounded-xl border border-gray-700 overflow-hidden hover:border-blue-600 transition-all cursor-pointer group"
+      className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-all cursor-pointer group"
       onClick={() => router.push(`/campaigns/${campaign._id}`)}
     >
-      {/* Campaign Image */}
-      <div className="relative h-48 bg-gradient-to-br from-blue-600 to-purple-600 overflow-hidden">
-        {campaign.media_url && campaign.media_url[0] ? (
+      {/* Campaign Banner Image */}
+      <div className="relative h-48 bg-gradient-to-br from-orange-100 to-orange-50 overflow-hidden">
+        {campaign.banner_image ? (
           <img
-            src={campaign.media_url[0]}
+            src={campaign.banner_image}
             alt={campaign.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-6xl">
-            {getCategoryIcon(campaign.category)}
+          <div className="w-full h-full flex items-center justify-center">
+            <img
+              src="/images/charity_icon 1.png"
+              alt="Campaign"
+              className="w-32 h-32 object-contain"
+            />
           </div>
         )}
-        <div className="absolute top-3 right-3">
-          {getStatusBadge(campaign.status)}
+        
+        {/* Category Badge */}
+        <div className="absolute top-3 left-3 flex items-center gap-1 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+          <span>{getCategoryIcon(campaign.category)}</span>
+          <span>{getCategoryLabel(campaign.category)}</span>
         </div>
-        {showCreator && campaign.creator && (
-          <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
-            {campaign.creator.avatar ? (
-              <img
-                src={campaign.creator.avatar}
-                alt={campaign.creator.username}
-                className="w-6 h-6 rounded-full"
-              />
-            ) : (
-              <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-                {campaign.creator.username.charAt(0).toUpperCase()}
-              </div>
-            )}
-            <span className="text-white text-sm font-medium">@{campaign.creator.username}</span>
-          </div>
-        )}
+
+        {/* Donor Count Badge */}
+        <div className="absolute top-3 right-3 flex items-center gap-1 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+          <span>❤️</span>
+          <span>Còn {daysLeft > 0 ? daysLeft : 0} ngày</span>
+        </div>
       </div>
 
       {/* Campaign Info */}
-      <div className="p-5">
-        <h3 className="text-lg font-semibold text-white mb-2 line-clamp-2 group-hover:text-blue-400 transition-colors">
+      <div className="p-4">
+        <h3 className="text-base font-bold text-gray-800 mb-2 line-clamp-2 min-h-[3rem]">
           {campaign.title}
         </h3>
-        <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
           {campaign.description}
         </p>
 
         {/* Progress Bar */}
         <div className="mb-3">
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-400">Đã quyên góp</span>
-            <span className="text-white font-medium">
-              {progressPercentage.toFixed(0)}%
-            </span>
-          </div>
-          <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-2">
             <div
-              className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all"
+              className="h-full bg-gradient-to-r from-orange-400 via-orange-500 to-teal-400 rounded-full transition-all"
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="flex items-center justify-between text-sm">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-3 gap-2 mb-3 text-center">
           <div>
-            <div className="text-white font-semibold">
-              {campaign.current_amount.toLocaleString('vi-VN')} VND
+            <div className="text-orange-600 font-bold text-sm">
+              {formatAmount(campaign.current_amount)}
             </div>
-            <div className="text-gray-400">
-              / {campaign.goal_amount.toLocaleString('vi-VN')} VND
-            </div>
+            <div className="text-gray-500 text-xs">Đạt được</div>
           </div>
-          <div className="text-right">
-            <div className="text-gray-400">
-              {daysLeft > 0 ? `Còn ${daysLeft} ngày` : 'Đã hết hạn'}
+          <div>
+            <div className="text-gray-800 font-bold text-sm">
+              {formatAmount(campaign.goal_amount)}
             </div>
-            <div className="text-white font-medium text-xs">
-              {new Date(campaign.end_date).toLocaleDateString('vi-VN')}
-            </div>
+            <div className="text-gray-500 text-xs">Mục tiêu</div>
           </div>
+          <div>
+            <div className="text-gray-800 font-bold text-sm">
+              {Math.floor(progressPercentage)}
+            </div>
+            <div className="text-gray-500 text-xs">Lượt ủng hộ</div>
+          </div>
+        </div>
+
+        {/* Action Button */}
+        <div className="flex items-center gap-2">
+          <button
+            className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium py-2 px-4 rounded-lg transition-all text-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/campaigns/${campaign._id}`);
+            }}
+          >
+            Ủng hộ ngay
+          </button>
+          <button
+            className="p-2 border border-gray-300 hover:border-gray-400 rounded-lg transition-all"
+            onClick={handleShare}
+            title="Chia sẻ"
+          >
+            <Share2 className="w-4 h-4 text-gray-600" />
+          </button>
         </div>
       </div>
     </div>
