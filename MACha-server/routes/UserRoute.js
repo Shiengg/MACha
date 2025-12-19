@@ -57,10 +57,7 @@ userRoutes.post('/kyc/:id/reject', authMiddleware, checkRole('admin'), rejectKYC
  *         message:
  *           type: string
  *           description: Error message
- *           examples:
- *             - "You can't follow your own account.."
- *             - "We couldn't find the user you want to follow."
- *             - "You're already following this person."
+ *           example: "You can't follow your own account."
  *     
  *     UnfollowUserResponse:
  *       type: object
@@ -76,9 +73,7 @@ userRoutes.post('/kyc/:id/reject', authMiddleware, checkRole('admin'), rejectKYC
  *         message:
  *           type: string
  *           description: Error message
- *           examples:
- *             - "We couldn't find the user you want to unfollow."
- *             - "You're not following this person."
+ *           example: "We couldn't find the user you want to unfollow."
  *     
  *     FollowerInfo:
  *       type: object

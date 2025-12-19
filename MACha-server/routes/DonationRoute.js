@@ -1,11 +1,18 @@
 import { Router } from "express";
 import { createDonation, getDonationsByCampaign } from "../controllers/DonationController.js";
+import { initSepayPayment, sepayCallback, sepaySuccess, sepayError, sepayCancel } from "../controllers/SepayController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 
 const donationRoutes = Router();
 
 donationRoutes.post('/:campaignId/donate', authMiddleware, createDonation);
 donationRoutes.get('/:campaignId/donations', getDonationsByCampaign);
+
+donationRoutes.post('/:campaignId/sepay/init', authMiddleware, initSepayPayment);
+donationRoutes.post('/sepay/callback', sepayCallback);
+donationRoutes.get('/sepay/success', sepaySuccess);
+donationRoutes.get('/sepay/error', sepayError);
+donationRoutes.get('/sepay/cancel', sepayCancel);
 
 /**
  * @swagger

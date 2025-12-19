@@ -55,3 +55,11 @@ export const APPROVE_KYC_ROUTE = (userId: string) => `${KYC_ROUTE}/${userId}/app
 export const REJECT_KYC_ROUTE = (userId: string) => `${KYC_ROUTE}/${userId}/reject`;
 export const SUBMIT_KYC_ROUTE = `${KYC_ROUTE}/submit`;
 export const GET_KYC_STATUS_ROUTE = `${KYC_ROUTE}/status`;
+
+export const DONATION_ROUTE = "api/donations";
+export const GET_DONATIONS_BY_CAMPAIGN_ROUTE = (campaignId: string) => `${DONATION_ROUTE}/${campaignId}/donations`;
+export const INIT_SEPAY_PAYMENT_ROUTE = (campaignId: string) => `${DONATION_ROUTE}/${campaignId}/sepay/init`;
+export const SEPAY_CALLBACK_ROUTE = `${DONATION_ROUTE}/sepay/callback`;
+export const SEPAY_SUCCESS_ROUTE = `${DONATION_ROUTE}/sepay/success`;
+export const SEPAY_ERROR_ROUTE = `${DONATION_ROUTE}/sepay/error`;
+export const SEPAY_CANCEL_ROUTE = `${DONATION_ROUTE}/sepay/cancel`;
