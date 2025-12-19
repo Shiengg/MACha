@@ -4,25 +4,29 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import { campaignService, Campaign } from '@/services/campaign.service';
+import { donationService, Donation } from '@/services/donation.service';
+import { useSocket } from '@/contexts/SocketContext';
 import Image from 'next/image';
-
-// Mock donors data - in real app, this would come from API
-const mockDonors = [
-    { id: 1, name: 'Nguyễn Văn A', amount: 2000000, time: '2 giờ trước', avatar: null, isRecent: true },
-    { id: 2, name: 'Trần Thị B', amount: 1500000, time: '3 giờ trước', avatar: null },
-    { id: 3, name: 'Lê Văn C', amount: 5000000, time: '5 giờ trước', avatar: null, isTop: true },
-    { id: 4, name: 'Phạm Thị D', amount: 1000000, time: '6 giờ trước', avatar: null },
-];
 
 function CampaignDetails() {
     const params = useParams();
     const router = useRouter();
     const campaignId = params.campaignId as string;
+    const { socket, isConnected } = useSocket();
 
     const [campaign, setCampaign] = useState<Campaign | null>(null);
+    const [donations, setDonations] = useState<Donation[]>([]);
     const [loading, setLoading] = useState(true);
+    const [donationsLoading, setDonationsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'story' | 'updates' | 'supporters'>('story');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
+    const handleDonate = () => {
+        router.push(`/campaigns/${campaignId}/donate`);
+    };
 
     useEffect(() => {
         const fetchCampaign = async () => {
@@ -42,8 +46,165 @@ function CampaignDetails() {
         }
     }, [campaignId]);
 
+    useEffect(() => {
+        const fetchDonations = async () => {
+            try {
+                setDonationsLoading(true);
+                const data = await donationService.getDonationsByCampaign(campaignId);
+                // Filter only completed donations and non-anonymous ones for display
+                const completedDonations = data.filter(
+                    (donation: Donation) => 
+                        donation.payment_status === 'completed' && 
+                        !donation.is_anonymous
+                );
+                setDonations(completedDonations);
+            } catch (err: any) {
+                console.error('Failed to fetch donations:', err);
+                setDonations([]);
+            } finally {
+                setDonationsLoading(false);
+            }
+        };
+
+        if (campaignId) {
+            fetchDonations();
+        }
+    }, [campaignId]);
+
+    // Reset to page 1 when search query changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery]);
+
+    // Join campaign room and listen for realtime donation events
+    useEffect(() => {
+        if (!socket || !isConnected || !campaignId) return;
+
+        // Join campaign room
+        const campaignRoom = `campaign:${campaignId}`;
+        socket.emit('join-room', campaignRoom);
+        console.log(`🏠 Joined campaign room: ${campaignRoom}`);
+
+        // Listen for new donations
+        const handleDonationCreated = (event: any) => {
+            console.log('🎉 New donation received:', event);
+            if (event.campaignId === campaignId && event.donation) {
+                const newDonation = event.donation;
+                // Only add if it's completed and not anonymous
+                if (newDonation.payment_status === 'completed' && !newDonation.is_anonymous) {
+                    setDonations(prev => {
+                        // Check if donation already exists to avoid duplicates
+                        const exists = prev.some(d => d._id === newDonation._id);
+                        if (exists) return prev;
+                        // Add to beginning of list
+                        return [newDonation, ...prev];
+                    });
+                    
+                    // Update campaign current amount if available
+                    if (event.campaign && campaign) {
+                        setCampaign(prev => prev ? {
+                            ...prev,
+                            current_amount: event.campaign.current_amount
+                        } : null);
+                    }
+                }
+            }
+        };
+
+        // Listen for donation status changes
+        const handleDonationStatusChanged = (event: any) => {
+            console.log('🔄 Donation status changed:', event);
+            if (event.campaignId === campaignId && event.donation) {
+                const updatedDonation = event.donation;
+                
+                setDonations(prev => {
+                    const index = prev.findIndex(d => d._id === updatedDonation._id);
+                    
+                    // If status changed to completed and not anonymous, add it
+                    if (updatedDonation.payment_status === 'completed' && !updatedDonation.is_anonymous) {
+                        if (index === -1) {
+                            // New completed donation, add to beginning
+                            return [updatedDonation, ...prev];
+                        } else {
+                            // Update existing donation
+                            return prev.map(d => d._id === updatedDonation._id ? updatedDonation : d);
+                        }
+                    } else {
+                        // Remove if status is not completed or is anonymous
+                        if (index !== -1) {
+                            return prev.filter(d => d._id !== updatedDonation._id);
+                        }
+                    }
+                    return prev;
+                });
+                
+                // Update campaign current amount
+                if (event.campaign && campaign) {
+                    setCampaign(prev => prev ? {
+                        ...prev,
+                        current_amount: event.campaign.current_amount
+                    } : null);
+                }
+            }
+        };
+
+        // Listen for donation updates
+        const handleDonationUpdated = (event: any) => {
+            console.log('🔄 Donation updated:', event);
+            if (event.campaignId === campaignId && event.donation) {
+                const updatedDonation = event.donation;
+                
+                setDonations(prev => {
+                    const index = prev.findIndex(d => d._id === updatedDonation._id);
+                    
+                    // Only show completed and non-anonymous donations
+                    if (updatedDonation.payment_status === 'completed' && !updatedDonation.is_anonymous) {
+                        if (index === -1) {
+                            // New donation, add to beginning
+                            return [updatedDonation, ...prev];
+                        } else {
+                            // Update existing donation
+                            return prev.map(d => d._id === updatedDonation._id ? updatedDonation : d);
+                        }
+                    } else {
+                        // Remove if not completed or is anonymous
+                        if (index !== -1) {
+                            return prev.filter(d => d._id !== updatedDonation._id);
+                        }
+                    }
+                    return prev;
+                });
+                
+                // Update campaign current amount
+                if (event.campaign && campaign) {
+                    setCampaign(prev => prev ? {
+                        ...prev,
+                        current_amount: event.campaign.current_amount
+                    } : null);
+                }
+            }
+        };
+
+        socket.on('donation:created', handleDonationCreated);
+        socket.on('donation:status_changed', handleDonationStatusChanged);
+        socket.on('donation:updated', handleDonationUpdated);
+
+        // Cleanup
+        return () => {
+            socket.off('donation:created', handleDonationCreated);
+            socket.off('donation:status_changed', handleDonationStatusChanged);
+            socket.off('donation:updated', handleDonationUpdated);
+            socket.emit('leave-room', campaignRoom);
+            console.log(`🚪 Left campaign room: ${campaignRoom}`);
+        };
+    }, [socket, isConnected, campaignId, campaign]);
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
+    };
+
+    const formatCurrencyVND = (amount: number) => {
+        return new Intl.NumberFormat('vi-VN').format(amount) + ' VND';
     };
 
     const formatDate = (dateString: string) => {
@@ -60,6 +221,45 @@ function CampaignDetails() {
         const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         return diff > 0 ? diff : 0;
     };
+
+    const formatTimeAgo = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+        
+        if (diffInSeconds < 60) return 'Vừa xong';
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} phút trước`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} giờ trước`;
+        if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} ngày trước`;
+        if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 604800)} tuần trước`;
+        return `${Math.floor(diffInSeconds / 2592000)} tháng trước`;
+    };
+
+    const formatDateTime = (dateString: string) => {
+        const date = new Date(dateString);
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${hours}:${minutes}:${seconds} - ${day}/${month}/${year}`;
+    };
+
+    // Get top donor (highest amount)
+    const topDonor = donations.length > 0 
+        ? donations.reduce((prev, current) => 
+            (prev.amount > current.amount) ? prev : current
+          )
+        : null;
+
+    // Get recent donations (last 24 hours)
+    const recentDonations = donations.filter((donation) => {
+        const donationDate = new Date(donation.createdAt);
+        const now = new Date();
+        const diffInHours = (now.getTime() - donationDate.getTime()) / (1000 * 60 * 60);
+        return diffInHours < 24;
+    });
 
     if (loading) {
         return (
@@ -157,7 +357,7 @@ function CampaignDetails() {
                                 {/* Stats */}
                                 <div className="grid grid-cols-3 gap-4">
                                     <div className="text-center p-4 bg-gray-50 rounded-xl">
-                                        <div className="text-2xl font-bold text-orange-500">125</div>
+                                        <div className="text-2xl font-bold text-orange-500">{donations.length}</div>
                                         <div className="text-gray-500 text-sm">Lượt ủng hộ</div>
                                     </div>
                                     <div className="text-center p-4 bg-gray-50 rounded-xl">
@@ -218,7 +418,7 @@ function CampaignDetails() {
                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                             </svg>
-                                            Người ủng hộ (125)
+                                            Danh sách ủng hộ ({donations.length})
                                         </span>
                                     </button>
                                 </div>
@@ -254,7 +454,7 @@ function CampaignDetails() {
                                                         <p className="text-gray-900 font-semibold">
                                                             {campaign.contact_info?.fullname || 'Chưa cập nhật'}
                                                         </p>
-                                                        <p className="text-gray-500 text-xs">Tổ chức từ thiện được xác thực</p>
+                                                        <p className="text-gray-500 text-xs">Cá nhân từ thiện được xác thực</p>
                                                         <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                                                             <span className="flex items-center gap-1">
                                                                 <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 24 24">
@@ -365,30 +565,156 @@ function CampaignDetails() {
                                         </div>
                                     )}
 
-                                    {activeTab === 'supporters' && (
-                                        <div className="space-y-4">
-                                            {mockDonors.map((donor) => (
-                                                <div key={donor.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                                                    <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full flex items-center justify-center text-white font-bold">
-                                                        {donor.name.charAt(0)}
+                                    {activeTab === 'supporters' && (() => {
+                                        // Filter donations based on search query
+                                        const filteredDonations = donations.filter((donation) => {
+                                            if (!searchQuery.trim()) return true;
+                                            const donor = typeof donation.donor === 'object' ? donation.donor : null;
+                                            const donorName = donor?.username || '';
+                                            return donorName.toLowerCase().includes(searchQuery.toLowerCase());
+                                        });
+
+                                        // Calculate pagination
+                                        const totalPages = Math.ceil(filteredDonations.length / itemsPerPage);
+                                        const startIndex = (currentPage - 1) * itemsPerPage;
+                                        const endIndex = startIndex + itemsPerPage;
+                                        const paginatedDonations = filteredDonations.slice(startIndex, endIndex);
+
+                                        return (
+                                            <div className="space-y-4">
+                                                {/* Search Bar */}
+                                                <div className="relative">
+                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                        </svg>
                                                     </div>
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <p className="font-semibold text-gray-900">{donor.name}</p>
-                                                            {donor.isTop && (
-                                                                <span className="text-yellow-500">⭐</span>
-                                                            )}
-                                                        </div>
-                                                        <p className="text-orange-500 font-medium">{formatCurrency(donor.amount)}</p>
-                                                        <p className="text-gray-400 text-xs">{donor.time}</p>
-                                                    </div>
-                                                    {donor.isRecent && (
-                                                        <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                                                    )}
+                                                    <input
+                                                        type="text"
+                                                        value={searchQuery}
+                                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                                        placeholder="Nhập tên người ủng hộ"
+                                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                                                    />
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
+
+                                                {donationsLoading ? (
+                                                    <div className="text-center py-8 text-gray-500">
+                                                        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                                        <p>Đang tải danh sách ủng hộ...</p>
+                                                    </div>
+                                                ) : filteredDonations.length === 0 ? (
+                                                    <div className="text-center py-12 text-gray-500">
+                                                        <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                                        </svg>
+                                                        <p>{searchQuery ? 'Không tìm thấy kết quả' : 'Chưa có người ủng hộ nào'}</p>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {/* Table */}
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full">
+                                                                <thead>
+                                                                    <tr className="bg-orange-100">
+                                                                        <th className="px-4 py-3 text-left text-medium font-medium text-gray-700">Người ủng hộ</th>
+                                                                        <th className="px-4 py-3 text-center text-medium font-medium text-gray-700">Số tiền ủng hộ</th>
+                                                                        <th className="px-4 py-3 text-right text-medium font-medium text-gray-700">Thời gian ủng hộ</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {paginatedDonations.map((donation) => {
+                                                                        const donor = typeof donation.donor === 'object' ? donation.donor : null;
+                                                                        const donorName = donor?.username || 'Người ủng hộ ẩn danh';
+                                                                        
+                                                                        return (
+                                                                            <tr key={donation._id} className="bg-white border-b border-gray-100 hover:bg-gray-50 transition">
+                                                                                <td className="px-4 py-3 text-medium text-gray-900">
+                                                                                    {donorName}
+                                                                                </td>
+                                                                                <td className="px-4 py-3 text-medium text-center font-medium text-gray-900">
+                                                                                    {formatCurrencyVND(donation.amount)}
+                                                                                </td>
+                                                                                <td className="px-4 py-3 text-medium text-right text-gray-600">
+                                                                                    {formatDateTime(donation.createdAt)}
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+
+                                                        {/* Pagination */}
+                                                        {totalPages > 1 && (
+                                                            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                                                                <div className="text-sm text-gray-600">
+                                                                    Hiển thị {startIndex + 1} - {Math.min(endIndex, filteredDonations.length)} trong tổng số {filteredDonations.length} kết quả
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <button
+                                                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                                                        disabled={currentPage === 1}
+                                                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                                                                            currentPage === 1
+                                                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                                                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                                                                        }`}
+                                                                    >
+                                                                        Trước
+                                                                    </button>
+                                                                    <div className="flex items-center gap-1">
+                                                                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                                                                            if (
+                                                                                page === 1 ||
+                                                                                page === totalPages ||
+                                                                                (page >= currentPage - 1 && page <= currentPage + 1)
+                                                                            ) {
+                                                                                return (
+                                                                                    <button
+                                                                                        key={page}
+                                                                                        onClick={() => setCurrentPage(page)}
+                                                                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
+                                                                                            currentPage === page
+                                                                                                ? 'bg-orange-500 text-white'
+                                                                                                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                                                                                        }`}
+                                                                                    >
+                                                                                        {page}
+                                                                                    </button>
+                                                                                );
+                                                                            } else if (
+                                                                                page === currentPage - 2 ||
+                                                                                page === currentPage + 2
+                                                                            ) {
+                                                                                return (
+                                                                                    <span key={page} className="px-2 text-gray-500">
+                                                                                        ...
+                                                                                    </span>
+                                                                                );
+                                                                            }
+                                                                            return null;
+                                                                        })}
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                                                        disabled={currentPage === totalPages}
+                                                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                                                                            currentPage === totalPages
+                                                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                                                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                                                                        }`}
+                                                                    >
+                                                                        Sau
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </div>
@@ -408,7 +734,7 @@ function CampaignDetails() {
                                         <p className="text-gray-500 text-sm">Mỗi đồng góp đều có ý nghĩa</p>
                                     </div>
                                 </div>
-                                <button className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2">
+                                <button onClick={handleDonate} className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
@@ -425,28 +751,53 @@ function CampaignDetails() {
                                     <h3 className="font-bold text-gray-900">Danh sách ủng hộ</h3>
                                 </div>
                                 <div className="space-y-4">
-                                    {mockDonors.map((donor) => (
-                                        <div key={donor.id} className="flex items-center gap-3">
-                                            <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                                                {donor.name.charAt(0)}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <p className="font-medium text-gray-900 text-sm truncate">{donor.name}</p>
-                                                    {donor.isTop && (
-                                                        <span className="text-yellow-500 text-xs">👑</span>
+                                    {donationsLoading ? (
+                                        <div className="text-center py-4 text-gray-500 text-sm">
+                                            <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                            <p>Đang tải...</p>
+                                        </div>
+                                    ) : donations.length === 0 ? (
+                                        <p className="text-center text-gray-500 text-sm py-4">Chưa có người ủng hộ</p>
+                                    ) : (
+                                        donations.slice(0, 5).map((donation) => {
+                                            const donor = typeof donation.donor === 'object' ? donation.donor : null;
+                                            const donorName = donor?.username || 'Người ủng hộ ẩn danh';
+                                            const donorInitial = donorName.charAt(0).toUpperCase();
+                                            const isTop = topDonor && donation._id === topDonor._id;
+                                            const isRecent = recentDonations.some(d => d._id === donation._id);
+                                            
+                                            return (
+                                                <div key={donation._id} className="flex items-center gap-3">
+                                                    {donor?.avatar_url ? (
+                                                        <img 
+                                                            src={donor.avatar_url} 
+                                                            alt={donorName}
+                                                            className="w-10 h-10 rounded-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                                            {donorInitial}
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-medium text-gray-900 text-sm truncate">{donorName}</p>
+                                                            {isTop && (
+                                                                <span className="text-yellow-500 text-xs">👑</span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-orange-500 text-sm font-medium">{formatCurrency(donation.amount)}</p>
+                                                        <p className="text-gray-400 text-xs">{formatTimeAgo(donation.createdAt)}</p>
+                                                    </div>
+                                                    {isRecent && (
+                                                        <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0"></div>
                                                     )}
                                                 </div>
-                                                <p className="text-orange-500 text-sm font-medium">{formatCurrency(donor.amount)}</p>
-                                                <p className="text-gray-400 text-xs">{donor.time}</p>
-                                            </div>
-                                            {donor.isRecent && (
-                                                <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0"></div>
-                                            )}
-                                        </div>
-                                    ))}
+                                            );
+                                        })
+                                    )}
                                 </div>
-                                <button className="w-full mt-4 py-2 text-gray-500 hover:text-gray-700 text-sm font-medium flex items-center justify-center gap-1">
+                                <button onClick={() => setActiveTab('supporters')} className="w-full mt-4 py-2 text-gray-500 hover:text-gray-700 text-sm font-medium flex items-center justify-center gap-1">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                                     </svg>

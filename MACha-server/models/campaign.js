@@ -107,12 +107,27 @@ const campaignSchema = new mongoose.Schema({
     rejected_at: {
         type: Date,
         default: null
+    },
+    total_donations_count: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    completed_donations_count: {
+        type: Number,
+        default: 0,
+        min: 0
     }
 },
     {
         timestamps: true
     }
 )
+
+// Indexes for common queries
+campaignSchema.index({ status: 1, createdAt: -1 });
+campaignSchema.index({ category: 1, status: 1 });
+campaignSchema.index({ creator: 1, status: 1 });
 
 const Campaign = mongoose.model("Campaign", campaignSchema);
 export default Campaign;
