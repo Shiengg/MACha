@@ -1,6 +1,7 @@
 import Donation from "../models/donation.js";
 import Campaign from "../models/campaign.js";
 import { redisClient } from "../config/redis.js";
+import * as trackingService from "./tracking.service.js";
 
 export const createDonation = async (campaignId, donorId, donationData) => {
     const { amount, currency, donation_method, is_anonymous } = donationData;
@@ -29,6 +30,31 @@ export const createDonation = async (campaignId, donorId, donationData) => {
     await redisClient.del(`donations:${campaignId}`);
     await redisClient.del(`campaign:${campaignId}`);
     await redisClient.del('campaigns');
+    
+    // Publish event (non-blocking)
+    try {
+        const populatedDonation = await Donation.findById(donation._id)
+            .populate("donor", "username avatar_url");
+        
+        await trackingService.publishEvent("tracking:donation:created", {
+            donationId: donation._id.toString(),
+            campaignId: campaignId.toString(),
+            donorId: donorId.toString(),
+            amount: donation.amount,
+            currency: donation.currency,
+            payment_status: donation.payment_status,
+            is_anonymous: donation.is_anonymous,
+            donation: populatedDonation,
+            campaign: {
+                _id: campaign._id,
+                title: campaign.title,
+                current_amount: campaign.current_amount,
+                goal_amount: campaign.goal_amount
+            }
+        });
+    } catch (eventError) {
+        console.error('Error publishing donation created event:', eventError);
+    }
     
     return { donation, campaign };
 }
@@ -82,6 +108,32 @@ export const createSepayDonation = async (campaignId, donorId, donationData) => 
     await redisClient.del(`donations:${campaignId}`);
     await redisClient.del(`campaign:${campaignId}`);
     await redisClient.del('campaigns');
+    
+    // Publish event for Sepay donation creation (non-blocking)
+    try {
+        const populatedDonation = await Donation.findById(donation._id)
+            .populate("donor", "username avatar_url");
+        
+        await trackingService.publishEvent("tracking:donation:created", {
+            donationId: donation._id.toString(),
+            campaignId: campaignId.toString(),
+            donorId: donorId.toString(),
+            amount: donation.amount,
+            currency: donation.currency,
+            payment_status: donation.payment_status,
+            is_anonymous: donation.is_anonymous,
+            donation_method: 'sepay',
+            donation: populatedDonation,
+            campaign: {
+                _id: campaign._id,
+                title: campaign.title,
+                current_amount: campaign.current_amount,
+                goal_amount: campaign.goal_amount
+            }
+        });
+    } catch (eventError) {
+        console.error('Error publishing sepay donation created event:', eventError);
+    }
     
     return { donation, campaign };
 }
@@ -171,5 +223,54 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
     await redisClient.del('campaigns');
     
     const campaign = await Campaign.findById(donation.campaign);
+    
+    // Publish event when status changes (non-blocking)
+    // Only publish if status changed to completed (most important for realtime updates)
+    if (status === 'completed') {
+        try {
+            const populatedDonation = await Donation.findById(donation._id)
+                .populate("donor", "username avatar_url");
+            
+            await trackingService.publishEvent("tracking:donation:status_changed", {
+                donationId: donation._id.toString(),
+                campaignId: donation.campaign.toString(),
+                donorId: donation.donor.toString(),
+                oldStatus: donation.payment_status, // Note: this is the new status after update
+                newStatus: status,
+                amount: donation.amount,
+                currency: donation.currency,
+                payment_status: donation.payment_status,
+                is_anonymous: donation.is_anonymous,
+                donation: populatedDonation,
+                campaign: {
+                    _id: campaign._id,
+                    title: campaign.title,
+                    current_amount: campaign.current_amount,
+                    goal_amount: campaign.goal_amount
+                }
+            });
+            
+            // Also publish general update event
+            await trackingService.publishEvent("tracking:donation:updated", {
+                donationId: donation._id.toString(),
+                campaignId: donation.campaign.toString(),
+                donorId: donation.donor.toString(),
+                amount: donation.amount,
+                currency: donation.currency,
+                payment_status: donation.payment_status,
+                is_anonymous: donation.is_anonymous,
+                donation: populatedDonation,
+                campaign: {
+                    _id: campaign._id,
+                    title: campaign.title,
+                    current_amount: campaign.current_amount,
+                    goal_amount: campaign.goal_amount
+                }
+            });
+        } catch (eventError) {
+            console.error('Error publishing donation status changed event:', eventError);
+        }
+    }
+    
     return { donation, campaign };
 }

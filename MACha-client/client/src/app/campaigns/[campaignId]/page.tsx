@@ -5,12 +5,14 @@ import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import { campaignService, Campaign } from '@/services/campaign.service';
 import { donationService, Donation } from '@/services/donation.service';
+import { useSocket } from '@/contexts/SocketContext';
 import Image from 'next/image';
 
 function CampaignDetails() {
     const params = useParams();
     const router = useRouter();
     const campaignId = params.campaignId as string;
+    const { socket, isConnected } = useSocket();
 
     const [campaign, setCampaign] = useState<Campaign | null>(null);
     const [donations, setDonations] = useState<Donation[]>([]);
@@ -73,6 +75,129 @@ function CampaignDetails() {
     useEffect(() => {
         setCurrentPage(1);
     }, [searchQuery]);
+
+    // Join campaign room and listen for realtime donation events
+    useEffect(() => {
+        if (!socket || !isConnected || !campaignId) return;
+
+        // Join campaign room
+        const campaignRoom = `campaign:${campaignId}`;
+        socket.emit('join-room', campaignRoom);
+        console.log(`🏠 Joined campaign room: ${campaignRoom}`);
+
+        // Listen for new donations
+        const handleDonationCreated = (event: any) => {
+            console.log('🎉 New donation received:', event);
+            if (event.campaignId === campaignId && event.donation) {
+                const newDonation = event.donation;
+                // Only add if it's completed and not anonymous
+                if (newDonation.payment_status === 'completed' && !newDonation.is_anonymous) {
+                    setDonations(prev => {
+                        // Check if donation already exists to avoid duplicates
+                        const exists = prev.some(d => d._id === newDonation._id);
+                        if (exists) return prev;
+                        // Add to beginning of list
+                        return [newDonation, ...prev];
+                    });
+                    
+                    // Update campaign current amount if available
+                    if (event.campaign && campaign) {
+                        setCampaign(prev => prev ? {
+                            ...prev,
+                            current_amount: event.campaign.current_amount
+                        } : null);
+                    }
+                }
+            }
+        };
+
+        // Listen for donation status changes
+        const handleDonationStatusChanged = (event: any) => {
+            console.log('🔄 Donation status changed:', event);
+            if (event.campaignId === campaignId && event.donation) {
+                const updatedDonation = event.donation;
+                
+                setDonations(prev => {
+                    const index = prev.findIndex(d => d._id === updatedDonation._id);
+                    
+                    // If status changed to completed and not anonymous, add it
+                    if (updatedDonation.payment_status === 'completed' && !updatedDonation.is_anonymous) {
+                        if (index === -1) {
+                            // New completed donation, add to beginning
+                            return [updatedDonation, ...prev];
+                        } else {
+                            // Update existing donation
+                            return prev.map(d => d._id === updatedDonation._id ? updatedDonation : d);
+                        }
+                    } else {
+                        // Remove if status is not completed or is anonymous
+                        if (index !== -1) {
+                            return prev.filter(d => d._id !== updatedDonation._id);
+                        }
+                    }
+                    return prev;
+                });
+                
+                // Update campaign current amount
+                if (event.campaign && campaign) {
+                    setCampaign(prev => prev ? {
+                        ...prev,
+                        current_amount: event.campaign.current_amount
+                    } : null);
+                }
+            }
+        };
+
+        // Listen for donation updates
+        const handleDonationUpdated = (event: any) => {
+            console.log('🔄 Donation updated:', event);
+            if (event.campaignId === campaignId && event.donation) {
+                const updatedDonation = event.donation;
+                
+                setDonations(prev => {
+                    const index = prev.findIndex(d => d._id === updatedDonation._id);
+                    
+                    // Only show completed and non-anonymous donations
+                    if (updatedDonation.payment_status === 'completed' && !updatedDonation.is_anonymous) {
+                        if (index === -1) {
+                            // New donation, add to beginning
+                            return [updatedDonation, ...prev];
+                        } else {
+                            // Update existing donation
+                            return prev.map(d => d._id === updatedDonation._id ? updatedDonation : d);
+                        }
+                    } else {
+                        // Remove if not completed or is anonymous
+                        if (index !== -1) {
+                            return prev.filter(d => d._id !== updatedDonation._id);
+                        }
+                    }
+                    return prev;
+                });
+                
+                // Update campaign current amount
+                if (event.campaign && campaign) {
+                    setCampaign(prev => prev ? {
+                        ...prev,
+                        current_amount: event.campaign.current_amount
+                    } : null);
+                }
+            }
+        };
+
+        socket.on('donation:created', handleDonationCreated);
+        socket.on('donation:status_changed', handleDonationStatusChanged);
+        socket.on('donation:updated', handleDonationUpdated);
+
+        // Cleanup
+        return () => {
+            socket.off('donation:created', handleDonationCreated);
+            socket.off('donation:status_changed', handleDonationStatusChanged);
+            socket.off('donation:updated', handleDonationUpdated);
+            socket.emit('leave-room', campaignRoom);
+            console.log(`🚪 Left campaign room: ${campaignRoom}`);
+        };
+    }, [socket, isConnected, campaignId, campaign]);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
