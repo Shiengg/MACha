@@ -254,7 +254,7 @@ function CampaignDetails() {
                                                         <p className="text-gray-900 font-semibold">
                                                             {campaign.contact_info?.fullname || 'Chưa cập nhật'}
                                                         </p>
-                                                        <p className="text-gray-500 text-xs">Tổ chức từ thiện được xác thực</p>
+                                                        <p className="text-gray-500 text-xs">Cá nhân từ thiện được xác thực</p>
                                                         <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                                                             <span className="flex items-center gap-1">
                                                                 <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 24 24">
