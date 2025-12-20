@@ -1,5 +1,5 @@
 import Router from "express";
-import { signup, login, logout, getCurrentUser, getUserById, updateUser } from "../controllers/AuthController.js";
+import * as AuthController from "../controllers/AuthController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { checkRole } from "../middlewares/checkRole.js";
 import { rateLimitByEmail, rateLimitByIP, rateLimitByUserId } from "../middlewares/rateLimitMiddleware.js";
@@ -7,17 +7,18 @@ import { rateLimitByEmail, rateLimitByIP, rateLimitByUserId } from "../middlewar
 const authRoutes = Router();
 
 // Rate limit: 5 requests per 60 seconds per email
-authRoutes.post('/signup', rateLimitByEmail(5, 60), signup);
-authRoutes.post('/login', rateLimitByEmail(5, 60), login);
+authRoutes.post('/signup', rateLimitByEmail(5, 60), AuthController.signup);
+authRoutes.post('/login', rateLimitByEmail(5, 60), AuthController.login);
 
 // Rate limit: 10 requests per 60 seconds per IP
-authRoutes.post('/logout', rateLimitByIP(10, 60), logout);
+authRoutes.post('/logout', rateLimitByIP(10, 60), AuthController.logout);
 
 // Rate limit: 20 requests per 60 seconds per user
-authRoutes.get('/me', authMiddleware, rateLimitByUserId(20, 60), getCurrentUser);
-authRoutes.get('/:id', authMiddleware, rateLimitByUserId(20, 60), getUserById);
-authRoutes.patch('/:id', authMiddleware, rateLimitByUserId(10, 60), checkRole("user", "admin"), updateUser)
-
+authRoutes.get('/me', authMiddleware, rateLimitByUserId(20, 60), AuthController.getCurrentUser);
+authRoutes.get('/:id', authMiddleware, rateLimitByUserId(20, 60), AuthController.getUserById);
+authRoutes.patch('/:id', authMiddleware, rateLimitByUserId(10, 60), checkRole("user", "admin"), AuthController.updateUser)
+authRoutes.post('/otp', authMiddleware, rateLimitByUserId(10, 60), AuthController.sendOtp);
+authRoutes.post('/change-password', authMiddleware, rateLimitByUserId(10, 60), AuthController.changePassword);
 /**
  * @swagger
  * components:

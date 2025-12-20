@@ -160,7 +160,7 @@ export default function Header() {
                                         onClick={() => router.push('/settings')}
                                         className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                     >
-                                        Cài đặt
+                                        Cài đặt tài khoản
                                     </button>
                                     <div className="border-t border-gray-100 mt-2 pt-2">
                                         <button

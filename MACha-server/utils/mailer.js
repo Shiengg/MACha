@@ -11,9 +11,6 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-/**
- * Send generic email
- */
 export const sendEmail = async (to, subject, text, htmlContent) => {
     try {
         const info = await transporter.sendMail({
@@ -31,9 +28,6 @@ export const sendEmail = async (to, subject, text, htmlContent) => {
     }
 };
 
-/**
- * Send campaign approved email
- */
 export const sendCampaignApprovedEmail = async (to, data) => {
     const { username, campaignTitle, campaignId } = data;
     const campaignUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/campaigns/${campaignId}`;
@@ -124,9 +118,6 @@ Trân trọng,
     return await sendEmail(to, subject, text, htmlContent);
 };
 
-/**
- * Send campaign rejected email
- */
 export const sendCampaignRejectedEmail = async (to, data) => {
     const { username, campaignTitle, reason, campaignId } = data;
     const editCampaignUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/campaigns/${campaignId}`;
@@ -224,9 +215,6 @@ Trân trọng,
     return await sendEmail(to, subject, text, htmlContent);
 };
 
-/**
- * Verify transporter connection
- */
 export const verifyConnection = async () => {
     try {
         await transporter.verify();
@@ -237,3 +225,89 @@ export const verifyConnection = async () => {
         return false;
     }
 };
+
+export const sendOtpEmail = async (to, data) => {
+    const { username, otp, expiresIn } = data;
+  
+    const subject = "🔐 Mã OTP đặt lại mật khẩu MACha";
+  
+    const text = `
+  Xin chào ${username},
+  
+  Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản MACha.
+  
+  Mã OTP của bạn là: ${otp}
+  Mã này có hiệu lực trong ${expiresIn} giây.
+  
+  Vui lòng không chia sẻ mã này với bất kỳ ai.
+  
+  Trân trọng,
+  Đội ngũ MACha
+    `.trim();
+  
+    const htmlContent = `
+    <div style="background-color:#f4f6f8;padding:24px;">
+      <div style="
+        max-width:520px;
+        margin:0 auto;
+        background:#ffffff;
+        border-radius:12px;
+        padding:32px;
+        font-family:Arial, Helvetica, sans-serif;
+        color:#333;
+      ">
+        <h2 style="margin-top:0;color:#222;">Xin chào ${username},</h2>
+  
+        <p>
+          Bạn vừa yêu cầu <b>đặt lại mật khẩu</b> cho tài khoản <b>MACha</b>.
+        </p>
+  
+        <div style="
+          margin:24px 0;
+          padding:16px;
+          text-align:center;
+          background:#f0f4ff;
+          border-radius:8px;
+        ">
+          <p style="margin:0 0 8px 0;">Mã OTP của bạn</p>
+          <div style="
+            font-size:32px;
+            font-weight:bold;
+            letter-spacing:6px;
+            color:#1a73e8;
+          ">
+            ${otp}
+          </div>
+        </div>
+  
+        <p>
+          Mã OTP này sẽ hết hạn sau <b>${Math.floor(expiresIn / 60)} phút</b>.
+          Vui lòng <b>không chia sẻ</b> mã này cho bất kỳ ai.
+        </p>
+  
+        <hr style="border:none;border-top:1px solid #eee;margin:24px 0;"/>
+  
+        <p style="font-size:14px;color:#777;">
+          Nếu bạn không yêu cầu thao tác này, hãy bỏ qua email hoặc liên hệ hỗ trợ.
+        </p>
+  
+        <p style="margin-top:24px;">
+          Trân trọng,<br/>
+          <b>Đội ngũ MACha</b>
+        </p>
+      </div>
+  
+      <p style="
+        text-align:center;
+        font-size:12px;
+        color:#aaa;
+        margin-top:16px;
+      ">
+        © ${new Date().getFullYear()} MACha. All rights reserved.
+      </p>
+    </div>
+    `;
+  
+    return await sendEmail(to, subject, text, htmlContent);
+  };
+  

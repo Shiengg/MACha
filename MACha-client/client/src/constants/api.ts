@@ -3,6 +3,9 @@ export const LOGIN_ROUTE = `${AUTH_ROUTE}/login`;
 export const SIGNUP_ROUTE = `${AUTH_ROUTE}/signup`;
 export const GET_CURRENT_USER_ROUTE = `${AUTH_ROUTE}/me`;
 export const LOGOUT_ROUTE = `${AUTH_ROUTE}/logout`;
+export const UPDATE_USER_ROUTE = (userId: string) => `${AUTH_ROUTE}/${userId}`;
+export const SEND_OTP_ROUTE = `${AUTH_ROUTE}/otp`;
+export const CHANGE_PASSWORD_ROUTE = `${AUTH_ROUTE}/change-password`;
 
 export const POST_ROUTE = "api/posts";
 export const GET_POSTS_ROUTE = `${POST_ROUTE}`;

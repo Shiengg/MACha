@@ -2,9 +2,9 @@ import jwt from "jsonwebtoken";
 import { compare } from "bcryptjs";
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as authService from "../services/auth.service.js";
-import { redisClient } from "../config/redis.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
+import { sendOtpEmail } from "../utils/mailer.js";
 
 const maxAge = 3 * 24 * 60 * 60;
 const maxAgeMili = maxAge * 1000;
@@ -218,6 +218,43 @@ export const updateUser = async (req, res) => {
         }
 
         return res.status(HTTP_STATUS.OK).json({ user: updatedUser });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message
+        });
+    }
+}
+
+export const sendOtp = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const {otp, expiresIn} = await authService.createOtp(userId);
+        await sendOtpEmail(req.user.email, {
+            username: req.user.username,
+            otp,
+            expiresIn
+        });
+        return res.status(HTTP_STATUS.OK).json({
+            success: true,
+            otp,
+            expiresIn
+        })
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message
+        });
+    }
+}
+
+export const changePassword = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const {otp, newPassword} = req.body;
+        await authService.changePassword(userId, otp, newPassword);
+        return res.status(HTTP_STATUS.OK).json({
+            success: true,
+            message: "Mật khẩu đã được thay đổi thành công"
+        });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
             message: error.message
