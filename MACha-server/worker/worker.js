@@ -388,6 +388,7 @@ async function handleUserFollowed(job) {
                 sender: {
                     _id: follower._id,
                     username: follower.username,
+                    fullname: follower.fullname,
                     avatar: follower.avatar
                 },
                 is_read: false,

@@ -255,11 +255,11 @@ export const forgotPassword = async (email) => {
     return newPassword;
 }
 
-export const cleanupUnverifiedUsers = async (days = 3) => {
+export const cleanupUnverifiedUsers = async (days = 0) => {
+    const thresholdDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
     return User.deleteMany({
-        is_verified: false,
-        createdAt: {
-            $lt: new Date(Date.now() - days * 24 * 60 * 60 * 1000)
-        }
+        is_verified: { $in: [false, "false"] },
+        createdAt: { $lt: thresholdDate }
     });
 }

@@ -57,7 +57,6 @@ function SignupPageContent() {
             });
 
             if (!otp) {
-                // Người dùng bấm Hủy hoặc không nhập OTP
                 return;
             }
 
@@ -71,7 +70,7 @@ function SignupPageContent() {
 
             Swal.fire({
                 title: 'Đăng ký & xác thực thành công!',
-                text: 'Tài khoản của bạn đã được xác thực. Bạn sẽ được chuyển đến trang trước đó.',
+                text: 'Tài khoản của bạn đã được xác thực thành công.',
                 icon: 'success',
                 confirmButtonText: 'OK'
             });
