@@ -254,3 +254,12 @@ export const forgotPassword = async (email) => {
 
     return newPassword;
 }
+
+export const cleanupUnverifiedUsers = async (days = 3) => {
+    return User.deleteMany({
+        is_verified: false,
+        createdAt: {
+            $lt: new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+        }
+    });
+}
