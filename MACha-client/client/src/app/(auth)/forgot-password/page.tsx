@@ -3,14 +3,35 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import apiClient from '@/lib/api-client';
+import { FORGOT_PASSWORD_ROUTE } from '@/constants/api';
+import Swal from 'sweetalert2';
+import { useRouter } from 'next/navigation';
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
-
+    const router = useRouter();
     const handleResetPassword = async () => {
-        // TODO: Implement reset password logic
-        console.log('Reset password for:', email);
+        try {
+            const res = await apiClient.post(FORGOT_PASSWORD_ROUTE, {email}, {withCredentials: true})
+            if (res.data.success) {
+                Swal.fire({
+                    title: 'Mật khẩu mới đã được gửi đến email của bạn',
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                });
+            }
+        } catch (error: any) {
+            const message = error?.response?.data?.message || "Đã xảy ra lỗi. Vui lòng thử lại.";
+            Swal.fire({
+                title: 'Lỗi',
+                text: message,
+                icon: 'error',
+                confirmButtonText: 'OK'
+            });
+        }
+        router.push('/login');
     };
 
     const handleKeyPress = (e: React.KeyboardEvent) => {

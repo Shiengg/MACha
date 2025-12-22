@@ -2,7 +2,6 @@ import jwt from "jsonwebtoken";
 import { compare } from "bcryptjs";
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as authService from "../services/auth.service.js";
-import { redisClient } from "../config/redis.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
 
@@ -218,6 +217,80 @@ export const updateUser = async (req, res) => {
         }
 
         return res.status(HTTP_STATUS.OK).json({ user: updatedUser });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message
+        });
+    }
+}
+
+export const sendOtp = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const {otp, expiresIn} = await authService.createOtp(userId);
+        try {
+            await queueService.pushJob({
+                type: "SEND_OTP",
+                email: req.user.email,
+                username: req.user.username,
+                otp: otp,
+                expiresIn: expiresIn
+            });
+        } catch (error) {
+            console.error('Error publishing event or pushing job:', error);
+        }
+        return res.status(HTTP_STATUS.OK).json({
+            success: true,
+            otp,
+            expiresIn
+        })
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message
+        });
+    }
+}
+
+export const changePassword = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const {otp, newPassword} = req.body;
+        await authService.changePassword(userId, otp, newPassword);
+        return res.status(HTTP_STATUS.OK).json({
+            success: true,
+            message: "Mật khẩu đã được thay đổi thành công"
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message
+        });
+    }
+}
+
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await authService.findUserByEmail(email);
+        if (!user) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                message: "User not found"
+            });
+        }
+        const newPassword = await authService.forgotPassword(email);
+        try {
+            await queueService.pushJob({
+                type: "SEND_FORGOT_PASSWORD",
+                email: email,
+                username: user.username,
+                newPassword: newPassword
+            });
+        } catch (error) {
+            console.error('Error publishing event or pushing job:', error);
+        }
+        return res.status(HTTP_STATUS.OK).json({
+            success: true,
+            message: "Mật khẩu mới đã được gửi đến email của bạn"
+        });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
             message: error.message

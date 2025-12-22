@@ -1,5 +1,6 @@
 import User from "../models/user.js";
 import { redisClient } from "../config/redis.js";
+import bcrypt from "bcryptjs";
 
 /**
  * Kiểm tra xem user đã tồn tại chưa (theo username hoặc email)
@@ -168,3 +169,58 @@ export const resetFailedLoginAttempts = async (email) => {
     const attemptsKey = `login_attempts:${email}`;
     await redisClient.del(attemptsKey);
 };
+
+export const createOtp = async (userId) => {
+    const expiresIn = 600;
+    const OTPKey = `otp:${userId}`;
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    await redisClient.setEx(OTPKey, expiresIn, hashedOtp);
+    return { otp: parseInt(otp), expiresIn };
+};
+
+export const verifyOtp = async (userId, otp) => {
+    const OTPKey = `otp:${userId}`;
+    const storedHashedOtp = await redisClient.get(OTPKey);
+    
+    if (!storedHashedOtp) {
+        throw new Error("OTP không hợp lệ hoặc đã hết hạn");
+    }
+    
+    const isValid = await bcrypt.compare(otp.toString(), storedHashedOtp);
+    
+    if (!isValid) {
+        throw new Error("OTP không hợp lệ");
+    }
+    
+    await redisClient.del(OTPKey);
+    
+    return true;
+};
+
+export const changePassword = async (userId, otp, newPassword) => {
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new Error("User not found");
+    }
+
+    await verifyOtp(userId, otp);
+
+    user.password = newPassword;
+    await user.save();
+
+    const OTPKey = `otp:${userId}`;
+    await redisClient.del(OTPKey);
+
+    return { success: true, message: "Đổi mật khẩu thành công" };
+}
+
+export const forgotPassword = async (email) => {
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+
+    const newPassword = Math.random().toString(36).substring(2, 15);
+    user.password = newPassword;
+    await user.save();
+
+    return newPassword;
+}

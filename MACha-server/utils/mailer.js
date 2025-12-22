@@ -11,9 +11,6 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-/**
- * Send generic email
- */
 export const sendEmail = async (to, subject, text, htmlContent) => {
     try {
         const info = await transporter.sendMail({
@@ -23,17 +20,12 @@ export const sendEmail = async (to, subject, text, htmlContent) => {
             text,
             html: htmlContent,
         });
-        console.log(`📧 Email sent successfully to ${to}: ${info.messageId}`);
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error(`❌ Failed to send email to ${to}:`, error.message);
         return { success: false, error: error.message };
     }
 };
 
-/**
- * Send campaign approved email
- */
 export const sendCampaignApprovedEmail = async (to, data) => {
     const { username, campaignTitle, campaignId } = data;
     const campaignUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/campaigns/${campaignId}`;
@@ -124,9 +116,6 @@ Trân trọng,
     return await sendEmail(to, subject, text, htmlContent);
 };
 
-/**
- * Send campaign rejected email
- */
 export const sendCampaignRejectedEmail = async (to, data) => {
     const { username, campaignTitle, reason, campaignId } = data;
     const editCampaignUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/campaigns/${campaignId}`;
@@ -224,16 +213,173 @@ Trân trọng,
     return await sendEmail(to, subject, text, htmlContent);
 };
 
-/**
- * Verify transporter connection
- */
 export const verifyConnection = async () => {
     try {
         await transporter.verify();
-        console.log('✅ Mail transporter is ready to send emails');
         return true;
     } catch (error) {
-        console.error('❌ Mail transporter verification failed:', error.message);
         return false;
     }
 };
+
+export const sendOtpEmail = async (to, data) => {
+    const { username, otp, expiresIn } = data;
+  
+    const subject = "🔐 Mã OTP đặt lại mật khẩu MACha";
+  
+    const text = `
+  Xin chào ${username},
+  
+  Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản MACha.
+  
+  Mã OTP của bạn là: ${otp}
+  Mã này có hiệu lực trong ${expiresIn} giây.
+  
+  Vui lòng không chia sẻ mã này với bất kỳ ai.
+  
+  Trân trọng,
+  Đội ngũ MACha
+    `.trim();
+  
+    const htmlContent = `
+    <div style="background-color:#f4f6f8;padding:24px;">
+      <div style="
+        max-width:520px;
+        margin:0 auto;
+        background:#ffffff;
+        border-radius:12px;
+        padding:32px;
+        font-family:Arial, Helvetica, sans-serif;
+        color:#333;
+      ">
+        <h2 style="margin-top:0;color:#222;">Xin chào ${username},</h2>
+  
+        <p>
+          Bạn vừa yêu cầu <b>đặt lại mật khẩu</b> cho tài khoản <b>MACha</b>.
+        </p>
+  
+        <div style="
+          margin:24px 0;
+          padding:16px;
+          text-align:center;
+          background:#f0f4ff;
+          border-radius:8px;
+        ">
+          <p style="margin:0 0 8px 0;">Mã OTP của bạn</p>
+          <div style="
+            font-size:32px;
+            font-weight:bold;
+            letter-spacing:6px;
+            color:#1a73e8;
+          ">
+            ${otp}
+          </div>
+        </div>
+  
+        <p>
+          Mã OTP này sẽ hết hạn sau <b>${Math.floor(expiresIn / 60)} phút</b>.
+          Vui lòng <b>không chia sẻ</b> mã này cho bất kỳ ai.
+        </p>
+  
+        <hr style="border:none;border-top:1px solid #eee;margin:24px 0;"/>
+  
+        <p style="font-size:14px;color:#777;">
+          Nếu bạn không yêu cầu thao tác này, hãy bỏ qua email hoặc liên hệ hỗ trợ.
+        </p>
+  
+        <p style="margin-top:24px;">
+          Trân trọng,<br/>
+          <b>Đội ngũ MACha</b>
+        </p>
+      </div>
+  
+      <p style="
+        text-align:center;
+        font-size:12px;
+        color:#aaa;
+        margin-top:16px;
+      ">
+        © ${new Date().getFullYear()} MACha. All rights reserved.
+      </p>
+    </div>
+    `;
+  
+    return await sendEmail(to, subject, text, htmlContent);
+  };
+  
+  export const sendForgotPasswordEmail = async (to, data) => {
+    const { username, newPassword } = data;
+  
+    const subject = "🔐 Mật khẩu mới của bạn";
+  
+    const text = `
+  Xin chào ${username},
+  
+  Mật khẩu mới của bạn là: ${newPassword}
+  
+  Vui lòng đổi mật khẩu ngay sau khi đăng nhập.
+  Nếu bạn không yêu cầu đặt lại mật khẩu, hãy liên hệ bộ phận hỗ trợ ngay.
+    `.trim();
+  
+    const htmlContent = `
+    <div style="background-color:#f4f6f8;padding:32px 16px;">
+      <div style="
+        max-width:520px;
+        margin:0 auto;
+        background:#ffffff;
+        border-radius:12px;
+        padding:32px;
+        font-family:Arial, Helvetica, sans-serif;
+        color:#333333;
+        box-shadow:0 4px 12px rgba(0,0,0,0.05);
+      ">
+  
+        <h2 style="margin-top:0;color:#1f2937;">
+          🔐 Đặt lại mật khẩu
+        </h2>
+  
+        <p style="font-size:14px;line-height:1.6;">
+          Xin chào <strong>${username}</strong>,
+        </p>
+  
+        <p style="font-size:14px;line-height:1.6;">
+          Chúng tôi đã tạo mật khẩu mới cho tài khoản của bạn:
+        </p>
+  
+        <div style="
+          margin:20px 0;
+          padding:16px;
+          background:#f9fafb;
+          border-radius:8px;
+          text-align:center;
+          font-size:18px;
+          font-weight:bold;
+          letter-spacing:1px;
+          color:#111827;
+          border:1px dashed #d1d5db;
+        ">
+          ${newPassword}
+        </div>
+  
+        <p style="font-size:14px;line-height:1.6;">
+          👉 <strong>Vui lòng đăng nhập và đổi mật khẩu ngay</strong> để đảm bảo an toàn cho tài khoản của bạn.
+        </p>
+  
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+  
+        <p style="font-size:12px;color:#6b7280;line-height:1.6;">
+          Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng liên hệ bộ phận hỗ trợ ngay.
+          <br/>
+          Email này được gửi tự động, vui lòng không trả lời.
+        </p>
+  
+        <p style="font-size:12px;color:#9ca3af;margin-bottom:0;">
+          © ${new Date().getFullYear()} Your Company. All rights reserved.
+        </p>
+      </div>
+    </div>
+    `;
+  
+    return await sendEmail(to, subject, text, htmlContent);
+  };
+  
