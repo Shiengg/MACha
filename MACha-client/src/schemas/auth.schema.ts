@@ -4,42 +4,41 @@ import { z } from 'zod';
 export const loginSchema = z.object({
   email: z
     .string()
-    .min(1, 'Email is required')
-    .email('Invalid email address'),
+    .min(1, 'Email là bắt buộc')
+    .email('Email không hợp lệ'),
   password: z
     .string()
-    .min(1, 'Password is required')
-    .min(6, 'Password must be at least 6 characters'),
+    .min(1, 'Mật khẩu là bắt buộc')
+    .min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
 });
 
 // Register schema
 export const registerSchema = z.object({
   username: z
     .string()
-    .min(1, 'Username is required')
-    .min(3, 'Username must be at least 3 characters')
-    .max(30, 'Username must not exceed 30 characters')
-    .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers and underscores'),
+    .min(1, 'Username là bắt buộc')
+    .min(3, 'Username phải có ít nhất 3 ký tự')
+    .max(30, 'Username không được vượt quá 30 ký tự')
+    .regex(/^[a-zA-Z0-9_]+$/, 'Username chỉ được chứa chữ cái, số và dấu gạch dưới'),
   email: z
     .string()
-    .min(1, 'Email is required')
-    .email('Invalid email address'),
+    .min(1, 'Email là bắt buộc')
+    .email('Email không hợp lệ'),
   password: z
     .string()
-    .min(1, 'Password is required')
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number'),
+    .min(1, 'Mật khẩu là bắt buộc')
+    .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
+    .regex(/[A-Z]/, 'Mật khẩu phải có ít nhất 1 ký tự in hoa')
+    .regex(/[a-z]/, 'Mật khẩu phải có ít nhất 1 ký tự thường')
+    .regex(/[0-9]/, 'Mật khẩu phải có ít nhất 1 số'),
   confirmPassword: z
     .string()
-    .min(1, 'Confirm password is required'),
+    .min(1, 'Xác nhận mật khẩu là bắt buộc'),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: 'Passwords do not match',
+  message: 'Mật khẩu không khớp',
   path: ['confirmPassword'],
 });
 
-// Type inference from schemas
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type RegisterFormData = z.infer<typeof registerSchema>;
 

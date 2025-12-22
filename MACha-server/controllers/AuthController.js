@@ -227,7 +227,7 @@ export const updateUser = async (req, res) => {
 export const sendOtp = async (req, res) => {
     try {
         const userId = req.user._id;
-        const {otp, expiresIn} = await authService.createOtp(userId);
+        const { otp, expiresIn } = await authService.createOtp(userId);
         try {
             await queueService.pushJob({
                 type: "SEND_OTP",
@@ -251,17 +251,57 @@ export const sendOtp = async (req, res) => {
     }
 }
 
+export const verifyOtpChangePassword = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { otp } = req.body;
+
+        if (!otp) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "OTP là bắt buộc",
+            });
+        }
+
+        await authService.verifyOtpForChangePassword(userId, otp);
+
+        return res.status(HTTP_STATUS.OK).json({
+            success: true,
+            message: "OTP hợp lệ. Bạn có thể đặt mật khẩu mới.",
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message,
+        });
+    }
+}
+
 export const changePassword = async (req, res) => {
     try {
         const userId = req.user._id;
-        const {otp, newPassword} = req.body;
-        await authService.changePassword(userId, otp, newPassword);
+        const { newPassword } = req.body;
+
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Mật khẩu mới phải có ít nhất 6 ký tự",
+            });
+        }
+
+        await authService.changePassword(userId, newPassword);
         return res.status(HTTP_STATUS.OK).json({
             success: true,
             message: "Mật khẩu đã được thay đổi thành công"
         });
     } catch (error) {
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        const businessErrors = [
+            "OTP chưa được xác thực hoặc đã hết hạn",
+            "Mật khẩu mới không được trùng với mật khẩu cũ",
+        ];
+        const status =
+            businessErrors.includes(error?.message)
+                ? HTTP_STATUS.BAD_REQUEST
+                : HTTP_STATUS.INTERNAL_SERVER_ERROR;
+
+        return res.status(status).json({
             message: error.message
         });
     }

@@ -4,24 +4,13 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from "@/components/guards/ProtectedRoute";
 import { getUserById, followUser, unfollowUser } from '@/services/user.service';
+import { campaignService, type Campaign } from '@/services/campaign.service';
+import CampaignCard from '@/components/campaign/CampaignCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
 import Swal from 'sweetalert2';
 
 import type { User } from '@/services/user.service';
-
-interface Campaign {
-  _id: string;
-  title: string;
-  description: string;
-  goal_amount: number;
-  current_amount: number;
-  status: string;
-  category: string;
-  media_url?: string[];
-  createdAt: string;
-  end_date: string;
-}
 
 function ProfileContent() {
   const params = useParams();
@@ -62,9 +51,8 @@ function ProfileContent() {
         const userData = await getUserById(userId);
         setUser(userData);
 
-        // TODO: Fetch user's campaigns
-        // const userCampaigns = await getCampaignsByUser(userId);
-        // setCampaigns(userCampaigns);
+        const userCampaigns = await campaignService.getCampaignsByCreator(userId);
+        setCampaigns(userCampaigns);
       } catch (err) {
         console.error("Error loading user:", err);
         setError("Không thể tải thông tin người dùng. Vui lòng thử lại sau.");
@@ -356,7 +344,7 @@ function ProfileContent() {
               {/* User Info + Actions */}
               <div className="flex-1 w-full">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h1 className="text-2xl md:text-3xl font-semibold text-gray-900">
                         {user.fullname || user.username}
@@ -368,7 +356,7 @@ function ProfileContent() {
                       @{user.username}
                     </p>
                     {user.bio && (
-                      <p className="text-gray-600 mt-2 max-w-2xl text-sm md:text-base">
+                      <p className="text-gray-600 mt-2 max-w-sm text-sm md:text-base break-words">
                         {user.bio}
                       </p>
                     )}
@@ -548,136 +536,11 @@ function ProfileContent() {
                   )}
                 </div>
               ) : (
-                <>
-                  {/* My Story section giống layout card trong thiết kế */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center">
-                        <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M4 6h16a1 1 0 011 1v11a1 1 0 01-1 1H4a1 1 0 01-1-1V7a1 1 0 011-1z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                          My Story
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Những chiến dịch nổi bật mà {user.fullname || user.username} đã tạo
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {campaigns.slice(0, 3).map((campaign, index) => (
-                        <div
-                          key={campaign._id}
-                          className={`${index === 0
-                            ? 'md:col-span-2 md:row-span-2'
-                            : ''
-                            } group cursor-pointer rounded-2xl overflow-hidden border border-gray-100 hover:border-emerald-400 hover:shadow-md transition-all`}
-                          onClick={() => router.push(`/campaigns/${campaign._id}`)}
-                        >
-                          <div className={`${index === 0 ? 'h-52 md:h-60' : 'h-36'} relative`}>
-                            {campaign.media_url && campaign.media_url[0] ? (
-                              <img
-                                src={campaign.media_url[0]}
-                                alt={campaign.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-5xl bg-gradient-to-br from-emerald-100 to-lime-100">
-                                {getCategoryIcon(campaign.category)}
-                              </div>
-                            )}
-                            <div className="absolute top-3 left-3">
-                              {getStatusBadge(campaign.status)}
-                            </div>
-                          </div>
-                          <div className="p-4 bg-white">
-                            <p className="text-sm font-semibold text-gray-900 line-clamp-2">
-                              {campaign.title}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Tất cả chiến dịch */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {campaigns.map((campaign) => (
-                      <div
-                        key={campaign._id}
-                        className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-emerald-500 hover:shadow-md transition-all cursor-pointer group"
-                        onClick={() => router.push(`/campaigns/${campaign._id}`)}
-                      >
-                        {/* Campaign Image */}
-                        <div className="relative h-44 bg-gray-100 overflow-hidden">
-                          {campaign.media_url && campaign.media_url[0] ? (
-                            <img
-                              src={campaign.media_url[0]}
-                              alt={campaign.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-6xl">
-                              {getCategoryIcon(campaign.category)}
-                            </div>
-                          )}
-                          <div className="absolute top-3 right-3">
-                            {getStatusBadge(campaign.status)}
-                          </div>
-                        </div>
-
-                        {/* Campaign Info */}
-                        <div className="p-5">
-                          <h3 className="text-base font-semibold text-gray-900 mb-1 line-clamp-2 group-hover:text-emerald-600 transition-colors">
-                            {campaign.title}
-                          </h3>
-                          <p className="text-gray-500 text-sm mb-4 line-clamp-2">
-                            {campaign.description}
-                          </p>
-
-                          {/* Progress Bar */}
-                          <div className="mb-3">
-                            <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-500">Đã quyên góp</span>
-                              <span className="text-gray-900 font-semibold">
-                                {((campaign.current_amount / campaign.goal_amount) * 100).toFixed(0)}%
-                              </span>
-                            </div>
-                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-emerald-400 to-lime-400 rounded-full transition-all"
-                                style={{
-                                  width: `${Math.min((campaign.current_amount / campaign.goal_amount) * 100, 100)}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Stats */}
-                          <div className="flex items-center justify-between text-sm">
-                            <div>
-                              <div className="text-gray-900 font-semibold">
-                                {campaign.current_amount.toLocaleString('vi-VN')} VND
-                              </div>
-                              <div className="text-gray-500">
-                                / {campaign.goal_amount.toLocaleString('vi-VN')} VND
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-gray-500">Thời hạn</div>
-                              <div className="text-gray-900 font-medium">
-                                {new Date(campaign.end_date).toLocaleDateString('vi-VN')}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {campaigns.map((campaign) => (
+                    <CampaignCard key={campaign._id} campaign={campaign} showCreator={false} />
+                  ))}
+                </div>
               )}
             </div>
           )}

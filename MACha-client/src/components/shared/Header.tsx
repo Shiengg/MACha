@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePathname, useRouter } from "next/navigation";
 import { Search, MessageCircle } from "lucide-react";
 import { useState } from "react";
+import Image from "next/image";
 import NotificationDropdown from "./NotificationDropdown";
 
 export default function Header() {
@@ -70,7 +71,7 @@ export default function Header() {
                         </button>
 
                         {/* Search Bar */}
-                        <form 
+                        <form
                             onSubmit={handleSearch}
                             className="flex-1 max-w-lg"
                         >
@@ -123,10 +124,20 @@ export default function Header() {
                         {isAuthenticated && user ? (
                             <div className="relative group">
                                 <button
-                                    className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-semibold hover:ring-2 hover:ring-emerald-400 hover:ring-offset-2 transition-all"
+                                    className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-semibold hover:ring-2 hover:ring-emerald-400 hover:ring-offset-2 transition-all"
                                     aria-label="User menu"
                                 >
-                                    {user.username ? user.username.charAt(0).toUpperCase() : 'U'}
+                                    {user.avatar ? (
+                                        <Image
+                                            src={user.avatar}
+                                            alt={user.username || 'User avatar'}
+                                            fill
+                                            sizes="40px"
+                                            className="object-cover"
+                                        />
+                                    ) : (
+                                        (user.username?.charAt(0).toUpperCase() || 'U')
+                                    )}
                                 </button>
 
                                 {/* Dropdown Menu */}
@@ -150,12 +161,7 @@ export default function Header() {
                                     >
                                         Hồ sơ của tôi
                                     </button>
-                                    <button
-                                        onClick={() => router.push('/my-campaigns')}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        Chiến dịch của tôi
-                                    </button>
+
                                     <button
                                         onClick={() => router.push('/settings')}
                                         className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"

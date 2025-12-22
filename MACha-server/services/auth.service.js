@@ -51,7 +51,7 @@ export const findUserByEmail = async (email) => {
  */
 export const getUserById = async (userId) => {
     const cacheKey = `user:${userId.toString()}`;
-    
+
     // 1. Kiểm tra cache trước
     const cached = await redisClient.get(cacheKey);
     if (cached) {
@@ -61,10 +61,10 @@ export const getUserById = async (userId) => {
     // 2. Cache miss → Query DB
     const user = await User.findById(userId).select("-password");
     if (!user) return null;
-    
+
     // 3. Set cache cho lần sau (TTL 1 giờ)
     await redisClient.setEx(cacheKey, 3600, JSON.stringify(user));
-    
+
     return user;
 };
 
@@ -74,7 +74,7 @@ export const getUserById = async (userId) => {
 export const validateUpdateFields = (requestBody, allowedFields) => {
     const requestFields = Object.keys(requestBody);
     const invalidFields = requestFields.filter(field => !allowedFields.includes(field));
-    
+
     if (invalidFields.length > 0) {
         return {
             isValid: false,
@@ -82,7 +82,7 @@ export const validateUpdateFields = (requestBody, allowedFields) => {
             allowedFields
         };
     }
-    
+
     // Lọc chỉ lấy các fields được phép
     const updates = {};
     for (const field of allowedFields) {
@@ -90,7 +90,7 @@ export const validateUpdateFields = (requestBody, allowedFields) => {
             updates[field] = requestBody[field];
         }
     }
-    
+
     return {
         isValid: true,
         updates
@@ -104,17 +104,17 @@ export const validateUpdateFields = (requestBody, allowedFields) => {
 export const updateUserById = async (userId, updates) => {
     // 1. Update user trong DB
     const updatedUser = await User.findByIdAndUpdate(
-        userId, 
-        updates, 
+        userId,
+        updates,
         { new: true }
     ).select("-password");
-    
+
     if (!updatedUser) return null;
-    
+
     // 2. Invalidate cache (xóa cache cũ)
     const cacheKey = `user:${userId.toString()}`;
     await redisClient.del(cacheKey);
-    
+
     return updatedUser;
 };
 
@@ -142,23 +142,23 @@ export const getFailedLoginAttempts = async (email) => {
  */
 export const incrementFailedLoginAttempts = async (email) => {
     const attemptsKey = `login_attempts:${email}`;
-    
+
     // Tăng counter lên 1
     const attempts = await redisClient.incr(attemptsKey);
-    
+
     // Nếu là lần đầu tiên thất bại, set TTL 2 phút (120 giây)
     // Sau 2 phút sẽ tự động reset counter
     if (attempts === 1) {
         await redisClient.expire(attemptsKey, 120);
     }
-    
+
     // Nếu đạt 5 lần thất bại, khóa tài khoản
     if (attempts >= 5) {
         const lockKey = `login_lock:${email}`;
         // Khóa tài khoản trong 2 phút
         await redisClient.setEx(lockKey, 120, "locked");
     }
-    
+
     return attempts;
 };
 
@@ -182,35 +182,55 @@ export const createOtp = async (userId) => {
 export const verifyOtp = async (userId, otp) => {
     const OTPKey = `otp:${userId}`;
     const storedHashedOtp = await redisClient.get(OTPKey);
-    
+
     if (!storedHashedOtp) {
         throw new Error("OTP không hợp lệ hoặc đã hết hạn");
     }
-    
+
     const isValid = await bcrypt.compare(otp.toString(), storedHashedOtp);
-    
+
     if (!isValid) {
         throw new Error("OTP không hợp lệ");
     }
-    
+
     await redisClient.del(OTPKey);
-    
+
     return true;
 };
 
-export const changePassword = async (userId, otp, newPassword) => {
+const getChangePasswordKey = (userId) => `change_pw_verified:${userId}`;
+
+export const verifyOtpForChangePassword = async (userId, otp) => {
+    await verifyOtp(userId, otp);
+
+    const changePwKey = getChangePasswordKey(userId);
+    const expiresIn = 600;
+    await redisClient.setEx(changePwKey, expiresIn, "true");
+
+    return true;
+};
+
+export const changePassword = async (userId, newPassword) => {
+    const changePwKey = getChangePasswordKey(userId);
+    const isVerified = await redisClient.get(changePwKey);
+
+    if (!isVerified) {
+        throw new Error("OTP chưa được xác thực hoặc đã hết hạn");
+    }
+
     const user = await User.findById(userId);
     if (!user) {
         throw new Error("User not found");
     }
 
-    await verifyOtp(userId, otp);
+    if (await bcrypt.compare(newPassword, user.password)) {
+        throw new Error("Mật khẩu mới không được trùng với mật khẩu cũ");
+    }
 
     user.password = newPassword;
     await user.save();
 
-    const OTPKey = `otp:${userId}`;
-    await redisClient.del(OTPKey);
+    await redisClient.del(changePwKey);
 
     return { success: true, message: "Đổi mật khẩu thành công" };
 }

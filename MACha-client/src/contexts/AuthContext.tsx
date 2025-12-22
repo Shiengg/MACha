@@ -6,7 +6,7 @@ import apiClient from "@/lib/api-client";
 import { GET_CURRENT_USER_ROUTE, LOGOUT_ROUTE } from "@/constants/api";
 
 interface User {
-    id: string;
+    _id?: string;
     email: string;
     username?: string;
     role?: string;
@@ -24,7 +24,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({children}: {children: React.ReactNode}) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -32,7 +32,13 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
         try {
             const res = await apiClient.get(GET_CURRENT_USER_ROUTE, { withCredentials: true });
             if (res.data?.user) {
-                setUser(res.data.user as User);
+                const rawUser = res.data.user as any;
+                const normalizedUser: User = {
+                    // Ưu tiên id nếu backend đã map sẵn, fallback sang _id
+                    id: rawUser.id || rawUser._id,
+                    ...rawUser,
+                };
+                setUser(normalizedUser);
                 return true;
             }
             return false;
@@ -63,22 +69,22 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             setUser(null);
         }
     }
-    
+
     return (
         <AuthContext.Provider
-        value={{
-            user,
-            isAuthenticated: !!user,
-            login,
-            logout,
-            loading,
-            setUser,
-        }}
+            value={{
+                user,
+                isAuthenticated: !!user,
+                login,
+                logout,
+                loading,
+                setUser,
+            }}
         >
             {children}
         </AuthContext.Provider>
     )
-    
+
 }
 
 // Custom hook để sử dụng AuthContext

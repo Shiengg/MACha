@@ -8,6 +8,7 @@ import {
   CANCEL_CAMPAIGN_ROUTE,
   GET_CAMPAIGNS_BY_CATEGORY_ROUTE,
   GET_ACTIVE_CATEGORIES_ROUTE,
+  GET_CAMPAIGNS_BY_CREATOR_ROUTE,
 } from '@/constants/api';
 
 export interface Campaign {
@@ -116,6 +117,13 @@ export const campaignService = {
   async getActiveCategories(): Promise<CategoryWithCount[]> {
     const response = await apiClient.get(GET_ACTIVE_CATEGORIES_ROUTE);
     return response.data.categories;
+  },
+
+  async getCampaignsByCreator(creatorId: string): Promise<Campaign[]> {
+    const response = await apiClient.get(GET_CAMPAIGNS_BY_CREATOR_ROUTE, {
+      params: { creatorId },
+    });
+    return response.data.campaigns;
   },
 
   async updateCampaign(id: string, payload: UpdateCampaignPayload): Promise<Campaign> {
