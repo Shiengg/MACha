@@ -20,10 +20,8 @@ export const sendEmail = async (to, subject, text, htmlContent) => {
             text,
             html: htmlContent,
         });
-        console.log(`📧 Email sent successfully to ${to}: ${info.messageId}`);
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error(`❌ Failed to send email to ${to}:`, error.message);
         return { success: false, error: error.message };
     }
 };
@@ -218,10 +216,8 @@ Trân trọng,
 export const verifyConnection = async () => {
     try {
         await transporter.verify();
-        console.log('✅ Mail transporter is ready to send emails');
         return true;
     } catch (error) {
-        console.error('❌ Mail transporter verification failed:', error.message);
         return false;
     }
 };
@@ -305,6 +301,82 @@ export const sendOtpEmail = async (to, data) => {
       ">
         © ${new Date().getFullYear()} MACha. All rights reserved.
       </p>
+    </div>
+    `;
+  
+    return await sendEmail(to, subject, text, htmlContent);
+  };
+  
+  export const sendForgotPasswordEmail = async (to, data) => {
+    const { username, newPassword } = data;
+  
+    const subject = "🔐 Mật khẩu mới của bạn";
+  
+    const text = `
+  Xin chào ${username},
+  
+  Mật khẩu mới của bạn là: ${newPassword}
+  
+  Vui lòng đổi mật khẩu ngay sau khi đăng nhập.
+  Nếu bạn không yêu cầu đặt lại mật khẩu, hãy liên hệ bộ phận hỗ trợ ngay.
+    `.trim();
+  
+    const htmlContent = `
+    <div style="background-color:#f4f6f8;padding:32px 16px;">
+      <div style="
+        max-width:520px;
+        margin:0 auto;
+        background:#ffffff;
+        border-radius:12px;
+        padding:32px;
+        font-family:Arial, Helvetica, sans-serif;
+        color:#333333;
+        box-shadow:0 4px 12px rgba(0,0,0,0.05);
+      ">
+  
+        <h2 style="margin-top:0;color:#1f2937;">
+          🔐 Đặt lại mật khẩu
+        </h2>
+  
+        <p style="font-size:14px;line-height:1.6;">
+          Xin chào <strong>${username}</strong>,
+        </p>
+  
+        <p style="font-size:14px;line-height:1.6;">
+          Chúng tôi đã tạo mật khẩu mới cho tài khoản của bạn:
+        </p>
+  
+        <div style="
+          margin:20px 0;
+          padding:16px;
+          background:#f9fafb;
+          border-radius:8px;
+          text-align:center;
+          font-size:18px;
+          font-weight:bold;
+          letter-spacing:1px;
+          color:#111827;
+          border:1px dashed #d1d5db;
+        ">
+          ${newPassword}
+        </div>
+  
+        <p style="font-size:14px;line-height:1.6;">
+          👉 <strong>Vui lòng đăng nhập và đổi mật khẩu ngay</strong> để đảm bảo an toàn cho tài khoản của bạn.
+        </p>
+  
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+  
+        <p style="font-size:12px;color:#6b7280;line-height:1.6;">
+          Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng liên hệ bộ phận hỗ trợ ngay.
+          <br/>
+          Email này được gửi tự động, vui lòng không trả lời.
+        </p>
+  
+        <p style="font-size:12px;color:#9ca3af;margin-bottom:0;">
+          © ${new Date().getFullYear()} Your Company. All rights reserved.
+        </p>
+      </div>
     </div>
     `;
   

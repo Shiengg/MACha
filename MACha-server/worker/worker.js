@@ -6,7 +6,7 @@ import User from "../models/user.js";
 import Campaign from "../models/campaign.js";
 import connectDB from "../config/db.js";
 import * as notificationService from "../services/notification.service.js";
-import { sendCampaignApprovedEmail, sendCampaignRejectedEmail, verifyConnection } from "../utils/mailer.js";
+import * as mailerService from "../utils/mailer.js";
 
 dotenv.config();
 
@@ -28,8 +28,6 @@ const notificationPublisher = createClient({
 notificationPublisher.on("error", (err) => console.error("Notification Publisher Error:", err));
 
 async function processQueue() {
-    console.log('🔄 Worker started! Listening to job_queue...');
-    console.log('⏳ Waiting for jobs...\n');
 
     while (true) {
         try {
@@ -43,7 +41,6 @@ async function processQueue() {
             const jobData = jobQueue.element;
             const job = JSON.parse(jobData);
 
-            console.log(`📦 Received job:`, job);
 
             switch (job.type) {
                 case "SIGNUP":
@@ -64,6 +61,12 @@ async function processQueue() {
                 case "CAMPAIGN_REJECTED":
                     await handleCampaignRejected(job);
                     break;
+                case "SEND_OTP":
+                    await handleSendOtp(job);
+                    break;
+                case "SEND_FORGOT_PASSWORD":
+                    await handleSendForgotPassword(job);
+                    break;
             }
         } catch (error) {
             console.error('Error processing job:', error);
@@ -71,33 +74,15 @@ async function processQueue() {
     }
 }
 
-async function handleSignUp(job) {
-    try {
-        console.log(`Processing signup for user ${job.userId}...`);
-
-        console.log(`Signup job completed for user ${job.userId}\n`);
-    } catch (error) {
-        console.error('Error processing signup job:', error);
-    }
-}
-
 async function handleCampaignCreated(job) {
     try {
-        console.log(`Processing campaign created for campaign ${job.campaignId}...`);
-
-        // TODO: Có thể thêm gửi email thông báo campaign đã được tạo và đang chờ duyệt
-        console.log(`Campaign ${job.campaignId} created by user ${job.userId}, pending approval`);
-        console.log(`Campaign created job completed\n`);
     } catch (error) {
         console.error('Error processing campaign created job:', error);
     }
 }
 
 async function handlePostLiked(job) {
-    try {
-        console.log(`Processing POST_LIKED for post ${job.postId}...`);
-        
-        // 1. Lấy thông tin post để biết author
+    try {   
         const post = await Post.findById(job.postId)
             .populate('user', '_id username avatar')
             .select('user content_text');
@@ -129,11 +114,8 @@ async function handlePostLiked(job) {
             post: job.postId,
             message: `đã thích bài viết của bạn`,
             is_read: false
-        });
+    });
         
-        console.log(`Notification created: ${notification._id}`);
-        
-        // 5. Publish event để server emit vào room
         await notificationPublisher.publish('notification:new', JSON.stringify({
             recipientId: post.user._id.toString(),
             notification: {
@@ -153,8 +135,6 @@ async function handlePostLiked(job) {
                 createdAt: notification.createdAt
             }
         }));
-        
-        console.log(`📬 Published notification event for user ${post.user._id}\n`);
         
     } catch (error) {
         console.error('Error processing POST_LIKED job:', error);
@@ -215,9 +195,6 @@ async function handleCommentAdded(job) {
 
 async function handleCampaignApproved(job) {
     try {
-        console.log(`Processing CAMPAIGN_APPROVED for campaign ${job.campaignId}...`);
-        
-        // 1. Lấy thông tin campaign
         const campaign = await Campaign.findById(job.campaignId)
             .select('title creator');
 
@@ -254,9 +231,6 @@ async function handleCampaignApproved(job) {
             is_read: false
         });
 
-        console.log(`Notification created: ${notification._id}`);
-
-        // 5. Publish event để server emit vào room
         await notificationPublisher.publish('notification:new', JSON.stringify({
             recipientId: creator._id.toString(),
             notification: {
@@ -276,26 +250,14 @@ async function handleCampaignApproved(job) {
                 createdAt: notification.createdAt
             },
         }));
-
-        console.log(`📬 Published notification event for user ${creator._id}`);
-
-        // 6. Gửi email thông báo campaign được duyệt
+        
         if (creator.email) {
-            const emailResult = await sendCampaignApprovedEmail(creator.email, {
+            await mailerService.sendCampaignApprovedEmail(creator.email, {
                 username: creator.username,
                 campaignTitle: campaign.title,
                 campaignId: campaign._id.toString()
             });
-            
-            if (emailResult.success) {
-                console.log(`Campaign approved email sent to ${creator.email}`);
-            } else {
-                console.error(`Failed to send email: ${emailResult.error}`);
-            }
         }
-
-        console.log(`CAMPAIGN_APPROVED job completed\n`);
-        
     } catch (error) {
         console.error('Error processing CAMPAIGN_APPROVED job:', error);
     }
@@ -303,9 +265,6 @@ async function handleCampaignApproved(job) {
 
 async function handleCampaignRejected(job) {
     try {
-        console.log(`Processing CAMPAIGN_REJECTED for campaign ${job.campaignId}...`);
-        
-        // 1. Lấy thông tin campaign
         const campaign = await Campaign.findById(job.campaignId)
             .select('title creator');
 
@@ -342,9 +301,6 @@ async function handleCampaignRejected(job) {
             is_read: false
         });
 
-        console.log(`Notification created: ${notification._id}`);
-
-        // 5. Publish event để server emit vào room
         await notificationPublisher.publish('notification:new', JSON.stringify({
             recipientId: creator._id.toString(),
             notification: {
@@ -365,43 +321,50 @@ async function handleCampaignRejected(job) {
             },
         }));
 
-        console.log(`📬 Published notification event for user ${creator._id}`);
-
-        // 6. Gửi email thông báo campaign bị từ chối
         if (creator.email) {
-            const emailResult = await sendCampaignRejectedEmail(creator.email, {
+            await sendCampaignRejectedEmail(creator.email, {
                 username: creator.username,
                 campaignTitle: campaign.title,
                 campaignId: campaign._id.toString(),
                 reason: job.reason || 'Không có lý do cụ thể'
             });
             
-            if (emailResult.success) {
-                console.log(`Campaign rejected email sent to ${creator.email}`);
-            } else {
-                console.error(`Failed to send email: ${emailResult.error}`);
-            }
         }
-
-        console.log(`CAMPAIGN_REJECTED job completed\n`);
-        
     } catch (error) {
         console.error('Error processing CAMPAIGN_REJECTED job:', error);
     }
 }
 
+async function handleSendOtp(job) {
+    try {
+        await mailerService.sendOtpEmail(job.email, {
+            username: job.username,
+            otp: job.otp,
+            expiresIn: job.expiresIn
+        });
+    } catch (error) {
+        console.error('Error processing SEND_OTP job:', error);
+    }
+}
+
+async function handleSendForgotPassword(job) {
+    try {
+        await mailerService.sendForgotPasswordEmail(job.email, {
+            username: job.username,
+            newPassword: job.newPassword
+        });
+    } catch (error) {
+        console.error('Error processing SEND_FORGOT_PASSWORD job:', error);
+    }
+}
+
 async function startWorker() {
     try {
-        console.log('Starting Worker...');
         await workerRedisClient.connect();
-        console.log('Worker Redis connected successfully');
-        
         await notificationPublisher.connect();
-        console.log('Notification Publisher connected successfully');
 
         // Verify mail transporter
         await verifyConnection();
-        console.log('');
 
         await processQueue();
     } catch (error) {
@@ -412,18 +375,14 @@ async function startWorker() {
 
 // Xử lý graceful shutdown
 process.on('SIGINT', async () => {
-    console.log('\n\nWorker shutting down gracefully...');
     await workerRedisClient.quit();
     await notificationPublisher.quit();
-    console.log('Worker stopped');
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-    console.log('\n\nWorker shutting down gracefully...');
     await workerRedisClient.quit();
     await notificationPublisher.quit();
-    console.log('Worker stopped');
     process.exit(0);
 });
 

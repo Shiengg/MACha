@@ -214,3 +214,13 @@ export const changePassword = async (userId, otp, newPassword) => {
 
     return { success: true, message: "Đổi mật khẩu thành công" };
 }
+
+export const forgotPassword = async (email) => {
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+
+    const newPassword = Math.random().toString(36).substring(2, 15);
+    user.password = newPassword;
+    await user.save();
+
+    return newPassword;
+}
