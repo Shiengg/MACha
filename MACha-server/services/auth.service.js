@@ -29,6 +29,7 @@ export const createUser = async (payload) => {
         avatar: user.avatar,
         bio: user.bio,
         date_of_birth: user.date_of_birth,
+        is_verified: user.is_verified,
         followers: user.followers,
         following: user.following,
         followers_count: user.followers_count,
@@ -199,6 +200,7 @@ export const verifyOtp = async (userId, otp) => {
 };
 
 const getChangePasswordKey = (userId) => `change_pw_verified:${userId}`;
+const getUserAccountKey = (userId) => `user_account_verified:${userId}`;
 
 export const verifyOtpForChangePassword = async (userId, otp) => {
     await verifyOtp(userId, otp);
@@ -209,6 +211,14 @@ export const verifyOtpForChangePassword = async (userId, otp) => {
 
     return true;
 };
+
+export const verifyOtpForUserAccount = async (userId, otp) => {
+    await verifyOtp(userId, otp);
+
+    const userAccountKey = getUserAccountKey(userId);
+    const expiresIn = 600;
+    await redisClient.setEx(userAccountKey, expiresIn, "true");
+}
 
 export const changePassword = async (userId, newPassword) => {
     const changePwKey = getChangePasswordKey(userId);
@@ -243,4 +253,13 @@ export const forgotPassword = async (email) => {
     await user.save();
 
     return newPassword;
+}
+
+export const cleanupUnverifiedUsers = async (days = 3) => {
+    return User.deleteMany({
+        is_verified: false,
+        createdAt: {
+            $lt: new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+        }
+    });
 }

@@ -27,7 +27,7 @@ export const registerSchema = z.object({
   password: z
     .string()
     .min(1, 'Mật khẩu là bắt buộc')
-    .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
+    .min(6, 'Mật khẩu phải có ít nhất 6 ký tự')
     .regex(/[A-Z]/, 'Mật khẩu phải có ít nhất 1 ký tự in hoa')
     .regex(/[a-z]/, 'Mật khẩu phải có ít nhất 1 ký tự thường')
     .regex(/[0-9]/, 'Mật khẩu phải có ít nhất 1 số'),

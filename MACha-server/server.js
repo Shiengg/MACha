@@ -8,17 +8,8 @@ import jwt from 'jsonwebtoken';
 import connectDB from './config/db.js';
 import { connectRedis } from './config/redis.js';
 import { setupSwagger } from './docs/swagger.js';
-import {
-    authRoutes,
-    userRoutes,
-    postRoutes,
-    commentRoutes,
-    likeRoutes,
-    campaignRoutes,
-    donationRoutes,
-    notificationRoute,
-    hashtagRoutes
-} from './routes/index.js';
+import * as routes from './routes/index.js';
+import './jobs/cleanupUnverifiedUsers.job.js';
 
 import { initSubscribers } from './subscribers/initSubscriber.js';
 import User from './models/user.js';
@@ -56,15 +47,16 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/posts", postRoutes);
-app.use("/api/comments", commentRoutes);
-app.use("/api/likes", likeRoutes);
-app.use("/api/campaigns", campaignRoutes);
-app.use("/api/donations", donationRoutes);
-app.use("/api/notifications", notificationRoute);
-app.use("/api/hashtags", hashtagRoutes);
+app.use("/api/auth", routes.authRoutes);
+app.use("/api/users", routes.userRoutes);
+app.use("/api/posts", routes.postRoutes);
+app.use("/api/comments", routes.commentRoutes);
+app.use("/api/likes", routes.likeRoutes);
+app.use("/api/campaigns", routes.campaignRoutes);
+app.use("/api/donations", routes.donationRoutes);
+app.use("/api/notifications", routes.notificationRoute);
+app.use("/api/hashtags", routes.hashtagRoutes);
+app.use("/api/conversations", routes.conversationRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {

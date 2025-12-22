@@ -7,6 +7,7 @@ import campaignRoutes from "./CampaignRoute.js";
 import donationRoutes from "./DonationRoute.js";
 import notificationRoute from "./NotificationRoute.js";
 import hashtagRoutes from "./HashtagRoute.js";
+import conversationRoutes from "./ConversationRoute.js";
 
 export {
     authRoutes,
@@ -17,5 +18,6 @@ export {
     campaignRoutes,
     donationRoutes,
     notificationRoute,
-    hashtagRoutes
+    hashtagRoutes,
+    conversationRoutes
 }

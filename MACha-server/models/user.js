@@ -40,6 +40,10 @@ const userSchema = mongoose.Schema({
         enum: ["user", "admin", "org"],
         default: "user",
     },
+    is_verified: {
+        type: Boolean,
+        default: false,
+    },
 
     kyc_status: {
         type: String,
