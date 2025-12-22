@@ -1,13 +1,15 @@
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as userService from "../services/user.service.js";
+import * as trackingService from "../services/tracking.service.js";
+import * as queueService from "../services/queue.service.js";
 
 export const getAllUsers = async (req, res) => {
     try {
         const users = await userService.getAllUsers();
-        
-        return res.status(HTTP_STATUS.OK).json({ 
+
+        return res.status(HTTP_STATUS.OK).json({
             count: users.length,
-            users 
+            users
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
@@ -20,8 +22,8 @@ export const getUserById = async (req, res) => {
         const user = await userService.getUserById(userId);
 
         if (!user) {
-            return res.status(HTTP_STATUS.NOT_FOUND).json({ 
-                message: "User not found" 
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                message: "User not found"
             });
         }
 
@@ -40,25 +42,39 @@ export const followUser = async (req, res) => {
 
         if (!result.success) {
             if (result.error === 'SELF_FOLLOW') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: "You can't follow your own account." 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "You can't follow your own account."
                 });
             }
             if (result.error === 'USER_NOT_FOUND') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: "We couldn't find the user you want to follow." 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "We couldn't find the user you want to follow."
                 });
             }
             if (result.error === 'ALREADY_FOLLOWING') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: "You're already following this person." 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "You're already following this person."
                 });
             }
         }
 
-        return res.status(HTTP_STATUS.OK).json({ 
-            message: "Followed successfully.", 
-            following: result.targetUserId 
+        try {
+            await trackingService.publishEvent("tracking:user:followed", {
+                followerId: currentUserId,
+                targetUserId: targetUserId
+            });
+            await queueService.pushJob({
+                type: "USER_FOLLOWED",
+                followerId: currentUserId,
+                targetUserId: targetUserId
+            });
+        } catch (error) {
+            console.error('Error publishing event or pushing job:', error);
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: "Followed successfully.",
+            following: result.targetUserId
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
@@ -74,15 +90,24 @@ export const unfollowUser = async (req, res) => {
 
         if (!result.success) {
             if (result.error === 'USER_NOT_FOUND') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: "We couldn't find the user you want to unfollow." 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "We couldn't find the user you want to unfollow."
                 });
             }
             if (result.error === 'NOT_FOLLOWING') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: "You're not following this person." 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "You're not following this person."
                 });
             }
+        }
+
+        try {
+            await trackingService.publishEvent("tracking:user:unfollowed", {
+                followerId: currentUserId,
+                targetUserId: targetUserId
+            });
+        } catch (error) {
+            console.error('Error publishing unfollow event:', error);
         }
 
         return res.status(HTTP_STATUS.OK).json({ message: "Successfully unfollowed." });
@@ -127,8 +152,8 @@ export const searchUsers = async (req, res) => {
 
         if (!result.success) {
             if (result.error === 'EMPTY_QUERY') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: "Search keyword is missing." 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "Search keyword is missing."
                 });
             }
         }
@@ -148,26 +173,26 @@ export const submitKYC = async (req, res) => {
 
         if (!result.success) {
             if (result.error === 'ALREADY_VERIFIED') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: "Your account is already verified" 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "Your account is already verified"
                 });
             }
             if (result.error === 'PENDING_REVIEW') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: "Your KYC is already pending review" 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "Your KYC is already pending review"
                 });
             }
             if (result.error === 'MISSING_REQUIRED_FIELDS') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
                     message: result.message,
                     missingFields: result.missingFields
                 });
             }
         }
 
-        return res.status(HTTP_STATUS.OK).json({ 
+        return res.status(HTTP_STATUS.OK).json({
             message: "KYC submitted successfully. Please wait for admin review.",
-            user: result.user 
+            user: result.user
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
@@ -188,10 +213,10 @@ export const getKYCStatus = async (req, res) => {
 export const getPendingKYCs = async (req, res) => {
     try {
         const users = await userService.getPendingKYCs();
-        
-        return res.status(HTTP_STATUS.OK).json({ 
+
+        return res.status(HTTP_STATUS.OK).json({
             count: users.length,
-            users 
+            users
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
@@ -205,13 +230,13 @@ export const getKYCDetails = async (req, res) => {
 
         if (!result.success) {
             if (result.error === 'USER_NOT_FOUND') {
-                return res.status(HTTP_STATUS.NOT_FOUND).json({ 
-                    message: "User not found" 
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "User not found"
                 });
             }
             if (result.error === 'NO_KYC_DATA') {
-                return res.status(HTTP_STATUS.NOT_FOUND).json({ 
-                    message: "No KYC data found for this user" 
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "No KYC data found for this user"
                 });
             }
         }
@@ -231,20 +256,20 @@ export const approveKYC = async (req, res) => {
 
         if (!result.success) {
             if (result.error === 'USER_NOT_FOUND') {
-                return res.status(HTTP_STATUS.NOT_FOUND).json({ 
-                    message: "User not found" 
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "User not found"
                 });
             }
             if (result.error === 'INVALID_STATUS') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: result.message 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: result.message
                 });
             }
         }
 
-        return res.status(HTTP_STATUS.OK).json({ 
+        return res.status(HTTP_STATUS.OK).json({
             message: "KYC approved successfully",
-            user: result.user 
+            user: result.user
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
@@ -257,8 +282,8 @@ export const rejectKYC = async (req, res) => {
         const { reason } = req.body;
 
         if (!reason || reason.trim().length === 0) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                message: "Rejection reason is required" 
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Rejection reason is required"
             });
         }
 
@@ -266,20 +291,20 @@ export const rejectKYC = async (req, res) => {
 
         if (!result.success) {
             if (result.error === 'USER_NOT_FOUND') {
-                return res.status(HTTP_STATUS.NOT_FOUND).json({ 
-                    message: "User not found" 
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "User not found"
                 });
             }
             if (result.error === 'INVALID_STATUS') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: result.message 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: result.message
                 });
             }
         }
 
-        return res.status(HTTP_STATUS.OK).json({ 
+        return res.status(HTTP_STATUS.OK).json({
             message: "KYC rejected successfully",
-            user: result.user 
+            user: result.user
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });

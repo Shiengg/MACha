@@ -5,7 +5,7 @@ import { Bell } from 'lucide-react';
 import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import Image from 'next/image';
-import { getNotifications, Notification } from '@/services/notification.service';
+import { getNotifications, Notification, markAllAsRead } from '@/services/notification.service';
 import PostModal from './PostModal';
 
 export default function NotificationDropdown() {
@@ -28,7 +28,7 @@ export default function NotificationDropdown() {
         setLoading(true);
         const data = await getNotifications();
         setNotifications(data);
-        
+
         // Đếm số unread
         const unread = data.filter(n => !n.is_read).length;
         setUnreadCount(unread);
@@ -48,16 +48,16 @@ export default function NotificationDropdown() {
 
     socket.on('new-notification', (notification: Notification) => {
       console.log('🔔 New notification received:', notification);
-      
+
       // Check xem notification đã tồn tại chưa (tránh duplicate)
       setNotifications(prev => {
         const exists = prev.some(n => n._id === notification._id);
         if (exists) return prev;
         return [notification, ...prev];
       });
-      
+
       setUnreadCount(prev => prev + 1);
-      
+
       // Play sound (optional)
       playNotificationSound();
     });
@@ -91,11 +91,21 @@ export default function NotificationDropdown() {
     audio.play().catch(err => console.log('Audio play failed:', err));
   };
 
-  const toggleDropdown = () => {
-    setIsOpen(!isOpen);
-    if (!isOpen) {
-      // Mark all as read when opening
-      setUnreadCount(0);
+  const toggleDropdown = async () => {
+    const nextIsOpen = !isOpen;
+    setIsOpen(nextIsOpen);
+
+    if (!isOpen && unreadCount > 0) {
+      try {
+        await markAllAsRead();
+
+        setNotifications((prev) =>
+          prev.map((n) => (n.is_read ? n : { ...n, is_read: true }))
+        );
+        setUnreadCount(0);
+      } catch (error) {
+        console.error('Failed to mark all notifications as read:', error);
+      }
     }
   };
 
@@ -108,7 +118,7 @@ export default function NotificationDropdown() {
     if (seconds < 3600) return `${Math.floor(seconds / 60)} phút trước`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)} giờ trước`;
     if (seconds < 604800) return `${Math.floor(seconds / 86400)} ngày trước`;
-    
+
     return date.toLocaleDateString('vi-VN', { day: 'numeric', month: 'short' });
   };
 
@@ -149,7 +159,7 @@ export default function NotificationDropdown() {
         className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
       >
         <Bell className="w-6 h-6 text-gray-700 dark:text-gray-300" />
-        
+
         {/* Unread Badge */}
         {unreadCount > 0 && (
           <span className="absolute top-0 right-0 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
@@ -186,9 +196,8 @@ export default function NotificationDropdown() {
                   <div
                     key={notification._id}
                     onClick={() => handleNotificationClick(notification)}
-                    className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 transition-colors ${
-                      !notification.is_read ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                    }`}
+                    className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 transition-colors ${!notification.is_read ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                      }`}
                   >
                     <div className="flex gap-3">
                       {/* Avatar */}
@@ -208,7 +217,7 @@ export default function NotificationDropdown() {
                             </div>
                           )}
                         </div>
-                        
+
                         {/* Type Icon Badge - Nằm góc trên bên phải */}
                         <div className="absolute -top-1 -right-1 w-7 h-7 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center text-base border-2 border-white dark:border-gray-800 shadow-sm">
                           {getNotificationIcon(notification.type)}
@@ -233,21 +242,21 @@ export default function NotificationDropdown() {
                             </>
                           )}
                         </p>
-                        
+
                         {/* Post Preview */}
                         {notification.post && (
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
                             "{notification.post.content_text}"
                           </p>
                         )}
-                        
+
                         {/* Campaign Preview */}
                         {notification.campaign && (
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
                             "{notification.campaign.title}"
                           </p>
                         )}
-                        
+
                         {/* Time */}
                         <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
                           {formatTimeAgo(notification.createdAt)}

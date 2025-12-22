@@ -3,28 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from "@/components/guards/ProtectedRoute";
-import { getUserById } from '@/services/user.service';
+import { getUserById, followUser, unfollowUser } from '@/services/user.service';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSocket } from '@/contexts/SocketContext';
 import Swal from 'sweetalert2';
 
-interface User {
-  _id: string;
-  username: string;
-  email: string;
-  fullname?: string;
-  avatar?: string;
-  bio?: string;
-  role?: string;
-  kyc_status?: string;
-  followers_count?: number;
-  following_count?: number;
-  createdAt: string;
-  updatedAt: string;
-  address?: {
-    city?: string;
-    district?: string;
-  };
-}
+import type { User } from '@/services/user.service';
 
 interface Campaign {
   _id: string;
@@ -42,17 +26,24 @@ interface Campaign {
 function ProfileContent() {
   const params = useParams();
   const router = useRouter();
-  const { user: currentUser, loading: authLoading } = useAuth();
+  const {
+    user: currentUser,
+    loading: authLoading,
+    setUser: setCurrentUser,
+  } = useAuth();
+  const { socket, isConnected } = useSocket();
   const userId = params.userId as string;
-  
+
   const [user, setUser] = useState<User | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'activity' | 'campaigns' | 'achievements' | 'about'>('campaigns');
-  const [isFollowing, setIsFollowing] = useState(false);
 
-  const isOwnProfile = currentUser?.id === userId;
+  // So sánh ID: API trả về _id, nhưng AuthContext có thể có id hoặc _id
+  // So sánh cả userId từ URL params và user._id từ API response
+  const currentUserId = currentUser?._id || currentUser?.id;
+  const isOwnProfile = !!(currentUserId && (currentUserId === userId || (user && currentUserId === user._id)));
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -67,11 +58,10 @@ function ProfileContent() {
         // Reset state trước khi fetch data mới
         setUser(null);
         setCampaigns([]);
-        setIsFollowing(false);
-        
+
         const userData = await getUserById(userId);
         setUser(userData);
-        
+
         // TODO: Fetch user's campaigns
         // const userCampaigns = await getCampaignsByUser(userId);
         // setCampaigns(userCampaigns);
@@ -86,24 +76,157 @@ function ProfileContent() {
     if (userId) {
       fetchUserData();
     }
-    
+
     // Cleanup function - reset state khi component unmount hoặc userId thay đổi
     return () => {
       setUser(null);
       setCampaigns([]);
       setError(null);
-      setIsFollowing(false);
       setActiveTab('campaigns'); // Reset về tab mặc định
     };
   }, [userId, currentUser?.id, authLoading]); // ✅ Listen vào currentUser.id thay vì currentUser object
 
+  const isFollowing =
+    !!currentUser &&
+    Array.isArray((currentUser as any).following) &&
+    (currentUser as any).following.includes(userId);
+
+  // Realtime cập nhật followers_count qua Socket.IO
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handleUserFollowed = (event: any) => {
+      if (event.targetUserId !== userId) return;
+
+      const currentId = currentUserId;
+
+      if (event.followerId === currentId) {
+        return;
+      }
+
+      setUser((prev) =>
+        prev
+          ? {
+            ...prev,
+            followers_count: (prev.followers_count || 0) + 1,
+          }
+          : prev
+      );
+
+      if (isOwnProfile && currentId && event.targetUserId === currentId && currentUser) {
+        setCurrentUser({
+          ...(currentUser as any),
+          followers_count: ((currentUser as any).followers_count || 0) + 1,
+        });
+      }
+    };
+
+    const handleUserUnfollowed = (event: any) => {
+      if (event.targetUserId !== userId) return;
+
+      const currentId = currentUserId;
+
+      if (event.followerId === currentId) {
+        return;
+      }
+
+      setUser((prev) =>
+        prev
+          ? {
+            ...prev,
+            followers_count: Math.max((prev.followers_count || 1) - 1, 0),
+          }
+          : prev
+      );
+
+      if (isOwnProfile && currentId && event.targetUserId === currentId && currentUser) {
+        setCurrentUser({
+          ...(currentUser as any),
+          followers_count: Math.max(
+            ((currentUser as any).followers_count || 1) - 1,
+            0
+          ),
+        });
+      }
+    };
+
+    socket.on('user:followed', handleUserFollowed);
+    socket.on('user:unfollowed', handleUserUnfollowed);
+
+    return () => {
+      socket.off('user:followed', handleUserFollowed);
+      socket.off('user:unfollowed', handleUserUnfollowed);
+    };
+  }, [socket, isConnected, userId, currentUserId, isOwnProfile, setCurrentUser, currentUser]);
+
   const handleFollow = async () => {
-    // TODO: Implement follow/unfollow API
-    Swal.fire({
-      icon: 'info',
-      title: 'Tính năng đang phát triển',
-      text: 'Chức năng theo dõi sẽ sớm được cập nhật!',
-    });
+    if (!currentUser) {
+      router.push(`/login?returnUrl=${encodeURIComponent(`/profile/${userId}`)}`);
+      return;
+    }
+
+    try {
+      if (isFollowing) {
+        await unfollowUser(userId);
+
+        const currentFollowing = Array.isArray((currentUser as any).following)
+          ? [...(currentUser as any).following]
+          : [];
+        const updatedFollowing = currentFollowing.filter((id: string) => id !== userId);
+
+        setCurrentUser({
+          ...currentUser,
+          following: updatedFollowing,
+          following_count: Math.max(
+            ((currentUser as any).following_count || 1) - 1,
+            0
+          ),
+        });
+
+        setUser((prev) =>
+          prev
+            ? {
+              ...prev,
+              followers_count: Math.max((prev.followers_count || 1) - 1, 0),
+            }
+            : prev
+        );
+      } else {
+        await followUser(userId);
+
+        const currentFollowing = Array.isArray((currentUser as any).following)
+          ? [...(currentUser as any).following]
+          : [];
+        const updatedFollowing = currentFollowing.includes(userId)
+          ? currentFollowing
+          : [...currentFollowing, userId];
+
+        setCurrentUser({
+          ...currentUser,
+          following: updatedFollowing,
+          following_count: ((currentUser as any).following_count || 0) + 1,
+        });
+
+        setUser((prev) =>
+          prev
+            ? {
+              ...prev,
+              followers_count: (prev.followers_count || 0) + 1,
+            }
+            : prev
+        );
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        'Không thể thực hiện thao tác. Vui lòng thử lại sau.';
+
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: message,
+      });
+    }
   };
 
   const handleMessage = () => {
@@ -268,16 +391,26 @@ function ProfileContent() {
                       )}
                     </div>
 
-                    {/* Action Buttons */}
-                    {!isOwnProfile && (
+                    {isOwnProfile ? (
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => router.push('/settings')}
+                          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all flex items-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Chỉnh sửa
+                        </button>
+                      </div>
+                    ) : (
                       <div className="flex items-center gap-3">
                         <button
                           onClick={handleFollow}
-                          className={`px-6 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                            isFollowing
-                              ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                              : 'bg-blue-600 hover:bg-blue-700 text-white'
-                          }`}
+                          className={`px-6 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${isFollowing
+                            ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                            }`}
                         >
                           {isFollowing ? (
                             <>
@@ -336,11 +469,10 @@ function ProfileContent() {
               <div className="flex items-center gap-1 px-6">
                 <button
                   onClick={() => setActiveTab('campaigns')}
-                  className={`px-6 py-4 font-medium transition-all relative ${
-                    activeTab === 'campaigns'
-                      ? 'text-blue-500'
-                      : 'text-gray-400 hover:text-gray-300'
-                  }`}
+                  className={`px-6 py-4 font-medium transition-all relative ${activeTab === 'campaigns'
+                    ? 'text-blue-500'
+                    : 'text-gray-400 hover:text-gray-300'
+                    }`}
                 >
                   Chiến dịch
                   {activeTab === 'campaigns' && (
@@ -349,11 +481,10 @@ function ProfileContent() {
                 </button>
                 <button
                   onClick={() => setActiveTab('activity')}
-                  className={`px-6 py-4 font-medium transition-all relative ${
-                    activeTab === 'activity'
-                      ? 'text-blue-500'
-                      : 'text-gray-400 hover:text-gray-300'
-                  }`}
+                  className={`px-6 py-4 font-medium transition-all relative ${activeTab === 'activity'
+                    ? 'text-blue-500'
+                    : 'text-gray-400 hover:text-gray-300'
+                    }`}
                 >
                   Hoạt động
                   {activeTab === 'activity' && (
@@ -362,11 +493,10 @@ function ProfileContent() {
                 </button>
                 <button
                   onClick={() => setActiveTab('achievements')}
-                  className={`px-6 py-4 font-medium transition-all relative ${
-                    activeTab === 'achievements'
-                      ? 'text-blue-500'
-                      : 'text-gray-400 hover:text-gray-300'
-                  }`}
+                  className={`px-6 py-4 font-medium transition-all relative ${activeTab === 'achievements'
+                    ? 'text-blue-500'
+                    : 'text-gray-400 hover:text-gray-300'
+                    }`}
                 >
                   Thành tựu
                   {activeTab === 'achievements' && (
@@ -375,11 +505,10 @@ function ProfileContent() {
                 </button>
                 <button
                   onClick={() => setActiveTab('about')}
-                  className={`px-6 py-4 font-medium transition-all relative ${
-                    activeTab === 'about'
-                      ? 'text-blue-500'
-                      : 'text-gray-400 hover:text-gray-300'
-                  }`}
+                  className={`px-6 py-4 font-medium transition-all relative ${activeTab === 'about'
+                    ? 'text-blue-500'
+                    : 'text-gray-400 hover:text-gray-300'
+                    }`}
                 >
                   Giới thiệu
                   {activeTab === 'about' && (
@@ -521,13 +650,13 @@ function ProfileContent() {
               </div>
               <h3 className="text-xl font-semibold text-white mb-2">Chưa có thành tựu</h3>
               <p className="text-gray-400">Các huy hiệu và thành tựu sẽ hiển thị ở đây</p>
-          </div>
+            </div>
           )}
 
           {activeTab === 'about' && (
             <div className="bg-[#1a1f2e] rounded-xl border border-gray-700 p-6">
               <h2 className="text-xl font-bold text-white mb-6">Giới thiệu</h2>
-              
+
               <div className="space-y-4">
                 {user.bio && (
                   <div className="flex items-start gap-3">
@@ -598,7 +727,7 @@ function ProfileContent() {
               </div>
             </div>
           )}
-          </div>
+        </div>
       </div>
     </div>
   );

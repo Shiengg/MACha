@@ -67,6 +67,9 @@ async function processQueue() {
                 case "SEND_FORGOT_PASSWORD":
                     await handleSendForgotPassword(job);
                     break;
+                case "USER_FOLLOWED":
+                    await handleUserFollowed(job);
+                    break;
             }
         } catch (error) {
             console.error('Error processing job:', error);
@@ -82,30 +85,30 @@ async function handleCampaignCreated(job) {
 }
 
 async function handlePostLiked(job) {
-    try {   
+    try {
         const post = await Post.findById(job.postId)
             .populate('user', '_id username avatar')
             .select('user content_text');
-        
+
         if (!post) {
             console.log('Post not found');
             return;
         }
-        
+
         // 2. Lấy thông tin người like
         const liker = await User.findById(job.userId).select('username avatar');
-        
+
         if (!liker) {
             console.log('Liker not found');
             return;
         }
-        
+
         // 3. Không tạo notification nếu tự like bài viết của mình
         if (post.user._id.toString() === job.userId) {
             console.log('User liked their own post, skip notification');
             return;
-        }   
-        
+        }
+
         // 4. Tạo notification trong database
         const notification = await notificationService.createNotification({
             receiver: post.user._id,
@@ -114,8 +117,8 @@ async function handlePostLiked(job) {
             post: job.postId,
             message: `đã thích bài viết của bạn`,
             is_read: false
-    });
-        
+        });
+
         await notificationPublisher.publish('notification:new', JSON.stringify({
             recipientId: post.user._id.toString(),
             notification: {
@@ -135,7 +138,7 @@ async function handlePostLiked(job) {
                 createdAt: notification.createdAt
             }
         }));
-        
+
     } catch (error) {
         console.error('Error processing POST_LIKED job:', error);
     }
@@ -146,16 +149,16 @@ async function handleCommentAdded(job) {
         const post = await Post.findById(job.postId)
             .populate('user', '_id username avatar')
             .select('user content_text');
-        
+
         if (!post) {
             console.log('Post not found');
             return;
         }
-        
+
         const userComment = await User.findById(job.userId).select('username avatar');
 
         if (!userComment) {
-            console.log('User comment not found');  
+            console.log('User comment not found');
             return;
         }
 
@@ -250,7 +253,7 @@ async function handleCampaignApproved(job) {
                 createdAt: notification.createdAt
             },
         }));
-        
+
         if (creator.email) {
             await mailerService.sendCampaignApprovedEmail(creator.email, {
                 username: creator.username,
@@ -328,7 +331,7 @@ async function handleCampaignRejected(job) {
                 campaignId: campaign._id.toString(),
                 reason: job.reason || 'Không có lý do cụ thể'
             });
-            
+
         }
     } catch (error) {
         console.error('Error processing CAMPAIGN_REJECTED job:', error);
@@ -358,13 +361,48 @@ async function handleSendForgotPassword(job) {
     }
 }
 
+async function handleUserFollowed(job) {
+    try {
+        const follower = await User.findById(job.followerId).select('username avatar');
+        const targetUser = await User.findById(job.targetUserId).select('username avatar');
+
+        if (!follower || !targetUser) {
+            console.log('Follower or target user not found');
+            return;
+        }
+
+        const notification = await notificationService.createNotification({
+            receiver: targetUser._id,
+            sender: follower._id,
+            type: 'follow',
+        });
+
+        await notificationPublisher.publish('notification:new', JSON.stringify({
+            recipientId: targetUser._id.toString(),
+            notification: {
+                _id: notification._id,
+                type: 'follow',
+                message: 'đã theo dõi bạn',
+                sender: {
+                    _id: follower._id,
+                    username: follower.username,
+                    avatar: follower.avatar
+                },
+                is_read: false,
+                createdAt: notification.createdAt
+            }
+        }));
+    } catch (error) {
+        console.error('Error processing USER_FOLLOWED job:', error);
+    }
+}
+
 async function startWorker() {
     try {
         await workerRedisClient.connect();
         await notificationPublisher.connect();
 
-        // Verify mail transporter
-        await verifyConnection();
+        // await verifyConnection();
 
         await processQueue();
     } catch (error) {

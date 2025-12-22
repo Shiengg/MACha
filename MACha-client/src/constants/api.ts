@@ -38,6 +38,8 @@ export const DELETE_NOTIFICATION_ROUTE = (notificationId: string) => `${NOTIFICA
 
 export const USER_ROUTE = "api/users";
 export const GET_USER_BY_ID_ROUTE = (userId: string) => `${USER_ROUTE}/${userId}`;
+export const FOLLOW_USER_ROUTE = (userId: string) => `${USER_ROUTE}/${userId}/follow`;
+export const UNFOLLOW_USER_ROUTE = (userId: string) => `${USER_ROUTE}/${userId}/unfollow`;
 
 export const CAMPAIGN_ROUTE = "api/campaigns";
 export const GET_ALL_CAMPAIGNS_ROUTE = `${CAMPAIGN_ROUTE}`;
