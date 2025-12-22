@@ -375,6 +375,8 @@ async function handleUserFollowed(job) {
             receiver: targetUser._id,
             sender: follower._id,
             type: 'follow',
+            message: 'đã theo dõi bạn',
+            is_read: false
         });
 
         await notificationPublisher.publish('notification:new', JSON.stringify({

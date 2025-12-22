@@ -1,12 +1,13 @@
 import { Router } from "express";
-import { 
-    getAllCampaigns, 
-    getCampaignById, 
+import {
+    getAllCampaigns,
+    getCampaignById,
     getCampaignsByCategory,
     getActiveCategories,
-    createCampaign, 
-    updateCampaign, 
-    deleteCampaign, 
+    getCampaignsByCreator,
+    createCampaign,
+    updateCampaign,
+    deleteCampaign,
     cancelCampaign,
     getPendingCampaigns,
     approveCampaign,
@@ -22,6 +23,7 @@ campaignRoutes.get('/', RateLimitMiddleware.rateLimitByIP(100, 60), getAllCampai
 campaignRoutes.get('/categories/active', RateLimitMiddleware.rateLimitByIP(100, 60), getActiveCategories);
 campaignRoutes.get('/category', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignsByCategory);
 campaignRoutes.get('/pending', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), getPendingCampaigns);
+campaignRoutes.get('/creator', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignsByCreator);
 campaignRoutes.get('/:id', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignById);
 campaignRoutes.post('/', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createCampaign);
 campaignRoutes.patch('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), updateCampaign);

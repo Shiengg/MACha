@@ -5,6 +5,7 @@ export const GET_CURRENT_USER_ROUTE = `${AUTH_ROUTE}/me`;
 export const LOGOUT_ROUTE = `${AUTH_ROUTE}/logout`;
 export const UPDATE_USER_ROUTE = (userId: string) => `${AUTH_ROUTE}/${userId}`;
 export const SEND_OTP_ROUTE = `${AUTH_ROUTE}/otp`;
+export const VERIFY_OTP_ROUTE = `${AUTH_ROUTE}/verify-otp`;
 export const CHANGE_PASSWORD_ROUTE = `${AUTH_ROUTE}/change-password`;
 export const FORGOT_PASSWORD_ROUTE = `${AUTH_ROUTE}/forgot-password`;
 
@@ -48,6 +49,7 @@ export const CREATE_CAMPAIGN_ROUTE = `${CAMPAIGN_ROUTE}`;
 export const UPDATE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}`;
 export const DELETE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}`;
 export const CANCEL_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/cancel`;
+export const GET_CAMPAIGNS_BY_CREATOR_ROUTE = `${CAMPAIGN_ROUTE}/creator`;
 export const GET_CAMPAIGNS_BY_CATEGORY_ROUTE = `${CAMPAIGN_ROUTE}/category`;
 export const GET_ACTIVE_CATEGORIES_ROUTE = `${CAMPAIGN_ROUTE}/categories/active`;
 export const GET_PENDING_CAMPAIGNS_ROUTE = `${CAMPAIGN_ROUTE}/pending`;

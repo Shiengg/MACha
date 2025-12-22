@@ -11,12 +11,12 @@ export const HTTP_STATUS = {
 }
 
 export const HTTP_STATUS_TEXT = {
-    USERNAME_REQUIRED: "Username is required.",
-    PASSWORD_REQUIRED: "Password is required.",
-    USERNAME_EXISTS: "Username already taken.",
-    LOGIN_SUCCESS: "Login successful.",
-    LOGIN_FAILED: "Invalid username or password.",
-    UNAUTHORIZED: "Unauthorized: Invalid or expired token",
-    FORBIDDEN: "Forbidden",
-    NOT_FOUND: "Not Found",
+    USERNAME_REQUIRED: "Username là bắt buộc.",
+    PASSWORD_REQUIRED: "Mật khẩu là bắt buộc.",
+    USERNAME_EXISTS: "Username đã tồn tại.",
+    LOGIN_SUCCESS: "Đăng nhập thành công.",
+    LOGIN_FAILED: "Tên đăng nhập hoặc mật khẩu không hợp lệ.",
+    UNAUTHORIZED: "Không xác thực: Token hết hạn hoặc không hợp lệ",
+    FORBIDDEN: "Truy cập bị cấm",
+    NOT_FOUND: "Không tìm thấy",
 }

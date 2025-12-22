@@ -33,29 +33,29 @@ export const getCampaignsByCategory = async (req, res) => {
 
         // Validate category
         if (!category) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                message: "Category parameter is required" 
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Category parameter is required"
             });
         }
 
         const validCategories = [
-            'children', 'elderly', 'poverty', 'disaster', 'medical', 
+            'children', 'elderly', 'poverty', 'disaster', 'medical',
             'education', 'disability', 'animal', 'environment', 'community', 'other'
         ];
 
         if (!validCategories.includes(category)) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
                 message: "Invalid category",
-                validCategories 
+                validCategories
             });
         }
 
         const campaigns = await campaignService.getCampaignsByCategory(category);
 
-        res.status(HTTP_STATUS.OK).json({ 
+        res.status(HTTP_STATUS.OK).json({
             category,
             count: campaigns.length,
-            campaigns 
+            campaigns
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
@@ -71,10 +71,27 @@ export const getActiveCategories = async (req, res) => {
     }
 }
 
+export const getCampaignsByCreator = async (req, res) => {
+    try {
+        const creatorId = req.query.creatorId || req.user?._id;
+        if (!creatorId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: "creatorId is required" });
+        }
+
+        const campaigns = await campaignService.getCampaignsByCreator(creatorId);
+        res.status(HTTP_STATUS.OK).json({
+            count: campaigns.length,
+            campaigns
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
+    }
+}
+
 export const createCampaign = async (req, res) => {
     try {
         if (req.user.kyc_status !== 'verified') {
-            return res.status(HTTP_STATUS.FORBIDDEN).json({ 
+            return res.status(HTTP_STATUS.FORBIDDEN).json({
                 message: "You need to complete KYC verification before creating a campaign",
                 kyc_status: req.user.kyc_status,
                 kyc_rejection_reason: req.user.kyc_rejection_reason
@@ -85,8 +102,8 @@ export const createCampaign = async (req, res) => {
 
         // Publish event và push job (không block response nếu fail)
         try {
-            await trackingService.publishEvent("tracking:campaign:created", { 
-                campaignId: campaign._id, 
+            await trackingService.publishEvent("tracking:campaign:created", {
+                campaignId: campaign._id,
                 userId: req.user._id,
                 title: campaign.title,
                 goal_amount: campaign.goal_amount,
@@ -97,10 +114,10 @@ export const createCampaign = async (req, res) => {
                 proof_documents_url: campaign.proof_documents_url,
                 category: campaign.category,
             });
-            await queueService.pushJob({ 
-                type: "CAMPAIGN_CREATED", 
-                campaignId: campaign._id, 
-                userId: req.user._id 
+            await queueService.pushJob({
+                type: "CAMPAIGN_CREATED",
+                campaignId: campaign._id,
+                userId: req.user._id
             });
         } catch (eventError) {
             console.error('Error publishing event or pushing job:', eventError);
@@ -115,39 +132,39 @@ export const createCampaign = async (req, res) => {
 export const updateCampaign = async (req, res) => {
     try {
         const result = await campaignService.updateCampaign(
-            req.params.id, 
-            req.user._id, 
+            req.params.id,
+            req.user._id,
             req.body
         );
 
         if (!result.success) {
             if (result.error === 'NOT_FOUND') {
-                return res.status(HTTP_STATUS.NOT_FOUND).json({ 
-                    message: "Campaign not found" 
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "Campaign not found"
                 });
             }
             if (result.error === 'FORBIDDEN') {
-                return res.status(HTTP_STATUS.FORBIDDEN).json({ 
-                    message: HTTP_STATUS_TEXT.FORBIDDEN 
+                return res.status(HTTP_STATUS.FORBIDDEN).json({
+                    message: HTTP_STATUS_TEXT.FORBIDDEN
                 });
             }
             if (result.error === 'CANNOT_UPDATE_AFTER_DONATION') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
                     message: result.message,
                     restrictedFields: result.restrictedFields
                 });
             }
             if (result.error === 'INVALID_STATUS_CHANGE') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: result.message 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: result.message
                 });
             }
         }
 
         // Publish tracking event
         try {
-            await trackingService.publishEvent("tracking:campaign:updated", { 
-                campaignId: result.campaign._id, 
+            await trackingService.publishEvent("tracking:campaign:updated", {
+                campaignId: result.campaign._id,
                 userId: req.user._id,
                 title: result.campaign.title,
                 goal_amount: result.campaign.goal_amount,
@@ -171,17 +188,17 @@ export const deleteCampaign = async (req, res) => {
 
         if (!result.success) {
             if (result.error === 'NOT_FOUND') {
-                return res.status(HTTP_STATUS.NOT_FOUND).json({ 
-                    message: "Campaign not found" 
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "Campaign not found"
                 });
             }
             if (result.error === 'FORBIDDEN') {
-                return res.status(HTTP_STATUS.FORBIDDEN).json({ 
-                    message: HTTP_STATUS_TEXT.FORBIDDEN 
+                return res.status(HTTP_STATUS.FORBIDDEN).json({
+                    message: HTTP_STATUS_TEXT.FORBIDDEN
                 });
             }
             if (result.error === 'CANNOT_DELETE_AFTER_DONATION') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
                     message: result.message,
                     currentAmount: result.currentAmount
                 });
@@ -190,8 +207,8 @@ export const deleteCampaign = async (req, res) => {
 
         // Publish tracking event
         try {
-            await trackingService.publishEvent("tracking:campaign:deleted", { 
-                campaignId: req.params.id, 
+            await trackingService.publishEvent("tracking:campaign:deleted", {
+                campaignId: req.params.id,
                 userId: req.user._id,
                 category: result.campaign.category,
             });
@@ -208,34 +225,34 @@ export const deleteCampaign = async (req, res) => {
 export const cancelCampaign = async (req, res) => {
     try {
         const { reason } = req.body;
-        
+
         const result = await campaignService.cancelCampaign(
-            req.params.id, 
-            req.user._id, 
+            req.params.id,
+            req.user._id,
             reason
         );
 
         if (!result.success) {
             if (result.error === 'NOT_FOUND') {
-                return res.status(HTTP_STATUS.NOT_FOUND).json({ 
-                    message: "Campaign not found" 
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "Campaign not found"
                 });
             }
             if (result.error === 'FORBIDDEN') {
-                return res.status(HTTP_STATUS.FORBIDDEN).json({ 
-                    message: HTTP_STATUS_TEXT.FORBIDDEN 
+                return res.status(HTTP_STATUS.FORBIDDEN).json({
+                    message: HTTP_STATUS_TEXT.FORBIDDEN
                 });
             }
             if (result.error === 'ALREADY_CANCELLED') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: result.message 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: result.message
                 });
             }
         }
 
         try {
-            await trackingService.publishEvent("tracking:campaign:cancelled", { 
-                campaignId: result.campaign._id, 
+            await trackingService.publishEvent("tracking:campaign:cancelled", {
+                campaignId: result.campaign._id,
                 userId: req.user._id,
                 reason: reason || 'No reason provided',
                 category: result.campaign.category,
@@ -244,9 +261,9 @@ export const cancelCampaign = async (req, res) => {
             console.error('Error publishing event:', error);
         }
 
-        return res.status(HTTP_STATUS.OK).json({ 
+        return res.status(HTTP_STATUS.OK).json({
             message: "Campaign cancelled successfully",
-            campaign: result.campaign 
+            campaign: result.campaign
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
@@ -256,9 +273,9 @@ export const cancelCampaign = async (req, res) => {
 export const getPendingCampaigns = async (req, res) => {
     try {
         const campaigns = await campaignService.getPendingCampaigns();
-        res.status(HTTP_STATUS.OK).json({ 
+        res.status(HTTP_STATUS.OK).json({
             count: campaigns.length,
-            campaigns 
+            campaigns
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
@@ -274,19 +291,19 @@ export const approveCampaign = async (req, res) => {
 
         if (!result.success) {
             if (result.error === 'NOT_FOUND') {
-                return res.status(HTTP_STATUS.NOT_FOUND).json({ 
-                    message: "Campaign not found" 
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "Campaign not found"
                 });
             }
             if (result.error === 'INVALID_STATUS') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: result.message 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: result.message
                 });
             }
         }
 
         try {
-            await trackingService.publishEvent("tracking:campaign:approved", { 
+            await trackingService.publishEvent("tracking:campaign:approved", {
                 campaignId: result.campaign._id,
                 adminId: req.user._id,
                 creatorId: result.campaign.creator,
@@ -305,9 +322,9 @@ export const approveCampaign = async (req, res) => {
             console.error('Error publishing event or pushing job:', eventError);
         }
 
-        return res.status(HTTP_STATUS.OK).json({ 
+        return res.status(HTTP_STATUS.OK).json({
             message: "Campaign approved successfully",
-            campaign: result.campaign 
+            campaign: result.campaign
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
@@ -326,24 +343,24 @@ export const rejectCampaign = async (req, res) => {
 
         if (!result.success) {
             if (result.error === 'NOT_FOUND') {
-                return res.status(HTTP_STATUS.NOT_FOUND).json({ 
-                    message: "Campaign not found" 
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "Campaign not found"
                 });
             }
             if (result.error === 'INVALID_STATUS') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: result.message 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: result.message
                 });
             }
             if (result.error === 'MISSING_REASON') {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
-                    message: result.message 
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: result.message
                 });
             }
         }
 
         try {
-            await trackingService.publishEvent("tracking:campaign:rejected", { 
+            await trackingService.publishEvent("tracking:campaign:rejected", {
                 campaignId: result.campaign._id,
                 adminId: req.user._id,
                 creatorId: result.campaign.creator,
@@ -364,9 +381,9 @@ export const rejectCampaign = async (req, res) => {
             console.error('Error publishing event or pushing job:', eventError);
         }
 
-        return res.status(HTTP_STATUS.OK).json({ 
+        return res.status(HTTP_STATUS.OK).json({
             message: "Campaign rejected successfully",
-            campaign: result.campaign 
+            campaign: result.campaign
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });

@@ -15,6 +15,7 @@ interface PostCardProps {
     user: {
       _id: string;
       username: string;
+      fullname?: string;
       avatar?: string;
     };
     content_text: string;
@@ -59,28 +60,28 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
 
     const handlePostLiked = (event: any) => {
       if (event.postId !== post._id) return;
-      
+
       const currentUserId = (user as any)?._id || user?.id;
-      
+
       // Nếu là chính mình vừa like (optimistic update đã xử lý rồi)
       if (event.userId === currentUserId) {
         justLikedRef.current = false; // Reset flag
         return;
       }
-      
+
       // Chỉ log nếu là chủ bài viết
       if (post.user._id === currentUserId) {
         console.log('🎉 Có người like bài viết của bạn:', event.postId);
         console.log('👤 User ID:', event.userId);
       }
-      
+
       // Cập nhật count cho tất cả mọi người
       setLikesCount((prev) => prev + 1);
     };
 
     const handlePostUnliked = (event: any) => {
       if (event.postId !== post._id) return;
-      
+
       const currentUserId = (user as any)?._id || user?.id;
 
       // Nếu là chính mình vừa unlike (optimistic update đã xử lý rồi)
@@ -88,13 +89,13 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
         justLikedRef.current = false;
         return;
       }
-      
+
       // Chỉ log nếu là chủ bài viết
       if (post.user._id === currentUserId) {
         console.log('💔 Có người unlike bài viết của bạn:', event.postId);
         console.log('👤 User ID:', event.userId);
       }
-      
+
       // Cập nhật count cho tất cả mọi người
       setLikesCount((prev) => prev - 1);
     }
@@ -102,19 +103,19 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
     const handleCommentAddedEvent = (event: any) => {
       // Chỉ xử lý nếu là bài viết hiện tại
       if (event.postId !== post._id) return;
-      
+
       const currentUserId = (user as any)?._id || user?.id;
-      
+
       // Nếu là chính mình vừa comment (optimistic update đã xử lý rồi)
       if (event.userId === currentUserId) {
         console.log('👤 Đó là bạn vừa comment (đã optimistic update)');
         justCommentedRef.current = false;
         return;
       }
-      
+
       console.log('💬 Có người comment bài viết này:', event.postId);
       console.log('📦 Comment:', event.content_text);
-      
+
       // Cập nhật comment count
       setCommentsCount((prev) => prev + 1);
     }
@@ -131,9 +132,9 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
         justCommentedRef.current = false;
         return;
       }
-      
+
       console.log('🗑️ Có người xóa comment:', event.commentId);
-      
+
       // Giảm count cho người khác
       setCommentsCount((prev) => Math.max(0, prev - 1));
     }
@@ -153,15 +154,15 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
 
   const handleLike = async () => {
     if (isLiking) return;
-    
+
     const previousState = isLiked;
     const previousCount = likesCount;
-    
+
     justLikedRef.current = true;
-    
+
     setIsLiked(!isLiked);
     setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
-    
+
     setIsLiking(true);
     try {
       await toggleLikePost(post._id, previousState);
@@ -172,7 +173,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
       setIsLiked(previousState);
       setLikesCount(previousCount);
       justLikedRef.current = false; // Reset flag khi có lỗi
-      
+
       // Show error message to user
       const errorMessage = error?.message || 'Có lỗi xảy ra khi thực hiện hành động này';
       alert(errorMessage);
@@ -219,13 +220,13 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
     if (seconds < 3600) return `${Math.floor(seconds / 60)} phút trước`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)} giờ trước`;
     if (seconds < 604800) return `${Math.floor(seconds / 86400)} ngày trước`;
-    
+
     return date.toLocaleDateString('vi-VN', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   const renderContentWithHashtags = (text: string) => {
     const parts = text.split(/(#\w+)/g);
-    
+
     return parts.map((part, index) => {
       // Nếu là hashtag
       if (part.startsWith('#')) {
@@ -244,8 +245,8 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
     });
   };
 
-  const contentPreview = post.content_text.length > 200 
-    ? post.content_text.slice(0, 200) + '...' 
+  const contentPreview = post.content_text.length > 200
+    ? post.content_text.slice(0, 200) + '...'
     : post.content_text;
 
   return (
@@ -263,13 +264,13 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 font-semibold">
-                {post.user.username.charAt(0).toUpperCase()}
+                {(post.user.fullname || post.user.username).charAt(0).toUpperCase()}
               </div>
             )}
           </div>
           <div>
             <h3 onClick={() => router.push(`/profile/${post.user._id}`)} className="font-semibold text-gray-900 dark:text-white hover:underline cursor-pointer">
-              {post.user.username}
+              {post.user.fullname || post.user.username}
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {formatTimeAgo(post.createdAt)}
@@ -284,7 +285,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
       {/* Content */}
       <div className="px-4 pb-3">
         <div className="text-gray-900 dark:text-white whitespace-pre-wrap text-[15px] leading-5">
-          {showFullText 
+          {showFullText
             ? renderContentWithHashtags(post.content_text)
             : renderContentWithHashtags(contentPreview)
           }
@@ -321,11 +322,10 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
               />
             </div>
           ) : (
-            <div className={`grid gap-1 ${
-              post.media_url.length === 2 ? 'grid-cols-2' : 
-              post.media_url.length === 3 ? 'grid-cols-3' : 
-              'grid-cols-2'
-            }`}>
+            <div className={`grid gap-1 ${post.media_url.length === 2 ? 'grid-cols-2' :
+              post.media_url.length === 3 ? 'grid-cols-3' :
+                'grid-cols-2'
+              }`}>
               {post.media_url.slice(0, 4).map((url, index) => (
                 <div key={index} className="relative w-full aspect-square bg-gray-100 dark:bg-gray-900">
                   <img
@@ -363,7 +363,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
         </div>
         <div className="flex items-center gap-4">
           {commentsCount > 0 && (
-            <span 
+            <span
               onClick={handleComment}
               className="cursor-pointer hover:underline"
             >
@@ -380,9 +380,8 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
       <div className="p-2 flex items-center justify-between gap-2">
         <button
           onClick={handleLike}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-            isLiked ? 'text-red-500' : 'text-gray-600 dark:text-gray-400'
-          }`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${isLiked ? 'text-red-500' : 'text-gray-600 dark:text-gray-400'
+            }`}
         >
           <Heart className={`w-5 h-5 ${isLiked ? 'fill-red-500' : ''}`} />
           <span className="font-medium">Thích</span>
