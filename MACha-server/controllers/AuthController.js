@@ -73,8 +73,13 @@ export const signup = async (req, res) => {
 
 export const verifyUserAccount = async (req, res) => {
     try {
-        const userId = req.user._id;
-        const { otp } = req.body;
+        const { userId, otp } = req.body;
+
+        if (!userId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "userId là bắt buộc",
+            });
+        }
 
         if (!otp) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({
@@ -84,9 +89,34 @@ export const verifyUserAccount = async (req, res) => {
 
         await authService.verifyOtpForUserAccount(userId, otp);
 
+        const user = await authService.getUserById(userId);
+        if (!user) {
+            return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+                message: "User không tồn tại hoặc token không hợp lệ",
+            });
+        }
+
+        if (!user.is_verified) {
+            user.is_verified = true;
+            await user.save?.();
+        }
+
+        res.cookie("jwt", createToken(user._id, user.username, user.role, user.fullname), {
+            maxAge: maxAgeMili,
+            secure: true,
+            httpOnly: true,
+            sameSite: "None"
+        });
+
         return res.status(HTTP_STATUS.OK).json({
             success: true,
             message: "Tài khoản đã được xác thực thành công.",
+            user: {
+                id: user._id,
+                username: user.username,
+                role: user.role,
+                is_verified: user.is_verified,
+            }
         });
     } catch (error) {
         res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({

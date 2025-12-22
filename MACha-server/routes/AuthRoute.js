@@ -9,8 +9,7 @@ const authRoutes = Router();
 // Rate limit: 5 requests per 60 seconds per email
 authRoutes.post('/signup', rateLimitByEmail(5, 60), AuthController.signup);
 authRoutes.post('/login', rateLimitByEmail(5, 60), AuthController.login);
-authRoutes.post('/verify-user-account', authMiddleware, rateLimitByUserId(10, 60), AuthController.verifyUserAccount);
-// Rate limit: 10 requests per 60 seconds per IP
+authRoutes.post('/verify-user-account', rateLimitByIP(10, 60), AuthController.verifyUserAccount);
 authRoutes.post('/logout', rateLimitByIP(10, 60), AuthController.logout);
 
 // Rate limit: 20 requests per 60 seconds per user
