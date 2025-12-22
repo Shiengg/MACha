@@ -31,9 +31,26 @@ setupSwagger(app);
 connectRedis();
 
 // CORS phải được cấu hình TRƯỚC tất cả các routes
+// Normalize origin URL để loại bỏ trailing slash (nếu có)
+const allowedOrigin = process.env.ORIGIN_URL?.replace(/\/$/, '') || 'http://localhost:3000';
+
 app.use(cors({
-    origin: process.env.ORIGIN_URL || 'http://localhost:3000',
+    origin: (origin, callback) => {
+        // Cho phép requests không có origin (như Postman, mobile apps)
+        if (!origin) {
+            return callback(null, true);
+        }
+        // Normalize origin để loại bỏ trailing slash trước khi so sánh
+        const normalizedOrigin = origin.replace(/\/$/, '');
+        if (normalizedOrigin === allowedOrigin) {
+            callback(null, true);
+        } else {
+            callback(new Error(`CORS: Origin ${origin} not allowed. Expected: ${allowedOrigin}`));
+        }
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json());
@@ -52,7 +69,7 @@ app.use("/api/hashtags", hashtagRoutes);
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: process.env.ORIGIN_URL || 'http://localhost:3000',
+        origin: allowedOrigin,
     }
 });
 
@@ -60,7 +77,7 @@ const io = new Server(server, {
 io.use(async (socket, next) => {
     try {
         let token = null;
-        
+
         // Lấy token từ auth hoặc cookie (giống authMiddleware)
         if (socket.handshake.auth.token) {
             token = socket.handshake.auth.token;
@@ -71,25 +88,25 @@ io.use(async (socket, next) => {
                 token = jwtCookie.split('=')[1];
             }
         }
-        
+
         if (!token) {
             console.log('⚠️  Socket connection without token');
             return next(new Error('Authentication error'));
         }
-        
+
         // Verify token (giống authMiddleware)
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        
+
         // Lấy user (giống authMiddleware)
         const user = await User.findById(decoded.id).select('-password');
         if (!user) {
             return next(new Error('User not found'));
         }
-        
+
         // Lưu vào socket
         socket.userId = user._id.toString();
         socket.user = user;
-        
+
         console.log(`🔐 Socket authenticated: ${user.username} (${socket.userId})`);
         next();
     } catch (err) {
@@ -102,29 +119,29 @@ io.use(async (socket, next) => {
 io.on('connection', (socket) => {
     const userId = socket.userId;
     const username = socket.user?.username;
-    
+
     console.log(`✅ Socket connected: ${socket.id} (User: ${username})`);
-    
+
     if (userId) {
         const userRoom = `user:${userId}`;
         socket.join(userRoom);
         console.log(`🏠 User ${username} joined room: ${userRoom}`);
-        
+
         socket.emit('room-joined', { room: userRoom, userId });
     }
-    
+
     // Handle join-room event
     socket.on('join-room', (room) => {
         socket.join(room);
         console.log(`🏠 Socket ${socket.id} joined room: ${room}`);
     });
-    
+
     // Handle leave-room event
     socket.on('leave-room', (room) => {
         socket.leave(room);
         console.log(`🚪 Socket ${socket.id} left room: ${room}`);
     });
-    
+
     socket.on('disconnect', () => {
         console.log(`❌ Socket disconnected: ${socket.id} (User: ${username})`);
     });
