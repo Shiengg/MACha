@@ -18,7 +18,6 @@ export const signup = async (req, res) => {
     try {
         const { username, email, password } = req.body;
 
-        // Validation
         if (!username || !password || !email) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({
                 message: "Username or email or password is not blank!"
@@ -31,7 +30,6 @@ export const signup = async (req, res) => {
             });
         }
 
-        // Kiểm tra user đã tồn tại
         const userExists = await authService.checkUserExists(username, email);
         if (userExists) {
             return res.status(HTTP_STATUS.CONFLICT).json({
@@ -39,29 +37,57 @@ export const signup = async (req, res) => {
             });
         }
 
-        // Tạo user mới
         const user = await authService.createUser({ username, email, password });
 
-        // Tạo token và set cookie
-        res.cookie("jwt", createToken(user.id, user.username, user.role, user.fullname), {
-            maxAge: maxAgeMili,
-            secure: true,
-            httpOnly: true,
-            sameSite: "None"
-        });
+        const { otp, expiresIn } = await authService.createOtp(user.id);
 
-        await trackingService.publishSignUpEvent(user.id, { type: "SIGNUP", userId: user.id, timestamp: Date.now() });
-
-        await queueService.pushJob({ type: "SIGNUP", userId: user.id, timestamp: Date.now() });
+        try {
+            await queueService.pushJob({
+                type: "SEND_OTP",
+                email: user.email,
+                username: user.username,
+                otp: otp,
+                expiresIn: expiresIn
+            });
+        } catch (error) {
+            console.error('Error publishing event or pushing job:', error);
+        }
 
         return res.status(HTTP_STATUS.CREATED).json({
+            success: true,
+            message: " Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.",
             user: {
                 id: user.id,
                 username: user.username,
-                role: user.role
+                role: user.role,
+                is_verified: user.is_verified,
             }
-        });
+        })
 
+    } catch (error) {
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message
+        });
+    }
+}
+
+export const verifyUserAccount = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { otp } = req.body;
+
+        if (!otp) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "OTP là bắt buộc",
+            });
+        }
+
+        await authService.verifyOtpForUserAccount(userId, otp);
+
+        return res.status(HTTP_STATUS.OK).json({
+            success: true,
+            message: "Tài khoản đã được xác thực thành công.",
+        });
     } catch (error) {
         res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
             message: error.message
@@ -115,6 +141,12 @@ export const login = async (req, res) => {
                 message: HTTP_STATUS_TEXT.LOGIN_FAILED,
                 remainingAttempts: remainingAttempts > 0 ? remainingAttempts : 0
             });
+        }
+
+        if (!user.is_verified) {
+            return res.status(HTTP_STATUS.FORBIDDEN).json({
+                message: "Tài khoản chưa được xác thực. Vui lòng kiểm tra email để xác thực tài khoản.",
+            })
         }
 
         // Reset failed login attempts khi đăng nhập thành công

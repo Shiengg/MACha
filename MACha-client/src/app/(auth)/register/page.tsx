@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { SIGNUP_ROUTE } from '@/constants/api';
+import { SIGNUP_ROUTE, VERIFY_SIGNUP_OTP_ROUTE } from '@/constants/api';
 import apiClient from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 import Image from 'next/image';
@@ -34,22 +34,54 @@ function SignupPageContent() {
                 signupData,
                 { withCredentials: true }
             );
-            if (res.data.user?.id) {
-                await login();
-                Swal.fire({
-                    title: 'Đăng ký thành công!',
-                    text: 'Bạn đã đăng ký thành công',
-                    icon: 'success',
-                    confirmButtonText: 'OK'
-                });
+            const userId = res.data.user?.id;
 
-                const returnUrl = searchParams.get('returnUrl') || '/';
-                router.push(returnUrl);
+            if (!userId) {
+                throw new Error('Không lấy được thông tin tài khoản vừa đăng ký.');
             }
-        } catch (error: any) {
-            const message = error?.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại.";
+
+            const { value: otp } = await Swal.fire({
+                title: 'Xác thực tài khoản',
+                text: 'Vui lòng nhập mã OTP đã được gửi đến email của bạn để hoàn tất đăng ký.',
+                input: 'text',
+                inputPlaceholder: 'Nhập mã OTP',
+                confirmButtonText: 'Xác thực',
+                showCancelButton: true,
+                cancelButtonText: 'Hủy',
+                inputValidator: (value) => {
+                    if (!value) {
+                        return 'Vui lòng nhập mã OTP';
+                    }
+                    return undefined;
+                }
+            });
+
+            if (!otp) {
+                // Người dùng bấm Hủy hoặc không nhập OTP
+                return;
+            }
+
+            await apiClient.post(
+                VERIFY_SIGNUP_OTP_ROUTE,
+                { userId, otp },
+                { withCredentials: true }
+            );
+
+            await login();
+
             Swal.fire({
-                title: 'Đăng ký thất bại!',
+                title: 'Đăng ký & xác thực thành công!',
+                text: 'Tài khoản của bạn đã được xác thực. Bạn sẽ được chuyển đến trang trước đó.',
+                icon: 'success',
+                confirmButtonText: 'OK'
+            });
+
+            const returnUrl = searchParams.get('returnUrl') || '/';
+            router.push(returnUrl);
+        } catch (error: any) {
+            const message = error?.response?.data?.message || error?.message || "Đăng ký hoặc xác thực thất bại. Vui lòng thử lại.";
+            Swal.fire({
+                title: 'Thao tác thất bại!',
                 text: message,
                 icon: 'error',
                 confirmButtonText: 'OK'

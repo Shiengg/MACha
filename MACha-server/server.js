@@ -17,7 +17,8 @@ import {
     campaignRoutes,
     donationRoutes,
     notificationRoute,
-    hashtagRoutes
+    hashtagRoutes,
+    conversationRoutes
 } from './routes/index.js';
 
 import { initSubscribers } from './subscribers/initSubscriber.js';
@@ -65,6 +66,7 @@ app.use("/api/campaigns", campaignRoutes);
 app.use("/api/donations", donationRoutes);
 app.use("/api/notifications", notificationRoute);
 app.use("/api/hashtags", hashtagRoutes);
+app.use("/api/conversations", conversationRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {
