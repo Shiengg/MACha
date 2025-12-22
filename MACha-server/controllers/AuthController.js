@@ -4,6 +4,8 @@ import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as authService from "../services/auth.service.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
+import User from "../models/user.js";
+import { redisClient } from "../config/redis.js";
 
 const maxAge = 3 * 24 * 60 * 60;
 const maxAgeMili = maxAge * 1000;
@@ -12,6 +14,19 @@ const { sign } = jwt;
 
 const createToken = (id, username, role, fullname) => {
     return sign({ id, username, role, fullname }, process.env.JWT_SECRET, { expiresIn: maxAge })
+}
+
+// Helper function để tạo cookie options dựa trên môi trường
+const getCookieOptions = () => {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isSecure = process.env.SECURE_COOKIE === 'true' || isProduction;
+    
+    return {
+        maxAge: maxAgeMili,
+        httpOnly: true,
+        secure: isSecure,
+        sameSite: isSecure ? "None" : "Lax"
+    };
 }
 
 export const signup = async (req, res) => {
@@ -97,16 +112,13 @@ export const verifyUserAccount = async (req, res) => {
         }
 
         if (!user.is_verified) {
+            await User.findByIdAndUpdate(userId, { is_verified: true });
+            const cacheKey = `user:${userId.toString()}`;
+            await redisClient.del(cacheKey);
             user.is_verified = true;
-            await user.save?.();
         }
 
-        res.cookie("jwt", createToken(user._id, user.username, user.role, user.fullname), {
-            maxAge: maxAgeMili,
-            secure: true,
-            httpOnly: true,
-            sameSite: "None"
-        });
+        res.cookie("jwt", createToken(user._id, user.username, user.role, user.fullname), getCookieOptions());
 
         return res.status(HTTP_STATUS.OK).json({
             success: true,
@@ -182,12 +194,7 @@ export const login = async (req, res) => {
         // Reset failed login attempts khi đăng nhập thành công
         await authService.resetFailedLoginAttempts(email);
 
-        res.cookie("jwt", createToken(user._id, user.username, user.role, user.fullname), {
-            maxAge: maxAgeMili,
-            secure: true,
-            httpOnly: true,
-            sameSite: "None"
-        });
+        res.cookie("jwt", createToken(user._id, user.username, user.role, user.fullname), getCookieOptions());
 
         return res.status(HTTP_STATUS.OK).json({
             user: {
@@ -206,10 +213,11 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
     try {
+        const cookieOptions = getCookieOptions();
         res.clearCookie("jwt", {
-            httpOnly: true,
-            secure: true,
-            sameSite: "None",
+            httpOnly: cookieOptions.httpOnly,
+            secure: cookieOptions.secure,
+            sameSite: cookieOptions.sameSite,
         })
         return res.status(HTTP_STATUS.OK).json({
             message: "Logout successful.",
