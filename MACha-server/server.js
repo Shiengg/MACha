@@ -57,6 +57,7 @@ app.use("/api/donations", routes.donationRoutes);
 app.use("/api/notifications", routes.notificationRoute);
 app.use("/api/hashtags", routes.hashtagRoutes);
 app.use("/api/conversations", routes.conversationRoutes);
+app.use("/api/messages", routes.messageRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {
