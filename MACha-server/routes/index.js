@@ -8,6 +8,7 @@ import donationRoutes from "./DonationRoute.js";
 import notificationRoute from "./NotificationRoute.js";
 import hashtagRoutes from "./HashtagRoute.js";
 import conversationRoutes from "./ConversationRoute.js";
+import messageRoutes from "./MessageRoute.js";
 
 export {
     authRoutes,
@@ -19,5 +20,6 @@ export {
     donationRoutes,
     notificationRoute,
     hashtagRoutes,
-    conversationRoutes
+    conversationRoutes,
+    messageRoutes
 }

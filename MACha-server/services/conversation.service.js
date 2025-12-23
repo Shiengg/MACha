@@ -14,5 +14,21 @@ export const createConversationPrivate = async (payload) => {
         members: [userId1, userId2],
         createdBy: userId1,
     });
+    await redisClient.del(`conversations:${userId1}`);
     return newConversation;
+}
+
+export const getConversationsByUserId = async (userId) => {
+    const conversationKey = `conversations:${userId}`;
+    const cached = await redisClient.get(conversationKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+    const conversations = await Conversation.find({
+        members: { $in: [userId] }
+    })
+        .populate("members", "username avatar fullname")
+        .sort({ createdAt: -1 });
+    await redisClient.setEx(conversationKey, 300, JSON.stringify(conversations));
+    return conversations;
 }

@@ -16,3 +16,16 @@ export const createConversationPrivate = async (req, res) => {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
     }
 }
+
+export const getConversationsByUserId = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const conversations = await conversationService.getConversationsByUserId(userId);
+        return res.status(HTTP_STATUS.OK).json({
+            success: true,
+            conversations
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+}
