@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Smile, Loader2 } from 'lucide-react';
+import { Send, Paperclip, Loader2, Info } from 'lucide-react';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
@@ -10,9 +10,10 @@ import type { Conversation } from '@/services/conversation.service';
 
 interface ChatWindowProps {
     conversation: Conversation | null;
+    onToggleInfoPanel?: () => void;
 }
 
-export default function ChatWindow({ conversation }: ChatWindowProps) {
+export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWindowProps) {
     const { user } = useAuth();
     const { socket } = useSocket();
     const [message, setMessage] = useState('');
@@ -125,7 +126,6 @@ export default function ChatWindow({ conversation }: ChatWindowProps) {
             setSending(true);
             setError(null);
 
-            // Call api send message
             const newMessage = await sendMessage(conversationId, {
                 content: trimmed,
                 type: 'text',
@@ -133,7 +133,6 @@ export default function ChatWindow({ conversation }: ChatWindowProps) {
 
             const idStr = String(newMessage._id);
 
-            // Add new message to the end of the list (optimistic update) nếu chưa có
             setMessages((prev) => {
                 if (prev.some((m) => String(m._id) === idStr)) {
                     return prev;
@@ -189,34 +188,50 @@ export default function ChatWindow({ conversation }: ChatWindowProps) {
         <div className="flex-1 flex flex-col h-full">
             {/* Chat Header */}
             <div className="p-4 border-b border-gray-200 bg-white">
-                <div className="flex items-center gap-3">
-                    {(() => {
-                        const otherParticipant = getOtherParticipant(conversation.members, currentUserId);
-                        return (
-                            <>
-                                {/* Avatar */}
-                                <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex-shrink-0 flex items-center justify-center text-white font-semibold overflow-hidden">
-                                    {otherParticipant.avatar ? (
-                                        <Image
-                                            src={otherParticipant.avatar}
-                                            alt={otherParticipant.username || 'User avatar'}
-                                            fill
-                                            sizes="40px"
-                                            className="object-cover"
-                                        />
-                                    ) : (
-                                        (otherParticipant.username?.charAt(0).toUpperCase() || 'U')
-                                    )}
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-gray-800">
-                                        {otherParticipant.username || 'Người dùng'}
-                                    </h3>
-                                    <p className="text-xs text-gray-500">Đang hoạt động</p>
-                                </div>
-                            </>
-                        );
-                    })()}
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        {(() => {
+                            const otherParticipant = getOtherParticipant(conversation.members, currentUserId);
+                            return (
+                                <>
+                                    {/* Avatar */}
+                                    <div className="relative flex-shrink-0">
+                                        <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-semibold overflow-hidden">
+                                            {otherParticipant.avatar ? (
+                                                <Image
+                                                    src={otherParticipant.avatar}
+                                                    alt={otherParticipant.fullname || otherParticipant.username || 'User avatar'}
+                                                    fill
+                                                    sizes="40px"
+                                                    className="object-cover"
+                                                />
+                                            ) : (
+                                                (otherParticipant.fullname?.charAt(0).toUpperCase() || 'U')
+                                            )}
+                                        </div>
+                                        {/* Online Status Indicator */}
+                                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-gray-800">
+                                            {otherParticipant.fullname || otherParticipant.username || 'Người dùng'}
+                                        </h3>
+                                        <p className="text-xs text-gray-500">Đang hoạt động</p>
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </div>
+                    {/* Info Button */}
+                    {onToggleInfoPanel && (
+                        <button
+                            onClick={onToggleInfoPanel}
+                            className="flex-shrink-0 w-6 h-6 rounded-full bg-orange-500 hover:bg-orange-600 flex items-center justify-center text-white transition-colors"
+                            aria-label="Toggle info panel"
+                        >
+                            <span className="text-sm font-semibold">i</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -263,8 +278,8 @@ export default function ChatWindow({ conversation }: ChatWindowProps) {
                         const isLastOfGroup = !next || nextSenderId !== senderId;
 
                         const bubbleBaseClasses = isOwnMessage
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-white text-gray-800 border border-gray-200';
+                            ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white'
+                            : 'bg-gray-200 text-gray-800 border border-gray-200';
 
                         let bubbleShapeClasses = '';
 
@@ -295,7 +310,7 @@ export default function ChatWindow({ conversation }: ChatWindowProps) {
                                             <div
                                                 className={`px-4 py-2 ${bubbleBaseClasses} ${bubbleShapeClasses}`}
                                             >
-                                                <p className="text-sm whitespace-pre-wrap break-words">
+                                                <p className="text-base whitespace-pre-wrap break-words">
                                                     {msg.content}
                                                 </p>
                                             </div>
@@ -313,7 +328,7 @@ export default function ChatWindow({ conversation }: ChatWindowProps) {
                                         <div
                                             className={`px-4 py-2 ${bubbleBaseClasses} ${bubbleShapeClasses}`}
                                         >
-                                            <p className="text-sm whitespace-pre-wrap break-words">
+                                            <p className="text-base whitespace-pre-wrap break-words">
                                                 {msg.content}
                                             </p>
                                         </div>
@@ -344,19 +359,19 @@ export default function ChatWindow({ conversation }: ChatWindowProps) {
             </div>
 
             {/* Message Input */}
-            <div className="p-4 border-t border-gray-200 bg-white">
-                <form onSubmit={handleSendMessage} className="flex items-end gap-2">
+            <div className="px-4 pb-4 pt-2 bg-gray-50">
+                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                     {/* Attachment Button */}
                     <button
                         type="button"
-                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        className="flex-shrink-0 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
                         aria-label="Attach file"
                     >
                         <Paperclip className="w-5 h-5" />
                     </button>
 
-                    {/* Message Input */}
-                    <div className="flex-1 relative">
+                    {/* Message Input - Bo tròn 2 đầu */}
+                    <div className="flex-1 relative flex items-end">
                         <textarea
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
@@ -368,26 +383,19 @@ export default function ChatWindow({ conversation }: ChatWindowProps) {
                             }}
                             placeholder={sending ? "Đang gửi..." : "Nhập tin nhắn..."}
                             rows={1}
-                            className="w-full px-4 py-2.5 pr-12 bg-gray-50 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all text-sm"
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 focus:bg-white transition-all text-sm self-end"
                             style={{
                                 maxHeight: '120px',
                                 minHeight: '44px',
                             }}
                         />
-                        <button
-                            type="button"
-                            className="absolute right-2 bottom-2 p-1.5 text-gray-500 hover:text-gray-700 transition-colors"
-                            aria-label="Emoji"
-                        >
-                            <Smile className="w-5 h-5" />
-                        </button>
                     </div>
 
                     {/* Send Button */}
                     <button
                         type="submit"
                         disabled={!message.trim() || sending}
-                        className="p-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="flex-shrink-0 p-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         aria-label="Send message"
                     >
                         <Send className="w-5 h-5" />

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import ConversationList from '@/components/message/ConversationList';
 import ChatWindow from '@/components/message/ChatWindow';
+import ConversationInfo from '@/components/message/ConversationInfo';
 import type { Conversation } from '@/services/conversation.service';
 import { getConversations } from '@/services/conversation.service';
 
@@ -14,6 +15,7 @@ export default function MessagesPage() {
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showInfoPanel, setShowInfoPanel] = useState(false);
 
     // Load conversations và tự động chọn conversation từ URL
     useEffect(() => {
@@ -47,7 +49,7 @@ export default function MessagesPage() {
 
     return (
         <ProtectedRoute>
-            <div className="bg-gray-50">
+            <div className="bg-gray-300">
                 <div className="flex h-[calc(100vh-73px)]">
                     {/* Left Sidebar - Conversation List */}
                     <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
@@ -60,16 +62,21 @@ export default function MessagesPage() {
                     </div>
 
                     {/* Center - Chat Window */}
-                    <div className="flex-1 flex flex-col bg-white">
-                        <ChatWindow conversation={selectedConversation} />
+                    <div className="flex-1 flex flex-col bg-white my-4 ml-4 mr-2 rounded-lg overflow-hidden shadow-sm">
+                        <ChatWindow 
+                            conversation={selectedConversation} 
+                            onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
+                        />
                     </div>
 
-                    {/* Right Sidebar - Placeholder */}
-                    <div className="w-80 border-l border-gray-200 bg-yellow-100 flex items-center justify-center">
-                        <div className="text-center">
-                            <p className="text-yellow-800 font-medium text-lg">Làm sau</p>
+                    {showInfoPanel && (
+                        <div className="w-80 border-l border-gray-200 bg-white flex flex-col my-4 mr-4 ml-2 rounded-lg shadow-sm">
+                            <ConversationInfo 
+                                conversation={selectedConversation}
+                                conversationId={selectedConversation?._id ?? null}
+                            />
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </ProtectedRoute>
