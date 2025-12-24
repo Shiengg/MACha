@@ -348,8 +348,32 @@ function ChangePasswordContent() {
             <div className="flex justify-between pt-4">
               <button
                 type="button"
-                disabled={step === 1 || loading}
-                onClick={() => setStep((prev) => (prev > 1 ? (prev - 1) as 1 | 2 | 3 : prev))}
+                disabled={loading}
+                onClick={() => {
+                  if (step === 1) {
+                    if (!otpSent) {
+                      router.back();
+                    } else {
+                      Swal.fire({
+                        icon: 'warning',
+                        title: 'Xác nhận',
+                        text: 'Bạn có chắc muốn quay lại? Tiến trình đổi mật khẩu sẽ bị hủy.',
+                        showCancelButton: true,
+                        confirmButtonColor: '#ff7a1a',
+                        cancelButtonColor: '#6b7280',
+                        confirmButtonText: 'Có, quay lại',
+                        cancelButtonText: 'Hủy',
+                      }).then((result) => {
+                        if (result.isConfirmed) {
+                          router.back();
+                        }
+                      });
+                    }
+                  } else {
+                    // Ở các bước khác: quay lại bước trước
+                    setStep((prev) => (prev > 1 ? (prev - 1) as 1 | 2 | 3 : prev));
+                  }
+                }}
                 className="px-5 py-2.5 rounded-full border border-gray-300 text-gray-700 text-sm font-medium bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Quay lại
