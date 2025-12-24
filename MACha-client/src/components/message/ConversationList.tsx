@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Search, MessageCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSocket } from '@/contexts/SocketContext';
 import { getConversations, type Conversation } from '@/services/conversation.service';
 
 interface ConversationListProps {
@@ -20,6 +21,7 @@ export default function ConversationList({
     loading: externalLoading
 }: ConversationListProps) {
     const { user } = useAuth();
+    const { socket } = useSocket();
     const [searchQuery, setSearchQuery] = useState('');
     const [conversations, setConversations] = useState<Conversation[]>(initialConversations || []);
     const [loading, setLoading] = useState(externalLoading ?? true);
@@ -66,6 +68,56 @@ export default function ConversationList({
 
         fetchConversations();
     }, [currentUserId, initialConversations]);
+
+    // Listen for realtime message updates to update conversation list
+    useEffect(() => {
+        if (!socket || !currentUserId) return;
+
+        const handleNewMessage = (incoming: any) => {
+            const msg = incoming?.message || incoming;
+            if (!msg || !msg.conversationId) return;
+
+            setConversations((prev) => {
+                const conversationId = msg.conversationId?.toString();
+                const existingIndex = prev.findIndex((c) => c._id === conversationId);
+
+                if (existingIndex >= 0) {
+                    // Conversation đã tồn tại: cập nhật lastMessage và đưa lên đầu
+                    const updated = [...prev];
+                    const conversation = updated[existingIndex];
+                    
+                    updated[existingIndex] = {
+                        ...conversation,
+                        lastMessage: {
+                            content: msg.content,
+                            senderId: msg.senderId,
+                            createdAt: msg.createdAt,
+                        },
+                        updatedAt: msg.createdAt || new Date().toISOString(),
+                    };
+
+                    // Sắp xếp lại: conversation có tin nhắn mới nhất lên đầu
+                    const sorted = updated.sort((a, b) => {
+                        const dateA = new Date(a.updatedAt).getTime();
+                        const dateB = new Date(b.updatedAt).getTime();
+                        return dateB - dateA;
+                    });
+
+                    return sorted;
+                } else {
+                    // Conversation chưa có trong list: có thể là conversation mới được tạo
+                    // Tạm thời không thêm vào list, để user tự refresh hoặc navigate
+                    return prev;
+                }
+            });
+        };
+
+        socket.on('chat:message:new', handleNewMessage);
+
+        return () => {
+            socket.off('chat:message:new', handleNewMessage);
+        };
+    }, [socket, currentUserId]);
 
     const getOtherParticipant = (members: Conversation['members'], currentUserId: string | undefined) => {
         if (!currentUserId) return members[0];
@@ -152,6 +204,13 @@ export default function ConversationList({
                                 currentUserId
                             );
                             const isSelected = selectedConversationId === conversation._id;
+                            
+                            const lastMessageSenderId = conversation.lastMessage 
+                                ? (typeof conversation.lastMessage.senderId === 'string'
+                                    ? conversation.lastMessage.senderId
+                                    : conversation.lastMessage.senderId?._id)
+                                : null;
+                            const isLastFromCurrentUser = lastMessageSenderId && currentUserId && lastMessageSenderId === currentUserId;
 
                             return (
                                 <button
@@ -191,6 +250,7 @@ export default function ConversationList({
                                             </div>
                                             {conversation.lastMessage && (
                                                 <p className="text-sm text-gray-600 truncate">
+                                                    {isLastFromCurrentUser ? 'Bạn: ' : ''}
                                                     {conversation.lastMessage.content}
                                                 </p>
                                             )}

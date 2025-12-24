@@ -14,17 +14,26 @@ export const sendMessage = async (payload) => {
     }
 
     await redisClient.del(keySet);
-
-    // Publish realtime event to Redis so Socket.IO subscriber can broadcast
     try {
-        const conversation = await Conversation.findById(payload.conversationId).select("members");
+        const conversation = await Conversation.findById(payload.conversationId).select("members lastMessage updatedAt");
         if (conversation) {
+            conversation.lastMessage = message._id;
+            conversation.updatedAt = new Date();
+            await conversation.save();
+
+            const memberIds = conversation.members.map((m) => m.toString());
+
+            if (memberIds.length > 0) {
+                const convKeys = memberIds.map((id) => `conversations:${id}`);
+                await redisClient.del(...convKeys);
+            }
+
             const populatedMessage = await message.populate("senderId", "username avatar fullname");
             await redisClient.publish(
                 "chat:message:new",
                 JSON.stringify({
                     message: populatedMessage,
-                    memberIds: conversation.members.map((m) => m.toString()),
+                    memberIds,
                 })
             );
         }

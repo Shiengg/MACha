@@ -27,8 +27,16 @@ export const getConversationsByUserId = async (userId) => {
     const conversations = await Conversation.find({
         members: { $in: [userId] }
     })
-        .populate("members", "username avatar fullname")
-        .sort({ createdAt: -1 });
+        .populate("members", "username avatar fullname email")
+        .populate({
+            path: "lastMessage",
+            select: "content senderId createdAt",
+            populate: {
+                path: "senderId",
+                select: "username avatar"
+            }
+        })
+        .sort({ updatedAt: -1 });
     await redisClient.setEx(conversationKey, 300, JSON.stringify(conversations));
     return conversations;
 }
