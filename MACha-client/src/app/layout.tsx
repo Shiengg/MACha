@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SocketProvider } from "@/contexts/SocketContext";
+import { OnlineStatusProvider } from "@/contexts/OnlineStatusContext";
 import Header from "@/components/shared/Header";
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,8 +37,10 @@ export default function RootLayout({
       >
         <AuthProvider>
           <SocketProvider>
-          <Header />
-          {children}
+            <OnlineStatusProvider>
+              <Header />
+              {children}
+            </OnlineStatusProvider>
           </SocketProvider>
         </AuthProvider>
       </body>

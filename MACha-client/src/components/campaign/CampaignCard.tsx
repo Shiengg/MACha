@@ -158,7 +158,7 @@ export default function CampaignCard({ campaign, showCreator = false }: Campaign
         {/* Action Button */}
         <div className="flex items-center gap-2">
           <button
-            className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium py-2 px-4 rounded-lg transition-all text-sm"
+            className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-2 px-4 rounded-lg transition-all text-sm"
             onClick={(e) => {
               e.stopPropagation();
               router.push(`/campaigns/${campaign._id}`);

@@ -115,7 +115,7 @@ export default function Header() {
                         >
                             <MessageCircle className="w-5 h-5" />
                             {/* Notification badge example */}
-                            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                            {/* <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span> */}
                         </button>
 
                         {/* Notification Dropdown - Facebook style */}

@@ -16,6 +16,8 @@ export interface User {
   kyc_status?: string;
   followers_count?: number;
   following_count?: number;
+  followers?: string[]; // Array of user IDs who follow this user
+  following?: string[]; // Array of user IDs this user follows
   address?: {
     city?: string;
     district?: string;

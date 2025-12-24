@@ -9,6 +9,7 @@ export interface Conversation {
   members: Array<{
     _id: string;
     username: string;
+    fullname?: string;
     avatar?: string;
     email: string;
   }>;
@@ -17,6 +18,7 @@ export interface Conversation {
     senderId: string | {
       _id: string;
       username?: string;
+      fullname?: string;
       avatar?: string;
     };
     createdAt: string;
