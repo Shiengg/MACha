@@ -80,6 +80,21 @@ function ProfileContent() {
     Array.isArray((currentUser as any).following) &&
     (currentUser as any).following.includes(userId);
 
+  const isFollowedBy =
+    !!currentUserId &&
+    !!user &&
+    Array.isArray(user.followers) &&
+    user.followers.length > 0 &&
+    user.followers.some((followerId) => {
+      // So sánh cả string và ObjectId
+      const followerIdStr = String(followerId);
+      const currentIdStr = String(currentUserId);
+      return followerIdStr === currentIdStr;
+    });
+
+  // Có thể nhắn tin nếu một trong hai người follow người kia
+  const canMessage = isFollowing || isFollowedBy;
+
   // Realtime cập nhật followers_count qua Socket.IO
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -433,7 +448,7 @@ function ProfileContent() {
                           </>
                         )}
                       </button>
-                      {isFollowing && (
+                      {canMessage && (
                         <button
                           onClick={handleMessage}
                           className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-full border border-gray-300 text-gray-700 text-sm font-medium bg-white hover:bg-gray-50 transition-colors w-full sm:w-auto"

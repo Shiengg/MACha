@@ -5,6 +5,7 @@ import { Send, Paperclip, Loader2, Info } from 'lucide-react';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
+import { useOnlineStatus } from '@/contexts/OnlineStatusContext';
 import { getMessages, sendMessage, type Message } from '@/services/message.service';
 import type { Conversation } from '@/services/conversation.service';
 
@@ -16,6 +17,7 @@ interface ChatWindowProps {
 export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWindowProps) {
     const { user } = useAuth();
     const { socket } = useSocket();
+    const { isUserOnline } = useOnlineStatus();
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(false);
@@ -192,6 +194,7 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                     <div className="flex items-center gap-3">
                         {(() => {
                             const otherParticipant = getOtherParticipant(conversation.members, currentUserId);
+                            const isOnline = otherParticipant._id && isUserOnline(otherParticipant._id);
                             return (
                                 <>
                                     {/* Avatar */}
@@ -210,13 +213,17 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                                             )}
                                         </div>
                                         {/* Online Status Indicator */}
-                                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                                        {isOnline && (
+                                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                                        )}
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-gray-800">
                                             {otherParticipant.fullname || otherParticipant.username || 'Người dùng'}
                                         </h3>
-                                        <p className="text-xs text-gray-500">Đang hoạt động</p>
+                                        <p className="text-xs text-gray-500">
+                                            {isOnline ? 'Đang hoạt động' : 'Offline'}
+                                        </p>
                                     </div>
                                 </>
                             );

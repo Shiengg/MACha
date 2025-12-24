@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Search, MessageCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
+import { useOnlineStatus } from '@/contexts/OnlineStatusContext';
 import { getConversations, type Conversation } from '@/services/conversation.service';
 
 interface ConversationListProps {
@@ -22,6 +23,7 @@ export default function ConversationList({
 }: ConversationListProps) {
     const { user } = useAuth();
     const { socket } = useSocket();
+    const { isUserOnline } = useOnlineStatus();
     const [searchQuery, setSearchQuery] = useState('');
     const [conversations, setConversations] = useState<Conversation[]>(initialConversations || []);
     const [loading, setLoading] = useState(externalLoading ?? true);
@@ -204,6 +206,7 @@ export default function ConversationList({
                                 currentUserId
                             );
                             const isSelected = selectedConversationId === conversation._id;
+                            const isOnline = otherParticipant._id && isUserOnline(otherParticipant._id);
                             
                             const lastMessageSenderId = conversation.lastMessage 
                                 ? (typeof conversation.lastMessage.senderId === 'string'
@@ -224,17 +227,23 @@ export default function ConversationList({
                                 >
                                     <div className="flex items-start gap-3">
                                         {/* Avatar */}
-                                        <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex-shrink-0 flex items-center justify-center text-white font-semibold overflow-hidden">
-                                            {otherParticipant.avatar ? (
-                                                <Image
-                                                    src={otherParticipant.avatar}
-                                                    alt={otherParticipant.username}
-                                                    fill
-                                                    sizes="48px"
-                                                    className="object-cover"
-                                                />
-                                            ) : (
-                                                otherParticipant.fullname?.charAt(0).toUpperCase() || 'U'
+                                        <div className="relative flex-shrink-0">
+                                            <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-semibold overflow-hidden">
+                                                {otherParticipant.avatar ? (
+                                                    <Image
+                                                        src={otherParticipant.avatar}
+                                                        alt={otherParticipant.username}
+                                                        fill
+                                                        sizes="48px"
+                                                        className="object-cover"
+                                                    />
+                                                ) : (
+                                                    otherParticipant.fullname?.charAt(0).toUpperCase() || 'U'
+                                                )}
+                                            </div>
+                                            {/* Online Status Indicator */}
+                                            {isOnline && (
+                                                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                                             )}
                                         </div>
 

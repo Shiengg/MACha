@@ -13,6 +13,7 @@ import './jobs/cleanupUnverifiedUsers.job.js';
 
 import { initSubscribers } from './subscribers/initSubscriber.js';
 import User from './models/user.js';
+import * as onlineService from './services/online.service.js';
 
 const app = express();
 dotenv.config();
@@ -104,7 +105,7 @@ io.use(async (socket, next) => {
 });
 
 // Socket.IO Connection Handler
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
     const userId = socket.userId;
     const username = socket.user?.username;
 
@@ -116,6 +117,19 @@ io.on('connection', (socket) => {
         console.log(`🏠 User ${username} joined room: ${userRoom}`);
 
         socket.emit('room-joined', { room: userRoom, userId });
+
+        await onlineService.setUserOnline(userId, socket.id);
+        
+        io.emit('user:online', { userId });
+
+        const heartbeatInterval = setInterval(async () => {
+            const refreshed = await onlineService.refreshUserOnline(userId);
+            if (!refreshed) {
+                clearInterval(heartbeatInterval);
+            }
+        }, 30000); // 30 giây
+
+        socket.heartbeatInterval = heartbeatInterval;
     }
 
     // Handle join-room event
@@ -130,8 +144,18 @@ io.on('connection', (socket) => {
         console.log(`🚪 Socket ${socket.id} left room: ${room}`);
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         console.log(`❌ Socket disconnected: ${socket.id} (User: ${username})`);
+
+        if (userId) {
+            if (socket.heartbeatInterval) {
+                clearInterval(socket.heartbeatInterval);
+            }
+
+            await onlineService.setUserOffline(userId);
+
+            io.emit('user:offline', { userId });
+        }
     });
 });
 
