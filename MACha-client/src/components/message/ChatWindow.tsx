@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Smile, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSocket } from '@/contexts/SocketContext';
 import { getMessages, sendMessage, type Message } from '@/services/message.service';
 import type { Conversation } from '@/services/conversation.service';
 
@@ -13,12 +14,15 @@ interface ChatWindowProps {
 
 export default function ChatWindow({ conversation }: ChatWindowProps) {
     const { user } = useAuth();
+    const { socket } = useSocket();
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(false);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    // Lưu các messageId vừa gửi để tránh add 2 lần (REST + Socket)
+    const sentMessageIdsRef = useRef<Set<string>>(new Set());
 
     const currentUserId = user?._id || user?.id;
     const conversationId = conversation?._id ?? null;
@@ -77,6 +81,38 @@ export default function ChatWindow({ conversation }: ChatWindowProps) {
         scrollToBottom();
     }, [messages]);
 
+    // Listen for realtime messages from Socket.IO
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleNewMessage = (incoming: any) => {
+            const msg = incoming?.message || incoming;
+            if (!msg || !conversationId) return;
+            if (msg.conversationId?.toString() !== conversationId.toString()) return;
+
+            const idStr = String(msg._id);
+
+            // Nếu message này mình vừa thêm từ REST thì bỏ qua event socket
+            if (sentMessageIdsRef.current.has(idStr)) {
+                sentMessageIdsRef.current.delete(idStr);
+                return;
+            }
+
+            setMessages((prev) => {
+                if (prev.some((m) => String(m._id) === idStr)) {
+                    return prev;
+                }
+                return [...prev, msg];
+            });
+        };
+
+        socket.on("chat:message:new", handleNewMessage);
+
+        return () => {
+            socket.off("chat:message:new", handleNewMessage);
+        };
+    }, [socket, conversationId]);
+
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         const trimmed = message.trim();
@@ -95,8 +131,16 @@ export default function ChatWindow({ conversation }: ChatWindowProps) {
                 type: 'text',
             });
 
-            // Add new message to the end of the list (optimistic update)
-            setMessages((prev) => [...prev, newMessage]);
+            const idStr = String(newMessage._id);
+
+            // Add new message to the end of the list (optimistic update) nếu chưa có
+            setMessages((prev) => {
+                if (prev.some((m) => String(m._id) === idStr)) {
+                    return prev;
+                }
+                return [...prev, newMessage];
+            });
+            sentMessageIdsRef.current.add(idStr);
             setMessage('');
         } catch (err: any) {
             console.error('Error sending message:', err);

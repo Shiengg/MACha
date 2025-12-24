@@ -1,4 +1,5 @@
 import Message from "../models/message.js";
+import Conversation from "../models/conversation.js";
 import { redisClient } from "../config/redis.js";
 
 export const sendMessage = async (payload) => {
@@ -13,6 +14,23 @@ export const sendMessage = async (payload) => {
     }
 
     await redisClient.del(keySet);
+
+    // Publish realtime event to Redis so Socket.IO subscriber can broadcast
+    try {
+        const conversation = await Conversation.findById(payload.conversationId).select("members");
+        if (conversation) {
+            const populatedMessage = await message.populate("senderId", "username avatar fullname");
+            await redisClient.publish(
+                "chat:message:new",
+                JSON.stringify({
+                    message: populatedMessage,
+                    memberIds: conversation.members.map((m) => m.toString()),
+                })
+            );
+        }
+    } catch (error) {
+        console.error("❌ Error publishing chat message event:", error);
+    }
 
     return message;
 }

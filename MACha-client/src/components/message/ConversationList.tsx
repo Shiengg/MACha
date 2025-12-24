@@ -9,24 +9,42 @@ import { getConversations, type Conversation } from '@/services/conversation.ser
 interface ConversationListProps {
     selectedConversationId: string | null;
     onSelectConversation: (conversation: Conversation) => void;
+    initialConversations?: Conversation[];
+    loading?: boolean;
 }
 
 export default function ConversationList({ 
     selectedConversationId, 
-    onSelectConversation 
+    onSelectConversation,
+    initialConversations,
+    loading: externalLoading
 }: ConversationListProps) {
     const { user } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [conversations, setConversations] = useState<Conversation[]>(initialConversations || []);
+    const [loading, setLoading] = useState(externalLoading ?? true);
     const [error, setError] = useState<string | null>(null);
 
     const currentUserId = user?._id || user?.id;
 
+    // Sync với initialConversations từ parent
     useEffect(() => {
-        const fetchConversations = async () => {
-            if (!currentUserId) return;
+        if (initialConversations) {
+            setConversations(initialConversations);
+        }
+    }, [initialConversations]);
 
+    useEffect(() => {
+        if (externalLoading !== undefined) {
+            setLoading(externalLoading);
+        }
+    }, [externalLoading]);
+
+    useEffect(() => {
+        // Chỉ fetch nếu không có initialConversations từ parent
+        if (initialConversations !== undefined || !currentUserId) return;
+
+        const fetchConversations = async () => {
             try {
                 setLoading(true);
                 setError(null);
@@ -47,7 +65,7 @@ export default function ConversationList({
         };
 
         fetchConversations();
-    }, [currentUserId]);
+    }, [currentUserId, initialConversations]);
 
     const getOtherParticipant = (members: Conversation['members'], currentUserId: string | undefined) => {
         if (!currentUserId) return members[0];
