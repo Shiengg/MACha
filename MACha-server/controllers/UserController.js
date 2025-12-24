@@ -267,6 +267,16 @@ export const approveKYC = async (req, res) => {
             }
         }
 
+        try {
+            await queueService.pushJob({
+                type: "SEND_KYC_APPROVED",
+                email: result.user.email,
+                username: result.user.username,
+            })
+        } catch (error) {
+            console.error('Error publishing event or pushing job:', error);
+        }
+
         return res.status(HTTP_STATUS.OK).json({
             message: "KYC approved successfully",
             user: result.user

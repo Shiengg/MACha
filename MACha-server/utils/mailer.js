@@ -305,9 +305,9 @@ export const sendOtpEmail = async (to, data) => {
     `;
   
     return await sendEmail(to, subject, text, htmlContent);
-  };
+};
   
-  export const sendForgotPasswordEmail = async (to, data) => {
+export const sendForgotPasswordEmail = async (to, data) => {
     const { username, newPassword } = data;
   
     const subject = "🔐 Mật khẩu mới của bạn";
@@ -376,6 +376,188 @@ export const sendOtpEmail = async (to, data) => {
         <p style="font-size:12px;color:#9ca3af;margin-bottom:0;">
           © ${new Date().getFullYear()} Your Company. All rights reserved.
         </p>
+      </div>
+    </div>
+    `;
+  
+    return await sendEmail(to, subject, text, htmlContent);
+};
+  
+export const sendOtpSignupEmail = async (to, data) => {
+    const { username, otp, expiresIn } = data;
+  
+    const subject = "🔐 Mã OTP đăng ký tài khoản MACha";
+  
+    const text = `
+  Xin chào ${username},
+  
+  Cảm ơn bạn đã đăng ký tài khoản MACha.
+  
+  Mã OTP của bạn là: ${otp}
+  Mã này có hiệu lực trong ${expiresIn} giây.
+  
+  Vui lòng không chia sẻ mã này với bất kỳ ai.
+  Nếu bạn không thực hiện đăng ký, hãy bỏ qua email này.
+  
+  Trân trọng,
+  Đội ngũ MACha
+    `.trim();
+  
+    const htmlContent = `
+    <div style="background-color:#f4f6f8;padding:32px 16px;">
+      <div style="
+        max-width:520px;
+        margin:0 auto;
+        background:#ffffff;
+        border-radius:12px;
+        padding:32px;
+        font-family:Arial, Helvetica, sans-serif;
+        color:#333333;
+        box-shadow:0 4px 12px rgba(0,0,0,0.05);
+      ">
+  
+        <h2 style="margin-top:0;color:#1f2937;">
+          🔐 Xác thực đăng ký tài khoản
+        </h2>
+  
+        <p style="font-size:14px;line-height:1.6;">
+          Xin chào <strong>${username}</strong>,
+        </p>
+  
+        <p style="font-size:14px;line-height:1.6;">
+          Cảm ơn bạn đã đăng ký tài khoản <strong>MACha</strong>.
+          Vui lòng sử dụng mã OTP bên dưới để hoàn tất quá trình đăng ký.
+        </p>
+  
+        <div style="
+          margin:24px 0;
+          padding:20px;
+          text-align:center;
+          background:#f0f9ff;
+          border-radius:10px;
+          border:1px dashed #38bdf8;
+        ">
+          <p style="margin:0 0 8px 0;font-size:14px;color:#0369a1;">
+            Mã OTP của bạn
+          </p>
+  
+          <div style="
+            font-size:32px;
+            font-weight:bold;
+            letter-spacing:6px;
+            color:#0284c7;
+          ">
+            ${otp}
+          </div>
+        </div>
+  
+        <p style="font-size:14px;line-height:1.6;">
+          ⏱️ Mã OTP này sẽ hết hạn sau
+          <strong>${Math.ceil(expiresIn / 60)} phút</strong>.
+        </p>
+  
+        <p style="font-size:14px;line-height:1.6;">
+          🔒 Vì lý do bảo mật, vui lòng <strong>không chia sẻ</strong> mã này với bất kỳ ai.
+        </p>
+  
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+  
+        <p style="font-size:12px;color:#6b7280;line-height:1.6;">
+          Nếu bạn không thực hiện đăng ký tài khoản MACha,
+          vui lòng bỏ qua email này hoặc liên hệ bộ phận hỗ trợ.
+        </p>
+  
+        <p style="margin-top:24px;font-size:14px;">
+          Trân trọng,<br/>
+          <strong>Đội ngũ MACha</strong>
+        </p>
+  
+        <p style="font-size:12px;color:#9ca3af;margin-bottom:0;">
+          © ${new Date().getFullYear()} MACha. All rights reserved.
+        </p>
+      </div>
+    </div>
+    `;
+  
+    return await sendEmail(to, subject, text, htmlContent);
+};
+
+export const sendKycApprovedEmail = async (to, data) => {
+    const { username } = data;
+  
+    const subject = "Thông báo phê duyệt KYC";
+  
+    const text = `
+  Xin chào ${username},
+  
+  Chúng tôi xin thông báo rằng hồ sơ xác minh danh tính (KYC) của bạn đã được phê duyệt thành công.
+  
+  Từ thời điểm này, bạn có thể sử dụng đầy đủ các tính năng và dịch vụ của MACha theo quy định.
+  
+  Nếu bạn không thực hiện yêu cầu xác minh này hoặc cần thêm thông tin, vui lòng liên hệ bộ phận hỗ trợ.
+  
+  Trân trọng,
+  Đội ngũ MACha
+    `.trim();
+  
+    const htmlContent = `
+    <div style="background-color:#f5f7fa;padding:32px 16px;">
+      <div style="
+        max-width:560px;
+        margin:0 auto;
+        background-color:#ffffff;
+        padding:40px;
+        font-family:Arial, Helvetica, sans-serif;
+        color:#1f2937;
+        border:1px solid #e5e7eb;
+      ">
+  
+        <h2 style="
+          margin:0 0 24px 0;
+          font-size:20px;
+          font-weight:600;
+          color:#111827;
+        ">
+          Thông báo phê duyệt xác minh danh tính (KYC)
+        </h2>
+  
+        <p style="font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+          Kính gửi <strong>${username}</strong>,
+        </p>
+  
+        <p style="font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+          Chúng tôi xin thông báo rằng hồ sơ xác minh danh tính (KYC) của Quý khách
+          đã được <strong>phê duyệt thành công</strong>.
+        </p>
+  
+        <p style="font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+          Kể từ thời điểm này, Quý khách có thể sử dụng đầy đủ các tính năng
+          và dịch vụ của nền tảng <strong>MACha</strong> theo quy định hiện hành.
+        </p>
+  
+        <p style="font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+          Trong trường hợp Quý khách không thực hiện yêu cầu xác minh này
+          hoặc cần thêm thông tin hỗ trợ, vui lòng liên hệ với chúng tôi
+          thông qua các kênh hỗ trợ chính thức.
+        </p>
+  
+        <p style="font-size:14px;line-height:1.6;margin:0;">
+          Trân trọng,
+          <br />
+          <strong>Đội ngũ MACha</strong>
+        </p>
+  
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:32px 0;" />
+  
+        <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:0;">
+          Đây là email được gửi tự động từ hệ thống MACha.
+          Vui lòng không trả lời email này.
+        </p>
+  
+        <p style="font-size:12px;color:#9ca3af;line-height:1.5;margin:8px 0 0 0;">
+          © ${new Date().getFullYear()} MACha. All rights reserved.
+        </p>
+  
       </div>
     </div>
     `;

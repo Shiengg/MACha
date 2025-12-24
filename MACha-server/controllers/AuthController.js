@@ -58,7 +58,7 @@ export const signup = async (req, res) => {
 
         try {
             await queueService.pushJob({
-                type: "SEND_OTP",
+                type: "SEND_OTP_SIGNUP",
                 email: user.email,
                 username: user.username,
                 otp: otp,
