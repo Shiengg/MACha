@@ -4,6 +4,7 @@ import { initNotificationSubscriber } from "./notification.subscriber.js";
 import { initCommentSubscriber } from "./comment.subscriber.js";
 import { initDonationSubscriber } from "./donation.subscriber.js";
 import { initUserSubscriber } from "./user.subscriber.js";
+import { initMessageSubscriber } from "./message.subscriber.js";
 
 
 export const initSubscribers = async (io) => {
@@ -13,4 +14,5 @@ export const initSubscribers = async (io) => {
     await initCommentSubscriber(io);
     await initDonationSubscriber(io);
     await initUserSubscriber(io);
+    await initMessageSubscriber(io);
 }

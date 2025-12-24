@@ -8,6 +8,7 @@ import { campaignService, type Campaign } from '@/services/campaign.service';
 import CampaignCard from '@/components/campaign/CampaignCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
+import { createConversationPrivate } from '@/services/conversation.service';
 import Swal from 'sweetalert2';
 
 import type { User } from '@/services/user.service';
@@ -217,12 +218,23 @@ function ProfileContent() {
     }
   };
 
-  const handleMessage = () => {
-    Swal.fire({
-      icon: 'info',
-      title: 'Tính năng đang phát triển',
-      text: 'Chức năng nhắn tin sẽ sớm được cập nhật!',
-    });
+  const handleMessage = async () => {
+    if (!currentUser || !userId) return;
+
+    try {
+      // Tạo hoặc lấy conversation với user này
+      const conversation = await createConversationPrivate(userId);
+      
+      // Navigate đến trang messages với conversation đã chọn
+      router.push(`/messages?conversation=${conversation._id}`);
+    } catch (error: any) {
+      console.error('Error creating conversation:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể tạo cuộc trò chuyện. Vui lòng thử lại sau.',
+      });
+    }
   };
 
   if (loading) {
@@ -375,6 +387,17 @@ function ProfileContent() {
 
                   {isOwnProfile ? (
                     <div className="flex items-center gap-3 w-full sm:w-auto">
+                      {user.kyc_status === 'unverified' && (
+                        <button
+                          onClick={() => router.push('/kyc')}
+                          className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-full border border-emerald-500 text-emerald-600 text-sm font-medium bg-white hover:bg-emerald-50 shadow-sm transition-colors w-full sm:w-auto"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m-7 9h8a2 2 0 002-2V7a2 2 0 00-2-2H9L7 7H5a2 2 0 00-2 2v8a2 2 0 002 2h2z" />
+                          </svg>
+                          Xác thực KYC
+                        </button>
+                      )}
                       <button
                         onClick={() => router.push('/settings')}
                         className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium shadow-sm transition-colors w-full sm:w-auto"
@@ -410,15 +433,17 @@ function ProfileContent() {
                           </>
                         )}
                       </button>
-                      <button
-                        onClick={handleMessage}
-                        className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-full border border-gray-300 text-gray-700 text-sm font-medium bg-white hover:bg-gray-50 transition-colors w-full sm:w-auto"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
-                        Nhắn tin
-                      </button>
+                      {isFollowing && (
+                        <button
+                          onClick={handleMessage}
+                          className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-full border border-gray-300 text-gray-700 text-sm font-medium bg-white hover:bg-gray-50 transition-colors w-full sm:w-auto"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                          </svg>
+                          Nhắn tin
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

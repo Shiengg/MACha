@@ -16,8 +16,9 @@ export default function Header() {
     // Hide header on auth pages
     const authPages = ['/login', '/register', '/forgot-password'];
     const isAuthPage = authPages.includes(pathname);
+    const isAdminPage = pathname.startsWith('/admin');
 
-    if (isAuthPage) {
+    if (isAuthPage || isAdminPage) {
         return null;
     }
 

@@ -128,10 +128,7 @@ export default function AdminUsers() {
               <h1 className="text-3xl font-bold text-white mb-2">Quản lý người dùng</h1>
               <p className="text-gray-400">Quản lý, tìm kiếm và lọc người dùng trong hệ thống.</p>
             </div>
-            <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2">
-              <span className="text-xl">+</span>
-              Thêm người dùng mới
-            </button>
+            
           </div>
 
           <div className="bg-[#1a1f2e] rounded-lg border border-gray-700">

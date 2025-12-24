@@ -72,3 +72,11 @@ export const SEPAY_CALLBACK_ROUTE = `${DONATION_ROUTE}/sepay/callback`;
 export const SEPAY_SUCCESS_ROUTE = `${DONATION_ROUTE}/sepay/success`;
 export const SEPAY_ERROR_ROUTE = `${DONATION_ROUTE}/sepay/error`;
 export const SEPAY_CANCEL_ROUTE = `${DONATION_ROUTE}/sepay/cancel`;
+
+export const CONVERSATION_ROUTE = "api/conversations";
+export const CREATE_CONVERSATION_PRIVATE_ROUTE = (userId2: string) => `${CONVERSATION_ROUTE}/private/${userId2}`;
+export const GET_CONVERSATIONS_ROUTE = `${CONVERSATION_ROUTE}`;
+
+export const MESSAGE_ROUTE = "api/messages";
+export const SEND_MESSAGE_ROUTE = (conversationId: string) => `${MESSAGE_ROUTE}/${conversationId}`;
+export const GET_MESSAGES_ROUTE = (conversationId: string) => `${MESSAGE_ROUTE}/${conversationId}`;

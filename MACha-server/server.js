@@ -21,17 +21,13 @@ connectDB();
 setupSwagger(app);
 connectRedis();
 
-// CORS phải được cấu hình TRƯỚC tất cả các routes
-// Normalize origin URL để loại bỏ trailing slash (nếu có)
 const allowedOrigin = process.env.ORIGIN_URL?.replace(/\/$/, '') || 'http://localhost:3000';
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Cho phép requests không có origin (như Postman, mobile apps)
         if (!origin) {
             return callback(null, true);
         }
-        // Normalize origin để loại bỏ trailing slash trước khi so sánh
         const normalizedOrigin = origin.replace(/\/$/, '');
         if (normalizedOrigin === allowedOrigin) {
             callback(null, true);
@@ -66,7 +62,6 @@ const io = new Server(server, {
     }
 });
 
-// Socket.IO Authentication Middleware
 io.use(async (socket, next) => {
     try {
         let token = null;

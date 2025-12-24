@@ -1,4 +1,5 @@
 import Message from "../models/message.js";
+import Conversation from "../models/conversation.js";
 import { redisClient } from "../config/redis.js";
 
 export const sendMessage = async (payload) => {
@@ -13,6 +14,32 @@ export const sendMessage = async (payload) => {
     }
 
     await redisClient.del(keySet);
+    try {
+        const conversation = await Conversation.findById(payload.conversationId).select("members lastMessage updatedAt");
+        if (conversation) {
+            conversation.lastMessage = message._id;
+            conversation.updatedAt = new Date();
+            await conversation.save();
+
+            const memberIds = conversation.members.map((m) => m.toString());
+
+            if (memberIds.length > 0) {
+                const convKeys = memberIds.map((id) => `conversations:${id}`);
+                await redisClient.del(...convKeys);
+            }
+
+            const populatedMessage = await message.populate("senderId", "username avatar fullname");
+            await redisClient.publish(
+                "chat:message:new",
+                JSON.stringify({
+                    message: populatedMessage,
+                    memberIds,
+                })
+            );
+        }
+    } catch (error) {
+        console.error("❌ Error publishing chat message event:", error);
+    }
 
     return message;
 }

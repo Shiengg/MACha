@@ -64,11 +64,17 @@ async function processQueue() {
                 case "SEND_OTP":
                     await handleSendOtp(job);
                     break;
+                case "SEND_OTP_SIGNUP":
+                    await handleSendOtpSignup(job);
+                    break;
                 case "SEND_FORGOT_PASSWORD":
                     await handleSendForgotPassword(job);
                     break;
                 case "USER_FOLLOWED":
                     await handleUserFollowed(job);
+                    break;
+                case "SEND_KYC_APPROVED":
+                    await handleSendKycApproved(job);
                     break;
             }
         } catch (error) {
@@ -400,12 +406,35 @@ async function handleUserFollowed(job) {
     }
 }
 
+async function handleSendOtpSignup(job) {
+    try {
+        await mailerService.sendOtpSignupEmail(job.email, {
+            username: job.username,
+            otp: job.otp,
+            expiresIn: job.expiresIn
+        });
+    } catch (error) {
+        console.error('Error processing SEND_OTP_SIGNUP job:', error);
+    }
+}
+
+async function handleSendKycApproved(job) {
+    try {
+        await mailerService.sendKycApprovedEmail(job.email, {
+            username: job.username,
+        });
+    }
+    catch (error) {
+        console.error('Error processing SEND_KYC_APPROVED job:', error);
+    }
+}
+
 async function startWorker() {
     try {
         await workerRedisClient.connect();
         await notificationPublisher.connect();
 
-        // await verifyConnection();
+        await mailerService.verifyConnection();
 
         await processQueue();
     } catch (error) {
