@@ -9,6 +9,9 @@ import {
   GET_CAMPAIGNS_BY_CATEGORY_ROUTE,
   GET_ACTIVE_CATEGORIES_ROUTE,
   GET_CAMPAIGNS_BY_CREATOR_ROUTE,
+  CREATE_CAMPAIGN_UPDATE_ROUTE,
+  GET_CAMPAIGN_UPDATES_ROUTE,
+  DELETE_CAMPAIGN_UPDATE_ROUTE,
 } from '@/constants/api';
 
 export interface Campaign {
@@ -91,6 +94,26 @@ export interface CategoryWithCount {
   count: number;
 }
 
+export interface CampaignUpdate {
+  _id: string;
+  campaign: string;
+  creator: {
+    _id: string;
+    username: string;
+    fullname?: string;
+    avatar_url?: string;
+  };
+  content?: string;
+  image_url?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCampaignUpdatePayload {
+  content?: string;
+  image_url?: string;
+}
+
 export const campaignService = {
   async createCampaign(payload: CreateCampaignPayload): Promise<Campaign> {
     const response = await apiClient.post(CREATE_CAMPAIGN_ROUTE, payload);
@@ -138,6 +161,20 @@ export const campaignService = {
   async cancelCampaign(id: string, reason: string): Promise<Campaign> {
     const response = await apiClient.post(CANCEL_CAMPAIGN_ROUTE(id), { reason });
     return response.data.campaign;
+  },
+
+  async createCampaignUpdate(campaignId: string, payload: CreateCampaignUpdatePayload): Promise<CampaignUpdate> {
+    const response = await apiClient.post(CREATE_CAMPAIGN_UPDATE_ROUTE(campaignId), payload);
+    return response.data.update;
+  },
+
+  async getCampaignUpdates(campaignId: string): Promise<CampaignUpdate[]> {
+    const response = await apiClient.get(GET_CAMPAIGN_UPDATES_ROUTE(campaignId));
+    return response.data.updates;
+  },
+
+  async deleteCampaignUpdate(updateId: string): Promise<void> {
+    await apiClient.delete(DELETE_CAMPAIGN_UPDATE_ROUTE(updateId));
   },
 };
 

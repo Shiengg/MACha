@@ -56,7 +56,15 @@ const campaignSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["pending", "active", "rejected", "completed", "cancelled"],
+        enum: [
+            "pending", 
+            "active",
+            "voting",
+            "approved", 
+            "completed", 
+            "rejected", 
+            "cancelled"
+        ],
         default: "pending"
     },
     category: {

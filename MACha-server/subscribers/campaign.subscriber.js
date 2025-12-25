@@ -94,4 +94,32 @@ export const initCampaignSubscriber = async (io) => {
             console.error('❌ Error parsing campaign cancelled event:', error);
         }
     });
+
+    await sub.subscribe("tracking:campaign:update:created", (message) => {
+        try {
+            const event = JSON.parse(message);
+            
+            // Emit to all clients (like donation events)
+            io.emit("campaign:update:created", event);
+            // Also emit to campaign-specific room
+            const room = `campaign:${event.campaignId}`;
+            io.to(room).emit("campaign:update:created", event);
+        } catch (error) {
+            console.error('Error parsing campaign update created event:', error);
+        }
+    });
+
+    await sub.subscribe("tracking:campaign:update:deleted", (message) => {
+        try {
+            const event = JSON.parse(message);
+            
+            // Emit to all clients (like donation events)
+            io.emit("campaign:update:deleted", event);
+            // Also emit to campaign-specific room
+            const room = `campaign:${event.campaignId}`;
+            io.to(room).emit("campaign:update:deleted", event);
+        } catch (error) {
+            console.error('Error parsing campaign update deleted event:', error);
+        }
+    });
 }

@@ -22,8 +22,10 @@ export const createDonation = async (campaignId, donorId, donationData) => {
         is_anonymous,
     });
     
-    // Update campaign current_amount
+    // Update campaign current_amount and completed_donations_count
+    // Direct donations are immediately completed (unlike Sepay which starts as pending)
     campaign.current_amount += amount;
+    campaign.completed_donations_count += 1;
     await campaign.save();
     
     // Invalidate cache
@@ -34,7 +36,7 @@ export const createDonation = async (campaignId, donorId, donationData) => {
     // Publish event (non-blocking)
     try {
         const populatedDonation = await Donation.findById(donation._id)
-            .populate("donor", "username avatar_url");
+            .populate("donor", "username avatar_url fullname");
         
         await trackingService.publishEvent("tracking:donation:created", {
             donationId: donation._id.toString(),
@@ -49,8 +51,21 @@ export const createDonation = async (campaignId, donorId, donationData) => {
                 _id: campaign._id,
                 title: campaign.title,
                 current_amount: campaign.current_amount,
-                goal_amount: campaign.goal_amount
+                goal_amount: campaign.goal_amount,
+                completed_donations_count: campaign.completed_donations_count
             }
+        });
+        
+        // Also publish campaign updated event
+        await trackingService.publishEvent("tracking:campaign:updated", {
+            campaignId: campaign._id.toString(),
+            userId: donorId.toString(),
+            title: campaign.title,
+            goal_amount: campaign.goal_amount,
+            current_amount: campaign.current_amount,
+            completed_donations_count: campaign.completed_donations_count,
+            status: campaign.status,
+            category: campaign.category,
         });
     } catch (eventError) {
         console.error('Error publishing donation created event:', eventError);
@@ -70,8 +85,8 @@ export const getDonationsByCampaign = async (campaignId) => {
     
     // Query database
     const donations = await Donation.find({ campaign: campaignId })
-        .populate("donor", "username avatar_url")
-        .sort({ created_at: -1 });
+        .populate("donor", "username avatar_url fullname")
+        .sort({ createdAt: -1 });
     
     // Save to cache (TTL: 5 minutes)
     await redisClient.setEx(donationKey, 300, JSON.stringify(donations));
@@ -112,7 +127,7 @@ export const createSepayDonation = async (campaignId, donorId, donationData) => 
     // Publish event for Sepay donation creation (non-blocking)
     try {
         const populatedDonation = await Donation.findById(donation._id)
-            .populate("donor", "username avatar_url");
+            .populate("donor", "username avatar_url fullname");
         
         await trackingService.publishEvent("tracking:donation:created", {
             donationId: donation._id.toString(),
@@ -128,7 +143,8 @@ export const createSepayDonation = async (campaignId, donorId, donationData) => 
                 _id: campaign._id,
                 title: campaign.title,
                 current_amount: campaign.current_amount,
-                goal_amount: campaign.goal_amount
+                goal_amount: campaign.goal_amount,
+                completed_donations_count: campaign.completed_donations_count
             }
         });
     } catch (eventError) {
@@ -183,11 +199,12 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
             return { donation, campaign };
         }
     }
-    // Không cho phép update từ cancelled/failed sang cancelled/failed khác (tránh duplicate updates)
     else if ((status === 'cancelled' || status === 'failed') && (donation.payment_status === 'cancelled' || donation.payment_status === 'failed')) {
         const campaign = await Campaign.findById(donation.campaign);
         return { donation, campaign };
     }
+    
+    const oldPaymentStatus = donation.payment_status;
     
     const updateData = {
         payment_status: status,
@@ -209,12 +226,29 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
     Object.assign(donation, updateData);
     await donation.save();
     
-    if (status === 'completed' && donation.payment_status !== 'completed') {
-        const campaign = await Campaign.findById(donation.campaign);
-        if (campaign) {
-            campaign.current_amount += donation.amount;
-            campaign.completed_donations_count += 1;
-            await campaign.save();
+    // Fetch campaign để cập nhật current_amount nếu cần
+    const campaign = await Campaign.findById(donation.campaign);
+    
+    // Cộng tiền vào campaign nếu status chuyển từ non-completed sang completed
+    if (status === 'completed' && oldPaymentStatus !== 'completed' && campaign) {
+        campaign.current_amount += donation.amount;
+        campaign.completed_donations_count += 1;
+        await campaign.save();
+        
+        // Publish campaign updated event when current_amount changes
+        try {
+            await trackingService.publishEvent("tracking:campaign:updated", {
+                campaignId: campaign._id.toString(),
+                userId: donation.donor.toString(),
+                title: campaign.title,
+                goal_amount: campaign.goal_amount,
+                current_amount: campaign.current_amount,
+                completed_donations_count: campaign.completed_donations_count,
+                status: campaign.status,
+                category: campaign.category,
+            });
+        } catch (campaignEventError) {
+            console.error('Error publishing campaign updated event:', campaignEventError);
         }
     }
     
@@ -222,20 +256,18 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
     await redisClient.del(`campaign:${donation.campaign}`);
     await redisClient.del('campaigns');
     
-    const campaign = await Campaign.findById(donation.campaign);
-    
     // Publish event when status changes (non-blocking)
     // Only publish if status changed to completed (most important for realtime updates)
-    if (status === 'completed') {
+    if (status === 'completed' && campaign) {
         try {
             const populatedDonation = await Donation.findById(donation._id)
-                .populate("donor", "username avatar_url");
+                .populate("donor", "username avatar_url fullname");
             
             await trackingService.publishEvent("tracking:donation:status_changed", {
                 donationId: donation._id.toString(),
                 campaignId: donation.campaign.toString(),
                 donorId: donation.donor.toString(),
-                oldStatus: donation.payment_status, // Note: this is the new status after update
+                oldStatus: oldPaymentStatus,
                 newStatus: status,
                 amount: donation.amount,
                 currency: donation.currency,
@@ -246,7 +278,9 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
                     _id: campaign._id,
                     title: campaign.title,
                     current_amount: campaign.current_amount,
-                    goal_amount: campaign.goal_amount
+                    goal_amount: campaign.goal_amount,
+                    completed_donations_count: campaign.completed_donations_count
+                    
                 }
             });
             
@@ -264,7 +298,8 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
                     _id: campaign._id,
                     title: campaign.title,
                     current_amount: campaign.current_amount,
-                    goal_amount: campaign.goal_amount
+                    goal_amount: campaign.goal_amount,
+                    completed_donations_count: campaign.completed_donations_count
                 }
             });
         } catch (eventError) {

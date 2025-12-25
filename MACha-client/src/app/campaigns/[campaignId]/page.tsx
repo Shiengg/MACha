@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/guards/ProtectedRoute';
-import { campaignService, Campaign } from '@/services/campaign.service';
+import { campaignService, Campaign, CampaignUpdate, CreateCampaignUpdatePayload } from '@/services/campaign.service';
 import { donationService, Donation } from '@/services/donation.service';
 import { useSocket } from '@/contexts/SocketContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { cloudinaryService } from '@/services/cloudinary.service';
 import Image from 'next/image';
 
 function CampaignDetails() {
@@ -16,13 +18,16 @@ function CampaignDetails() {
 
     const [campaign, setCampaign] = useState<Campaign | null>(null);
     const [donations, setDonations] = useState<Donation[]>([]);
+    const [updates, setUpdates] = useState<CampaignUpdate[]>([]);
     const [loading, setLoading] = useState(true);
     const [donationsLoading, setDonationsLoading] = useState(false);
+    const [updatesLoading, setUpdatesLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'story' | 'updates' | 'supporters'>('story');
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+    const { user } = useAuth();
 
     const handleDonate = () => {
         router.push(`/campaigns/${campaignId}/donate`);
@@ -68,6 +73,25 @@ function CampaignDetails() {
 
         if (campaignId) {
             fetchDonations();
+        }
+    }, [campaignId]);
+
+    useEffect(() => {
+        const fetchUpdates = async () => {
+            try {
+                setUpdatesLoading(true);
+                const data = await campaignService.getCampaignUpdates(campaignId);
+                setUpdates(data);
+            } catch (err: any) {
+                console.error('Failed to fetch updates:', err);
+                setUpdates([]);
+            } finally {
+                setUpdatesLoading(false);
+            }
+        };
+
+        if (campaignId) {
+            fetchUpdates();
         }
     }, [campaignId]);
 
@@ -185,19 +209,46 @@ function CampaignDetails() {
             }
         };
 
+        // Listen for campaign update created
+        const handleCampaignUpdateCreated = (event: any) => {
+            // Compare as strings to handle ObjectId comparison
+            if (String(event.campaignId) === String(campaignId) && event.update) {
+                const newUpdate = event.update;
+                setUpdates(prev => {
+                    // Check if update already exists to avoid duplicates
+                    const exists = prev.some(u => String(u._id) === String(newUpdate._id));
+                    if (exists) return prev;
+                    // Add to beginning of list
+                    return [newUpdate, ...prev];
+                });
+            }
+        };
+
+        // Listen for campaign update deleted
+        const handleCampaignUpdateDeleted = (event: any) => {
+            // Compare as strings to handle ObjectId comparison
+            if (String(event.campaignId) === String(campaignId) && event.updateId) {
+                setUpdates(prev => prev.filter(u => String(u._id) !== String(event.updateId)));
+            }
+        };
+
         socket.on('donation:created', handleDonationCreated);
         socket.on('donation:status_changed', handleDonationStatusChanged);
         socket.on('donation:updated', handleDonationUpdated);
+        socket.on('campaign:update:created', handleCampaignUpdateCreated);
+        socket.on('campaign:update:deleted', handleCampaignUpdateDeleted);
 
         // Cleanup
         return () => {
             socket.off('donation:created', handleDonationCreated);
             socket.off('donation:status_changed', handleDonationStatusChanged);
             socket.off('donation:updated', handleDonationUpdated);
+            socket.off('campaign:update:created', handleCampaignUpdateCreated);
+            socket.off('campaign:update:deleted', handleCampaignUpdateDeleted);
             socket.emit('leave-room', campaignRoom);
             console.log(`🚪 Left campaign room: ${campaignRoom}`);
         };
-    }, [socket, isConnected, campaignId, campaign]);
+        }, [socket, isConnected, campaignId]);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
@@ -244,6 +295,248 @@ function CampaignDetails() {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
         return `${hours}:${minutes}:${seconds} - ${day}/${month}/${year}`;
+    };
+
+    // UpdatesTab Component
+    const UpdatesTab = ({ campaignId, updates, setUpdates, updatesLoading, isCreator }: { campaignId: string, updates: CampaignUpdate[], setUpdates: React.Dispatch<React.SetStateAction<CampaignUpdate[]>>, updatesLoading: boolean, isCreator: boolean }) => {
+        const [updateContent, setUpdateContent] = useState('');
+        const [selectedImage, setSelectedImage] = useState<File | null>(null);
+        const [imagePreview, setImagePreview] = useState<string | null>(null);
+        const [isSubmitting, setIsSubmitting] = useState(false);
+        const [showForm, setShowForm] = useState(false);
+
+        const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+            const file = e.target.files?.[0];
+            if (file) {
+                setSelectedImage(file);
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setImagePreview(reader.result as string);
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        const handleSubmitUpdate = async (e: React.FormEvent) => {
+            e.preventDefault();
+            if (!updateContent.trim() && !selectedImage) return;
+
+            try {
+                setIsSubmitting(true);
+                let imageUrl: string | undefined;
+
+                if (selectedImage) {
+                    const uploadResult = await cloudinaryService.uploadImage(selectedImage, 'campaign-updates');
+                    imageUrl = uploadResult.secure_url;
+                }
+
+                const payload: CreateCampaignUpdatePayload = {};
+                if (updateContent.trim()) {
+                    payload.content = updateContent.trim();
+                }
+                if (imageUrl) {
+                    payload.image_url = imageUrl;
+                }
+
+                const newUpdate = await campaignService.createCampaignUpdate(campaignId, payload);
+                // Optimistically update state (socket event will also update for consistency)
+                setUpdates(prev => {
+                    const exists = prev.some(u => String(u._id) === String(newUpdate._id));
+                    if (exists) return prev;
+                    return [newUpdate, ...prev];
+                });
+                setUpdateContent('');
+                setSelectedImage(null);
+                setImagePreview(null);
+                setShowForm(false);
+            } catch (error: any) {
+                console.error('Failed to create update:', error);
+                alert(error.response?.data?.message || 'Không thể tạo cập nhật');
+            } finally {
+                setIsSubmitting(false);
+            }
+        };
+
+        const handleDeleteUpdate = async (updateId: string) => {
+            if (!confirm('Bạn có chắc muốn xóa cập nhật này?')) return;
+
+            try {
+                await campaignService.deleteCampaignUpdate(updateId);
+                // Optimistically update state (socket event will also update for consistency)
+                setUpdates(prev => prev.filter(u => String(u._id) !== String(updateId)));
+            } catch (error: any) {
+                console.error('Failed to delete update:', error);
+                alert(error.response?.data?.message || 'Không thể xóa cập nhật');
+                // Refresh updates on error to ensure consistency
+                try {
+                    const data = await campaignService.getCampaignUpdates(campaignId);
+                    setUpdates(data);
+                } catch (fetchError) {
+                    console.error('Failed to refresh updates:', fetchError);
+                }
+            }
+        };
+
+        return (
+            <div className="space-y-6">
+                {/* Create Update Form - Only for creator */}
+                {isCreator && (
+                    <div className="bg-white rounded-xl p-6">
+                        {!showForm ? (
+                            <button
+                                onClick={() => setShowForm(true)}
+                                className="w-full py-3 px-4 bg-orange-500 text-white font-medium rounded-lg hover:bg-orange-600 transition flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                Tạo cập nhật mới
+                            </button>
+                        ) : (
+                            <form onSubmit={handleSubmitUpdate} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Nội dung cập nhật (có thể là text, ảnh hoặc cả hai)
+                                    </label>
+                                    <textarea
+                                        value={updateContent}
+                                        onChange={(e) => setUpdateContent(e.target.value)}
+                                        placeholder="Nhập nội dung cập nhật (tùy chọn)..."
+                                        rows={4}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Chọn ảnh (tùy chọn)
+                                    </label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageSelect}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                                    />
+                                </div>
+
+                                {imagePreview && (
+                                    <div className="relative">
+                                        <img
+                                            src={imagePreview}
+                                            alt="Preview"
+                                            className="max-w-full h-auto rounded-lg max-h-64 object-contain"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedImage(null);
+                                                setImagePreview(null);
+                                            }}
+                                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                )}
+
+                                <div className="flex gap-3">
+                                    <button
+                                        type="submit"
+                                        disabled={isSubmitting || (!updateContent.trim() && !selectedImage)}
+                                        className="flex-1 py-2 px-4 bg-orange-500 text-white font-medium rounded-lg hover:bg-orange-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                    >
+                                        {isSubmitting ? 'Đang tạo...' : 'Đăng cập nhật'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowForm(false);
+                                            setUpdateContent('');
+                                            setSelectedImage(null);
+                                            setImagePreview(null);
+                                        }}
+                                        className="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition"
+                                    >
+                                        Hủy
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+                    </div>
+                )}
+
+                {/* Updates List */}
+                {updatesLoading ? (
+                    <div className="text-center py-12 text-gray-500">
+                        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                        <p>Đang tải cập nhật...</p>
+                    </div>
+                ) : updates.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                        <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        <p>Chưa có cập nhật nào</p>
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        {updates.map((update) => (
+                            <div key={update._id} className="bg-white border border-gray-200 rounded-xl p-6">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        {update.creator.avatar_url ? (
+                                            <img
+                                                src={update.creator.avatar_url}
+                                                alt={update.creator.username}
+                                                className="w-10 h-10 rounded-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full flex items-center justify-center text-white font-bold">
+                                                {update.creator.username.charAt(0).toUpperCase()}
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="font-semibold text-gray-900">
+                                                {update.creator.fullname || update.creator.username}
+                                            </p>
+                                            <p className="text-sm text-gray-500">{formatTimeAgo(update.createdAt)}</p>
+                                        </div>
+                                    </div>
+                                    {isCreator && (
+                                        <button
+                                            onClick={() => handleDeleteUpdate(update._id)}
+                                            className="text-red-500 hover:text-red-700 transition"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    )}
+                                </div>
+
+                                {update.content && (
+                                    <div className="mb-4">
+                                        <p className="text-gray-700 whitespace-pre-line leading-relaxed">{update.content}</p>
+                                    </div>
+                                )}
+
+                                {update.image_url && (
+                                    <div className="mb-4">
+                                        <img
+                                            src={update.image_url}
+                                            alt="Update"
+                                            className="max-w-full h-auto rounded-lg"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
     };
 
     // Get top donor (highest amount)
@@ -335,12 +628,13 @@ function CampaignDetails() {
                             {/* Progress Card */}
                             <div className="bg-white rounded-2xl shadow-lg p-6">
                                 <div className="flex justify-between items-end mb-3">
-                                    <span className="text-3xl font-bold text-orange-500">
-                                        {formatCurrency(campaign.current_amount)}
-                                    </span>
-                                    <span className="text-gray-500">
-                                        Mục tiêu: {formatCurrency(campaign.goal_amount)}
-                                    </span>
+                                    <div>
+                                        <span className="text-gray-500 text-xl">Đã đạt được </span>
+                                        <span className="text-3xl font-bold text-orange-500">
+                                            {formatCurrency(campaign.current_amount)}
+                                        </span>
+                                    </div>
+                                    
                                 </div>
 
                                 {/* Progress Bar */}
@@ -403,7 +697,7 @@ function CampaignDetails() {
                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                             </svg>
-                                            Cập nhật (5)
+                                            Hoạt động ({updates.length})
                                         </span>
                                     </button>
                                     <button
@@ -556,14 +850,7 @@ function CampaignDetails() {
                                         </div>
                                     )}
 
-                                    {activeTab === 'updates' && (
-                                        <div className="text-center py-12 text-gray-500">
-                                            <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                            </svg>
-                                            <p>Chưa có cập nhật nào</p>
-                                        </div>
-                                    )}
+                                    {activeTab === 'updates' && <UpdatesTab campaignId={campaignId} updates={updates} setUpdates={setUpdates} updatesLoading={updatesLoading} isCreator={!!(user && campaign && user._id === campaign.creator._id)} />}
 
                                     {activeTab === 'supporters' && (() => {
                                         // Filter donations based on search query
@@ -625,7 +912,7 @@ function CampaignDetails() {
                                                                 <tbody>
                                                                     {paginatedDonations.map((donation) => {
                                                                         const donor = typeof donation.donor === 'object' ? donation.donor : null;
-                                                                        const donorName = donor?.username || 'Người ủng hộ ẩn danh';
+                                                                        const donorName = donor?.fullname || donor?.username || 'Người ủng hộ ẩn danh';
                                                                         
                                                                         return (
                                                                             <tr key={donation._id} className="bg-white border-b border-gray-100 hover:bg-gray-50 transition">
@@ -722,8 +1009,8 @@ function CampaignDetails() {
                         {/* Right Column - Sidebar */}
                         <div className="space-y-6">
                             {/* Donate Card */}
-                            <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-6">
-                                <div className="flex items-center gap-3 mb-4">
+                            <div className="bg-white rounded-2xl shadow-lg p-6">
+                                <div className="flex items-center gap-3 mb-6">
                                     <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
                                         <svg className="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
                                             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
@@ -734,12 +1021,59 @@ function CampaignDetails() {
                                         <p className="text-gray-500 text-sm">Mỗi đồng góp đều có ý nghĩa</p>
                                     </div>
                                 </div>
-                                <button onClick={handleDonate} className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Ủng hộ ngay
-                                </button>
+
+                                {/* Goal and Time Remaining */}
+                                <div className="space-y-4 mb-6">
+                                    {/* Mục tiêu chiến dịch */}
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center flex-shrink-0">
+                                            <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <circle cx="12" cy="12" r="6" />
+                                                <circle cx="12" cy="12" r="2" fill="currentColor" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs text-gray-600 font-medium">Mục tiêu chiến dịch</div>
+                                            <div className="text-base font-bold text-gray-900">{formatCurrency(campaign.goal_amount)}</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Thời gian còn lại */}
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center flex-shrink-0">
+                                            <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs text-gray-600 font-medium">Thời gian còn lại</div>
+                                            <div className="text-base font-bold text-gray-900">{daysLeft !== null ? `${daysLeft} ngày` : '∞'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="space-y-3">
+                                    <button 
+                                        onClick={handleDonate} 
+                                        className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Ủng hộ ngay
+                                    </button>
+                                    <button 
+                                        onClick={() => alert('Chức năng đang phát triển')}
+                                        className="w-full py-4 bg-white border-2 border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-400 transition flex items-center justify-center gap-2"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Tạo bài viết
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Donors List */}

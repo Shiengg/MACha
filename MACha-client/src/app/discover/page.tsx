@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import ProtectedRoute from "@/components/guards/ProtectedRoute";
 import CampaignCard from "@/components/campaign/CampaignCard";
 import { campaignService, Campaign, CategoryWithCount } from "@/services/campaign.service";
+import { useSocket } from "@/contexts/SocketContext";
 import { Heart, Home, Leaf, AlertCircle, Users, PawPrint, Stethoscope, GraduationCap, Baby, UserCircle, Trees } from 'lucide-react';
 
 const categoryConfig: Record<string, { label: string; icon: any }> = {
@@ -26,6 +27,7 @@ function DiscoverContent() {
   const [categories, setCategories] = useState<Array<{ id: string; label: string; icon: any; count: number }>>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [loading, setLoading] = useState(true);
+  const { socket, isConnected } = useSocket();
 
   useEffect(() => {
     loadData();
@@ -39,6 +41,104 @@ function DiscoverContent() {
       setFilteredCampaigns(filtered);
     }
   }, [selectedCategory, campaigns]);
+
+  // Listen for campaign updates via Socket.IO
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handleCampaignCreated = (event: any) => {
+      if (event.status === 'active') {
+        setCampaigns(prev => {
+          const exists = prev.some(c => String(c._id) === String(event.campaignId));
+          if (exists) return prev;
+          // For new campaigns, we'd need full campaign data, so skip for now
+          // User can refresh to see new campaigns
+          return prev;
+        });
+      }
+    };
+
+    const handleCampaignUpdated = (event: any) => {
+      if (event.campaignId) {
+        setCampaigns(prev => {
+          const index = prev.findIndex(c => String(c._id) === String(event.campaignId));
+          if (index === -1) {
+            // Campaign not in list, don't add from update event
+            return prev;
+          } else {
+            // Update existing campaign with new data
+            return prev.map(c => {
+              if (String(c._id) === String(event.campaignId)) {
+                return {
+                  ...c,
+                  current_amount: event.current_amount !== undefined ? event.current_amount : c.current_amount,
+                  goal_amount: event.goal_amount !== undefined ? event.goal_amount : c.goal_amount,
+                  status: event.status !== undefined ? event.status : c.status,
+                  title: event.title !== undefined ? event.title : c.title,
+                  category: event.category !== undefined ? event.category : c.category,
+                  completed_donations_count: event.completed_donations_count !== undefined ? event.completed_donations_count : c.completed_donations_count
+                };
+              }
+              return c;
+            }).filter(c => c.status === 'active'); // Remove if no longer active
+          }
+        });
+      }
+    };
+
+    // Update campaign current_amount when donation is completed/updated
+    const handleDonationStatusChanged = (event: any) => {
+      if (event.campaignId && event.campaign?.current_amount !== undefined) {
+        setCampaigns(prev => {
+          const index = prev.findIndex(c => String(c._id) === String(event.campaignId));
+          if (index === -1) return prev;
+          
+          return prev.map(c => {
+            if (String(c._id) === String(event.campaignId)) {
+              return {
+                ...c,
+                current_amount: event.campaign.current_amount,
+                completed_donations_count: event.campaign.completed_donations_count !== undefined ? event.campaign.completed_donations_count : c.completed_donations_count
+              };
+            }
+            return c;
+          });
+        });
+      }
+    };
+
+    const handleDonationUpdated = (event: any) => {
+      if (event.campaignId && event.campaign?.current_amount !== undefined) {
+        setCampaigns(prev => {
+          const index = prev.findIndex(c => String(c._id) === String(event.campaignId));
+          if (index === -1) return prev;
+          
+          return prev.map(c => {
+            if (String(c._id) === String(event.campaignId)) {
+              return {
+                ...c,
+                current_amount: event.campaign.current_amount,
+                completed_donations_count: event.campaign.completed_donations_count !== undefined ? event.campaign.completed_donations_count : c.completed_donations_count
+              };
+            }
+            return c;
+          });
+        });
+      }
+    };
+
+    socket.on('campaign:created', handleCampaignCreated);
+    socket.on('campaign:updated', handleCampaignUpdated);
+    socket.on('donation:status_changed', handleDonationStatusChanged);
+    socket.on('donation:updated', handleDonationUpdated);
+
+    return () => {
+      socket.off('campaign:created', handleCampaignCreated);
+      socket.off('campaign:updated', handleCampaignUpdated);
+      socket.off('donation:status_changed', handleDonationStatusChanged);
+      socket.off('donation:updated', handleDonationUpdated);
+    };
+  }, [socket, isConnected]);
 
   const loadData = async () => {
     try {

@@ -1,7 +1,9 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Share2 } from 'lucide-react';
+import { donationService, Donation } from '@/services/donation.service';
 
 interface Campaign {
   _id: string;
@@ -22,6 +24,8 @@ interface Campaign {
   };
 }
 
+
+
 interface CampaignCardProps {
   campaign: Campaign;
   showCreator?: boolean;
@@ -29,6 +33,29 @@ interface CampaignCardProps {
 
 export default function CampaignCard({ campaign, showCreator = false }: CampaignCardProps) {
   const router = useRouter();
+  const [donations, setDonations] = useState<Donation[]>([]);
+
+  useEffect(() => {
+    const fetchDonations = async () => {
+      try {
+        const data = await donationService.getDonationsByCampaign(campaign._id);
+        // Filter only completed donations and non-anonymous ones for display
+        const completedDonations = data.filter(
+          (donation: Donation) => 
+            donation.payment_status === 'completed' && 
+            !donation.is_anonymous
+        );
+        setDonations(completedDonations);
+      } catch (err: any) {
+        console.error('Failed to fetch donations:', err);
+        setDonations([]);
+      }
+    };
+
+    if (campaign._id) {
+      fetchDonations();
+    }
+  }, [campaign._id]);
 
   const getCategoryIcon = (category: string) => {
     const icons: { [key: string]: string } = {
@@ -60,8 +87,26 @@ export default function CampaignCard({ campaign, showCreator = false }: Campaign
     : 0;
 
   const formatAmount = (amount: number) => {
-    if (amount >= 1000000) {
-      return `${(amount / 1000000).toFixed(0)}tr`;
+    if (amount >= 1000000 && amount < 1000000000) {
+      if (amount % 1000000 === 0) {
+        return `${(amount / 1000000).toFixed(0)} triệu`;
+      } else {
+        return `${(amount / 1000000).toFixed(1)} triệu`;
+      }
+    }
+    if (amount >= 1000000000 && amount < 1000000000000) {
+      if (amount % 1000000000 === 0) {
+        return `${(amount / 1000000000).toFixed(0)} tỷ`;
+      } else {
+        return `${(amount / 1000000000).toFixed(1)} tỷ`;
+      }
+    }
+    if (amount >= 1000000000000) {
+      if (amount % 1000000000000 === 0) {
+        return `${(amount / 1000000000000).toFixed(0)} nghìn tỷ`;
+      } else {
+        return `${(amount / 1000000000000).toFixed(1)} nghìn tỷ`;
+      }
     }
     return `${amount.toLocaleString('vi-VN')}`;
   };
@@ -149,7 +194,7 @@ export default function CampaignCard({ campaign, showCreator = false }: Campaign
           </div>
           <div>
             <div className="text-gray-800 font-bold text-sm">
-              {Math.floor(progressPercentage)}
+              {donations.length}
             </div>
             <div className="text-gray-500 text-xs">Lượt ủng hộ</div>
           </div>
