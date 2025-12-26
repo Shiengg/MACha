@@ -1,4 +1,5 @@
 import * as campaignService from "../services/campaign.service.js";
+import * as escrowService from "../services/escrow.service.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
@@ -387,5 +388,49 @@ export const rejectCampaign = async (req, res) => {
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const createWithdrawalRequest = async (req, res) => {
+    try {
+        const { campaignId } = req.params;
+        const userId = req.user._id;
+
+        const result = await escrowService.createWithdrawalRequest(
+            campaignId,
+            userId,
+            req.body
+        );
+
+        if (!result.success) {
+            // Map các error codes thành HTTP status codes
+            const errorStatusMap = {
+                "INVALID_AMOUNT": HTTP_STATUS.BAD_REQUEST,
+                "MISSING_REASON": HTTP_STATUS.BAD_REQUEST,
+                "CAMPAIGN_NOT_FOUND": HTTP_STATUS.NOT_FOUND,
+                "UNAUTHORIZED": HTTP_STATUS.FORBIDDEN,
+                "CAMPAIGN_NOT_ACTIVE": HTTP_STATUS.BAD_REQUEST,
+                "INSUFFICIENT_FUNDS": HTTP_STATUS.BAD_REQUEST,
+                "PENDING_REQUEST_EXISTS": HTTP_STATUS.CONFLICT
+            };
+
+            const statusCode = errorStatusMap[result.error] || HTTP_STATUS.BAD_REQUEST;
+
+            return res.status(statusCode).json({
+                message: result.message,
+                error: result.error,
+                ...(result.availableAmount !== undefined && { availableAmount: result.availableAmount }),
+                ...(result.pendingRequestId !== undefined && { pendingRequestId: result.pendingRequestId })
+            });
+        }
+
+        return res.status(HTTP_STATUS.CREATED).json({
+            message: "Withdrawal request created successfully",
+            escrow: result.escrow
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
+            message: error.message || "Internal server error" 
+        });
     }
 };

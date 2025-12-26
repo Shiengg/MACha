@@ -34,6 +34,10 @@ function CampaignDetails() {
     };
 
     useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [campaignId]);
+
+    useEffect(() => {
         const fetchCampaign = async () => {
             try {
                 setLoading(true);

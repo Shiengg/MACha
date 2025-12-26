@@ -5,6 +5,7 @@ import commentRoutes from "./CommentRoute.js";
 import likeRoutes from "./LikeRoute.js";
 import campaignRoutes from "./CampaignRoute.js";
 import donationRoutes from "./DonationRoute.js";
+import escrowRoutes from "./EscrowRoute.js";
 import notificationRoute from "./NotificationRoute.js";
 import hashtagRoutes from "./HashtagRoute.js";
 import conversationRoutes from "./ConversationRoute.js";
@@ -18,6 +19,7 @@ export {
     likeRoutes,
     campaignRoutes,
     donationRoutes,
+    escrowRoutes,
     notificationRoute,
     hashtagRoutes,
     conversationRoutes,

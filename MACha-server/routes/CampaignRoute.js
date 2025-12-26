@@ -11,7 +11,8 @@ import {
     cancelCampaign,
     getPendingCampaigns,
     approveCampaign,
-    rejectCampaign
+    rejectCampaign,
+    createWithdrawalRequest
 } from "../controllers/CampaignController.js";
 import {
     createCampaignUpdate,
@@ -41,6 +42,9 @@ campaignRoutes.post('/:id/reject', authMiddleware, checkRole('admin'), RateLimit
 campaignRoutes.post('/:campaignId/updates', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createCampaignUpdate);
 campaignRoutes.get('/:campaignId/updates', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignUpdates);
 campaignRoutes.delete('/updates/:updateId', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), deleteCampaignUpdate);
+
+// Withdrawal Requests routes
+campaignRoutes.post('/:campaignId/withdrawal-requests', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createWithdrawalRequest);
 
 /**
  * @swagger

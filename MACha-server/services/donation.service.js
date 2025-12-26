@@ -1,18 +1,120 @@
 import Donation from "../models/donation.js";
 import Campaign from "../models/campaign.js";
+import Escrow from "../models/escrow.js";
 import { redisClient } from "../config/redis.js";
 import * as trackingService from "./tracking.service.js";
+
+
+const calculateAvailableAmount = async (campaignId, currentAmount) => {
+    const releasedEscrows = await Escrow.find({
+        campaign: campaignId,
+        request_status: "released"
+    });
+
+    const totalReleasedAmount = releasedEscrows.reduce((sum, escrow) => {
+        return sum + (escrow.withdrawal_request_amount || 0);
+    }, 0);
+
+    return currentAmount - totalReleasedAmount;
+};
+
+const checkAndCreateMilestoneWithdrawalRequest = async (campaign) => {
+    const percentage = (campaign.current_amount / campaign.goal_amount) * 100;
+    
+    const milestones = [50, 75, 100];
+    
+
+    const achievedMilestone = milestones
+        .sort((a, b) => b - a)
+        .find(milestone => percentage >= milestone);
+    
+    if (!achievedMilestone) {
+        return null;
+    }
+    
+    const existingRequest = await Escrow.findOne({
+        campaign: campaign._id,
+        milestone_percentage: achievedMilestone,
+        auto_created: true,
+        request_status: {
+            $in: [
+                "pending_voting",
+                "voting_in_progress",
+                "voting_completed",
+                "admin_approved"
+            ]
+        }
+    });
+    
+    if (existingRequest) {
+        return null;
+    }
+    
+    const lowerMilestoneRequests = await Escrow.updateMany(
+        {
+            campaign: campaign._id,
+            milestone_percentage: { $lt: achievedMilestone },
+            auto_created: true,
+            request_status: {
+                $in: [
+                    "pending_voting",
+                    "voting_in_progress",
+                    "voting_completed",
+                    "admin_approved"
+                ]
+            }
+        },
+        {
+            request_status: "cancelled"
+        }
+    );
+    
+    if (lowerMilestoneRequests.modifiedCount > 0) {
+        console.log(`[Milestone] Đã hủy ${lowerMilestoneRequests.modifiedCount} withdrawal request(s) có milestone thấp hơn ${achievedMilestone}% cho campaign ${campaign._id}`);
+    }
+    
+    // Tính số tiền available (current_amount - tổng các escrow đã released)
+    const availableAmount = await calculateAvailableAmount(campaign._id, campaign.current_amount);
+    
+    // Nếu không còn tiền available, không tạo request
+    if (availableAmount <= 0) {
+        console.log(`[Milestone] Không có tiền available để tạo withdrawal request cho campaign ${campaign._id} (available: ${availableAmount})`);
+        return null;
+    }
+    
+    const withdrawalRequest = await Escrow.create({
+        campaign: campaign._id,
+        requested_by: campaign.creator,
+        withdrawal_request_amount: availableAmount,
+        request_reason: `Tạo yêu cầu rút tiền khi campaign đạt ${achievedMilestone}% mục tiêu`,
+        request_status: "pending_voting",
+        total_amount: campaign.current_amount,
+        remaining_amount: availableAmount,
+        auto_created: true,
+        milestone_percentage: achievedMilestone
+    });
+    
+    const now = new Date();
+    const votingEndDate = new Date(now);
+    votingEndDate.setDate(votingEndDate.getDate() + 7); // 7 ngày
+    withdrawalRequest.request_status = "voting_in_progress";
+    withdrawalRequest.voting_start_date = now;
+    withdrawalRequest.voting_end_date = votingEndDate;
+    await withdrawalRequest.save();
+    
+    console.log(`[Milestone] Tạo withdrawal request tự động cho campaign ${campaign._id} khi đạt ${achievedMilestone}% mục tiêu`);
+    
+    return withdrawalRequest;
+};
 
 export const createDonation = async (campaignId, donorId, donationData) => {
     const { amount, currency, donation_method, is_anonymous } = donationData;
     
-    // Check if campaign exists
     const campaign = await Campaign.findById(campaignId);
     if (!campaign) {
         return null;
     }
     
-    // Create donation
     const donation = await Donation.create({
         campaign: campaignId,
         donor: donorId,
@@ -22,18 +124,21 @@ export const createDonation = async (campaignId, donorId, donationData) => {
         is_anonymous,
     });
     
-    // Update campaign current_amount and completed_donations_count
-    // Direct donations are immediately completed (unlike Sepay which starts as pending)
     campaign.current_amount += amount;
     campaign.completed_donations_count += 1;
     await campaign.save();
     
-    // Invalidate cache
+    try {
+        await checkAndCreateMilestoneWithdrawalRequest(campaign);
+    } catch (milestoneError) {
+        console.error('Error checking milestone withdrawal request:', milestoneError);
+    }
+    
     await redisClient.del(`donations:${campaignId}`);
     await redisClient.del(`campaign:${campaignId}`);
     await redisClient.del('campaigns');
+    await redisClient.del(`eligible_voters:${campaignId}`);
     
-    // Publish event (non-blocking)
     try {
         const populatedDonation = await Donation.findById(donation._id)
             .populate("donor", "username avatar_url fullname");
@@ -56,7 +161,6 @@ export const createDonation = async (campaignId, donorId, donationData) => {
             }
         });
         
-        // Also publish campaign updated event
         await trackingService.publishEvent("tracking:campaign:updated", {
             campaignId: campaign._id.toString(),
             userId: donorId.toString(),
@@ -77,18 +181,15 @@ export const createDonation = async (campaignId, donorId, donationData) => {
 export const getDonationsByCampaign = async (campaignId) => {
     const donationKey = `donations:${campaignId}`;
     
-    // Check cache
     const cached = await redisClient.get(donationKey);
     if (cached) {
         return JSON.parse(cached);
     }
     
-    // Query database
     const donations = await Donation.find({ campaign: campaignId })
         .populate("donor", "username avatar_url fullname")
         .sort({ createdAt: -1 });
     
-    // Save to cache (TTL: 5 minutes)
     await redisClient.setEx(donationKey, 300, JSON.stringify(donations));
     
     return donations;
@@ -124,7 +225,6 @@ export const createSepayDonation = async (campaignId, donorId, donationData) => 
     await redisClient.del(`campaign:${campaignId}`);
     await redisClient.del('campaigns');
     
-    // Publish event for Sepay donation creation (non-blocking)
     try {
         const populatedDonation = await Donation.findById(donation._id)
             .populate("donor", "username avatar_url fullname");
@@ -165,35 +265,24 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
         return null;
     }
 
-    // Nếu giao dịch đã hoàn tất trước đó thì không cho phép cập nhật xuống trạng thái khác
-    // Tránh trường hợp đã COMPLETED rồi sau đó bị callback / redirect CANCELLED ghi đè
     if (donation.payment_status === 'completed') {
         const campaign = await Campaign.findById(donation.campaign);
         return { donation, campaign };
     }
     
-    // Bảo vệ: KHÔNG cho phép update từ completed sang cancelled/failed
-    // Nếu đã completed thì không thể bị downgrade
     if ((status === 'cancelled' || status === 'failed') && donation.payment_status === 'completed') {
         const campaign = await Campaign.findById(donation.campaign);
         return { donation, campaign };
     }
 
-    // Cho phép override từ cancelled/failed sang completed
-    // Vì success redirect chỉ được gọi khi SePay thực sự redirect về success URL (thanh toán đã thành công)
     if (status === 'completed' && (donation.payment_status === 'cancelled' || donation.payment_status === 'failed')) {
-        // Tiếp tục xử lý để update thành completed
     }
-    // Bảo vệ: Nếu đang cố cập nhật xuống 'cancelled' hoặc 'failed' nhưng có dấu hiệu thành công
-    // (như có transaction_id hoặc paid_at đã được set), thì không cho phép
     else if ((status === 'cancelled' || status === 'failed') && donation.payment_status === 'pending') {
-        // Kiểm tra nếu có transaction_id trong callback data - đây là dấu hiệu giao dịch đã được xử lý thành công
         if (sepayData?.transaction_id || donation.sepay_transaction_id) {
             const campaign = await Campaign.findById(donation.campaign);
             return { donation, campaign };
         }
         
-        // Kiểm tra nếu đã có paid_at timestamp - nghĩa là đã từng được đánh dấu thành công
         if (donation.paid_at) {
             const campaign = await Campaign.findById(donation.campaign);
             return { donation, campaign };
@@ -226,16 +315,19 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
     Object.assign(donation, updateData);
     await donation.save();
     
-    // Fetch campaign để cập nhật current_amount nếu cần
     const campaign = await Campaign.findById(donation.campaign);
     
-    // Cộng tiền vào campaign nếu status chuyển từ non-completed sang completed
     if (status === 'completed' && oldPaymentStatus !== 'completed' && campaign) {
         campaign.current_amount += donation.amount;
         campaign.completed_donations_count += 1;
         await campaign.save();
         
-        // Publish campaign updated event when current_amount changes
+        try {
+            await checkAndCreateMilestoneWithdrawalRequest(campaign);
+        } catch (milestoneError) {      
+            console.error('Error checking milestone withdrawal request:', milestoneError);
+        }
+        
         try {
             await trackingService.publishEvent("tracking:campaign:updated", {
                 campaignId: campaign._id.toString(),
@@ -255,9 +347,10 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
     await redisClient.del(`donations:${donation.campaign}`);
     await redisClient.del(`campaign:${donation.campaign}`);
     await redisClient.del('campaigns');
+    if (status === 'completed' && oldPaymentStatus !== 'completed') {
+        await redisClient.del(`eligible_voters:${donation.campaign}`);
+    }
     
-    // Publish event when status changes (non-blocking)
-    // Only publish if status changed to completed (most important for realtime updates)
     if (status === 'completed' && campaign) {
         try {
             const populatedDonation = await Donation.findById(donation._id)
@@ -284,7 +377,6 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
                 }
             });
             
-            // Also publish general update event
             await trackingService.publishEvent("tracking:donation:updated", {
                 donationId: donation._id.toString(),
                 campaignId: donation.campaign.toString(),
