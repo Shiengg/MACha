@@ -29,6 +29,20 @@ function DiscoverContent() {
   const [loading, setLoading] = useState(true);
   const { socket, isConnected } = useSocket();
 
+  // Helper function to check if campaign is still valid (active and not expired)
+  const isCampaignValid = (campaign: Campaign): boolean => {
+    // Must be active
+    if (campaign.status !== 'active') return false;
+    
+    // If no end_date, consider it as unlimited (still valid)
+    if (!campaign.end_date) return true;
+    
+    // Check if end_date is in the future
+    const endDate = new Date(campaign.end_date);
+    const now = new Date();
+    return endDate > now;
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -47,15 +61,9 @@ function DiscoverContent() {
     if (!socket || !isConnected) return;
 
     const handleCampaignCreated = (event: any) => {
-      if (event.status === 'active') {
-        setCampaigns(prev => {
-          const exists = prev.some(c => String(c._id) === String(event.campaignId));
-          if (exists) return prev;
-          // For new campaigns, we'd need full campaign data, so skip for now
-          // User can refresh to see new campaigns
-          return prev;
-        });
-      }
+      // For new campaigns, we'd need full campaign data, so skip for now
+      // User can refresh to see new campaigns
+      // Only add if it's active and valid (will be checked when full data is loaded)
     };
 
     const handleCampaignUpdated = (event: any) => {
@@ -69,18 +77,20 @@ function DiscoverContent() {
             // Update existing campaign with new data
             return prev.map(c => {
               if (String(c._id) === String(event.campaignId)) {
-                return {
+                const updatedCampaign = {
                   ...c,
                   current_amount: event.current_amount !== undefined ? event.current_amount : c.current_amount,
                   goal_amount: event.goal_amount !== undefined ? event.goal_amount : c.goal_amount,
                   status: event.status !== undefined ? event.status : c.status,
                   title: event.title !== undefined ? event.title : c.title,
                   category: event.category !== undefined ? event.category : c.category,
-                  completed_donations_count: event.completed_donations_count !== undefined ? event.completed_donations_count : c.completed_donations_count
+                  completed_donations_count: event.completed_donations_count !== undefined ? event.completed_donations_count : c.completed_donations_count,
+                  end_date: event.end_date !== undefined ? event.end_date : c.end_date
                 };
+                return updatedCampaign;
               }
               return c;
-            }).filter(c => c.status === 'active'); // Remove if no longer active
+            }).filter(c => isCampaignValid(c)); // Remove if no longer active or expired
           }
         });
       }
@@ -150,20 +160,23 @@ function DiscoverContent() {
         campaignService.getActiveCategories()
       ]);
       
-      // Only show active campaigns
-      const activeCampaigns = campaignsData.filter(c => c.status === 'active');
-      setCampaigns(activeCampaigns);
-      setFilteredCampaigns(activeCampaigns);
+      // Only show active campaigns that haven't expired
+      const validCampaigns = campaignsData.filter(c => isCampaignValid(c));
+      setCampaigns(validCampaigns);
+      setFilteredCampaigns(validCampaigns);
       
-      // Map categories with config
+      // Map categories with config - count only valid campaigns per category
       const mappedCategories = [
-        { id: 'all', label: 'Tất cả', icon: Heart, count: activeCampaigns.length },
-        ...categoriesData.map((cat: CategoryWithCount) => ({
-          id: cat.category,
-          label: categoryConfig[cat.category]?.label || cat.category,
-          icon: categoryConfig[cat.category]?.icon || Heart,
-          count: cat.count
-        }))
+        { id: 'all', label: 'Tất cả', icon: Heart, count: validCampaigns.length },
+        ...categoriesData.map((cat: CategoryWithCount) => {
+          const categoryCampaigns = validCampaigns.filter(c => c.category === cat.category);
+          return {
+            id: cat.category,
+            label: categoryConfig[cat.category]?.label || cat.category,
+            icon: categoryConfig[cat.category]?.icon || Heart,
+            count: categoryCampaigns.length
+          };
+        })
       ];
       
       setCategories(mappedCategories);

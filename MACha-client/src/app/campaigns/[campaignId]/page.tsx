@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import { campaignService, Campaign, CampaignUpdate, CreateCampaignUpdatePayload } from '@/services/campaign.service';
@@ -9,6 +9,7 @@ import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { cloudinaryService } from '@/services/cloudinary.service';
 import Image from 'next/image';
+import Swal from 'sweetalert2';
 
 function CampaignDetails() {
     const params = useParams();
@@ -28,6 +29,9 @@ function CampaignDetails() {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
     const { user } = useAuth();
+    const [showStickyBar, setShowStickyBar] = useState(false);
+    const donateCardRef = useRef<HTMLDivElement>(null);
+    const tabsRef = useRef<HTMLDivElement>(null);
 
     const handleDonate = () => {
         router.push(`/campaigns/${campaignId}/donate`);
@@ -36,6 +40,38 @@ function CampaignDetails() {
     useEffect(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, [campaignId]);
+
+    // Intersection Observer to detect when scroll past donate card
+    useEffect(() => {
+        if (!donateCardRef.current) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    // Show sticky bar when donate card is not visible (scrolled past it)
+                    setShowStickyBar(!entry.isIntersecting);
+                });
+            },
+            {
+                threshold: 0,
+                rootMargin: '-80px 0px 0px 0px', // Offset for header height
+            }
+        );
+
+        observer.observe(donateCardRef.current);
+
+        return () => {
+            observer.disconnect();
+        };
+    }, [campaign]);
+
+    // Scroll to tabs section when clicking tab in sticky bar
+    const handleStickyTabClick = (tab: 'story' | 'updates' | 'supporters') => {
+        setActiveTab(tab);
+        if (tabsRef.current) {
+            tabsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
 
     useEffect(() => {
         const fetchCampaign = async () => {
@@ -362,15 +398,26 @@ function CampaignDetails() {
         };
 
         const handleDeleteUpdate = async (updateId: string) => {
-            if (!confirm('Bạn có chắc muốn xóa cập nhật này?')) return;
+            const result = await Swal.fire({
+                title: 'Xác nhận xóa',
+                text: 'Bạn có chắc muốn xóa cập nhật này?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Xóa',
+                cancelButtonText: 'Hủy',
+            });
+
+            if (!result.isConfirmed) return;
 
             try {
                 await campaignService.deleteCampaignUpdate(updateId);
-                // Optimistically update state (socket event will also update for consistency)
                 setUpdates(prev => prev.filter(u => String(u._id) !== String(updateId)));
+                Swal.fire('Đã xóa!', 'Cập nhật đã được xóa thành công', 'success');
             } catch (error: any) {
                 console.error('Failed to delete update:', error);
-                alert(error.response?.data?.message || 'Không thể xóa cập nhật');
+                Swal.fire('Lỗi', error.response?.data?.message || 'Không thể xóa cập nhật', 'error');
                 // Refresh updates on error to ensure consistency
                 try {
                     const data = await campaignService.getCampaignUpdates(campaignId);
@@ -598,6 +645,66 @@ function CampaignDetails() {
     return (
         <ProtectedRoute>
             <div className="min-h-screen bg-gray-50">
+                {/* Sticky Bar - Shows when scroll past donate card */}
+                {showStickyBar && (
+                    <div className="fixed top-[64px] left-0 right-0 bg-white border-b border-gray-200 shadow-md z-40">
+                        <div className="max-w-6xl mx-auto px-4">
+                            <div className="flex items-center justify-between py-3">
+                                {/* Tabs */}
+                                <div className="flex items-center gap-1 flex-1">
+                                    <button
+                                        onClick={() => handleStickyTabClick('story')}
+                                        className={`px-4 py-2 text-sm font-medium transition rounded-lg ${
+                                            activeTab === 'story'
+                                                ? 'text-orange-500 bg-orange-50'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        Câu chuyện
+                                    </button>
+                                    <button
+                                        onClick={() => handleStickyTabClick('updates')}
+                                        className={`px-4 py-2 text-sm font-medium transition rounded-lg ${
+                                            activeTab === 'updates'
+                                                ? 'text-orange-500 bg-orange-50'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        Hoạt động ({updates.length})
+                                    </button>
+                                    <button
+                                        onClick={() => handleStickyTabClick('supporters')}
+                                        className={`px-4 py-2 text-sm font-medium transition rounded-lg ${
+                                            activeTab === 'supporters'
+                                                ? 'text-orange-500 bg-orange-50'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        Danh sách ủng hộ ({donations.length})
+                                    </button>
+                                </div>
+
+                                {/* Donate Button */}
+                                {campaign.end_date && daysLeft === 0 ? (
+                                    <div className="px-4 py-2 text-sm text-gray-500">
+                                        Chiến dịch đã kết thúc
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={handleDonate}
+                                        className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-lg hover:bg-orange-600 transition flex items-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Ủng hộ ngay
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Hero Section with Background */}
                 <div className="relative h-[200px]">
                     {/* Background Image with Blur */}
@@ -672,7 +779,7 @@ function CampaignDetails() {
                             </div>
 
                             {/* Tabs */}
-                            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                            <div ref={tabsRef} className="bg-white rounded-2xl shadow-lg overflow-hidden">
                                 <div className="flex border-b">
                                     <button
                                         onClick={() => setActiveTab('story')}
@@ -1013,7 +1120,7 @@ function CampaignDetails() {
                         {/* Right Column - Sidebar */}
                         <div className="space-y-6">
                             {/* Donate Card */}
-                            <div className="bg-white rounded-2xl shadow-lg p-6">
+                            <div ref={donateCardRef} className="bg-white rounded-2xl shadow-lg p-6">
                                 <div className="flex items-center gap-3 mb-6">
                                     <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
                                         <svg className="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
@@ -1059,24 +1166,36 @@ function CampaignDetails() {
 
                                 {/* Action Buttons */}
                                 <div className="space-y-3">
-                                    <button 
-                                        onClick={handleDonate} 
-                                        className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        Ủng hộ ngay
-                                    </button>
-                                    <button 
-                                        onClick={() => alert('Chức năng đang phát triển')}
-                                        className="w-full py-4 bg-white border-2 border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-400 transition flex items-center justify-center gap-2"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                        Tạo bài viết
-                                    </button>
+                                    {campaign.end_date && daysLeft === 0 ? (
+                                        <div className="w-full py-4 px-4 bg-gray-100 border-2 border-gray-300 rounded-xl flex flex-col items-center justify-center gap-2">
+                                            <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <p className="text-gray-700 font-semibold text-center">Chiến dịch đã kết thúc</p>
+                                            <p className="text-gray-500 text-sm text-center">Cảm ơn bạn đã quan tâm đến chiến dịch này</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <button 
+                                                onClick={handleDonate} 
+                                                className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                Ủng hộ ngay
+                                            </button>
+                                            <button 
+                                                onClick={() => alert('Chức năng đang phát triển')}
+                                                className="w-full py-4 bg-white border-2 border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-400 transition flex items-center justify-center gap-2"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
+                                                Tạo bài viết
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
