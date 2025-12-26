@@ -53,6 +53,7 @@ app.use("/api/likes", routes.likeRoutes);
 app.use("/api/campaigns", routes.campaignRoutes);
 app.use("/api/donations", routes.donationRoutes);
 app.use("/api/escrow", routes.escrowRoutes);
+app.use("/api/admin", routes.adminEscrowRoutes);
 app.use("/api/notifications", routes.notificationRoute);
 app.use("/api/hashtags", routes.hashtagRoutes);
 app.use("/api/conversations", routes.conversationRoutes);

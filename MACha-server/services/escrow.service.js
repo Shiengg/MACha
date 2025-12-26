@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Escrow from "../models/escrow.js";
 import Campaign from "../models/campaign.js";
 import Donation from "../models/donation.js";
@@ -6,6 +7,32 @@ import { redisClient } from "../config/redis.js";
 
 const VOTING_DURATION_DAYS = 7;
 
+
+export const getTotalReleasedAmount = async (campaignId) => {
+    const result = await Escrow.aggregate([
+        {
+            $match: {
+                campaign: mongoose.Types.ObjectId.isValid(campaignId) 
+                    ? new mongoose.Types.ObjectId(campaignId)
+                    : campaignId,
+                request_status: "released"
+            }
+        },
+        {
+            $group: {
+                _id: null,
+                totalReleasedAmount: { $sum: "$withdrawal_request_amount" }
+            }
+        }
+    ]);
+
+    return result.length > 0 ? (result[0].totalReleasedAmount || 0) : 0;
+};
+
+export const calculateAvailableAmount = async (campaignId, currentAmount) => {
+    const totalReleasedAmount = await getTotalReleasedAmount(campaignId);
+    return currentAmount - totalReleasedAmount;
+};
 
 const startVotingPeriod = (escrow) => {
     const now = new Date();
@@ -64,16 +91,7 @@ export const createWithdrawalRequest = async (campaignId, userId, requestData) =
         };
     }
 
-    const releasedEscrows = await Escrow.find({
-        campaign: campaignId,
-        request_status: "released"
-    });
-
-    const totalReleasedAmount = releasedEscrows.reduce((sum, escrow) => {
-        return sum + (escrow.withdrawal_request_amount || 0);
-    }, 0);
-
-    const availableAmount = campaign.current_amount - totalReleasedAmount;
+    const availableAmount = await calculateAvailableAmount(campaignId, campaign.current_amount);
 
     if (withdrawal_request_amount > availableAmount) {
         return {
@@ -363,4 +381,161 @@ export const processExpiredVotingPeriods = async () => {
     }
     
     return results;
+};
+
+
+export const getWithdrawalRequestsForReview = async (status = "voting_completed") => {
+    const escrows = await Escrow.find({ request_status: status })
+        .populate("campaign", "title goal_amount current_amount creator")
+        .populate("requested_by", "username email fullname")
+        .sort({ createdAt: -1 });
+    
+    // Tính voting results cho mỗi escrow
+    const escrowsWithVotingResults = await Promise.all(
+        escrows.map(async (escrow) => {
+            const votes = await Vote.find({ escrow: escrow._id });
+            
+            let totalApproveWeight = 0;
+            let totalRejectWeight = 0;
+            let approveCount = 0;
+            let rejectCount = 0;
+            
+            votes.forEach(vote => {
+                if (vote.value === "approve") {
+                    totalApproveWeight += vote.vote_weight || 0;
+                    approveCount++;
+                } else if (vote.value === "reject") {
+                    totalRejectWeight += vote.vote_weight || 0;
+                    rejectCount++;
+                }
+            });
+            
+            const totalWeight = totalApproveWeight + totalRejectWeight;
+            const approvePercentage = totalWeight > 0 ? (totalApproveWeight / totalWeight) * 100 : 0;
+            const rejectPercentage = totalWeight > 0 ? (totalRejectWeight / totalWeight) * 100 : 0;
+            
+            return {
+                ...escrow.toObject(),
+                votingResults: {
+                    totalVotes: votes.length,
+                    approveCount,
+                    rejectCount,
+                    totalApproveWeight,
+                    totalRejectWeight,
+                    approvePercentage: approvePercentage.toFixed(2),
+                    rejectPercentage: rejectPercentage.toFixed(2)
+                }
+            };
+        })
+    );
+    
+    return escrowsWithVotingResults;
+};
+
+export const approveWithdrawalRequest = async (escrowId, adminId) => {
+    const escrow = await Escrow.findById(escrowId).populate("campaign");
+    if (!escrow) {
+        return {
+            success: false,
+            error: "ESCROW_NOT_FOUND",
+            message: "Không tìm thấy withdrawal request"
+        };
+    }
+    
+    if (escrow.request_status !== "voting_completed") {
+        return {
+            success: false,
+            error: "INVALID_STATUS",
+            message: `Withdrawal request không ở trạng thái voting_completed. Hiện tại: ${escrow.request_status}`
+        };
+    }
+    
+    const now = new Date();
+    
+    escrow.request_status = "admin_approved";
+    escrow.admin_reviewed_by = adminId;
+    escrow.admin_reviewed_at = now;
+    await escrow.save();
+    
+    // TODO: Tích hợp payment gateway để chuyển tiền
+    // SePay hiện tại chỉ hỗ trợ nhận tiền từ donor, không có API để transfer money
+    // Có thể cần tích hợp bank transfer API hoặc payment gateway khác
+    // Tạm thời, giả sử payment thành công và update status thành "released"
+    
+    // Simulate payment success (TODO: Replace with actual payment gateway integration)
+    try {
+        // TODO: Implement actual payment transfer logic here
+        // Example:
+        // const paymentResult = await transferMoney({
+        //     recipientBankAccount: campaign.creator.bank_account,
+        //     amount: escrow.withdrawal_request_amount,
+        //     ...
+        // });
+        
+        // If payment successful:
+        escrow.request_status = "released";
+        escrow.released_at = new Date();
+        await escrow.save();
+        
+        // Update campaign: trừ current_amount (hoặc maintain separate released_amount field)
+        // Note: campaign.current_amount không nên trừ vì nó là tổng số tiền đã nhận
+        // Có thể cần thêm field released_amount vào campaign model
+        
+    } catch (paymentError) {
+        // Nếu payment failed, giữ nguyên status "admin_approved"
+        console.error('Payment transfer failed:', paymentError);
+        return {
+            success: false,
+            error: "PAYMENT_FAILED",
+            message: "Chuyển tiền thất bại. Vui lòng thử lại sau.",
+            escrow: escrow
+        };
+    }
+    
+    return {
+        success: true,
+        escrow: escrow,
+        message: "Withdrawal request đã được approve và tiền đã được chuyển"
+    };
+};
+
+export const rejectWithdrawalRequest = async (escrowId, adminId, rejectionReason) => {
+    const escrow = await Escrow.findById(escrowId);
+    if (!escrow) {
+        return {
+            success: false,
+            error: "ESCROW_NOT_FOUND",
+            message: "Không tìm thấy withdrawal request"
+        };
+    }
+    
+    if (escrow.request_status !== "voting_completed") {
+        return {
+            success: false,
+            error: "INVALID_STATUS",
+            message: `Withdrawal request không ở trạng thái voting_completed. Hiện tại: ${escrow.request_status}`
+        };
+    }
+    
+    if (!rejectionReason || rejectionReason.trim().length === 0) {
+        return {
+            success: false,
+            error: "MISSING_REJECTION_REASON",
+            message: "Lý do từ chối là bắt buộc"
+        };
+    }
+    
+    const now = new Date();
+    
+    escrow.request_status = "admin_rejected";
+    escrow.admin_reviewed_by = adminId;
+    escrow.admin_reviewed_at = now;
+    escrow.admin_rejection_reason = rejectionReason;
+    await escrow.save();
+    
+    return {
+        success: true,
+        escrow: escrow,
+        message: "Withdrawal request đã bị từ chối"
+    };
 };

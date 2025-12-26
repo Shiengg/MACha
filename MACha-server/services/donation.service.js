@@ -3,20 +3,7 @@ import Campaign from "../models/campaign.js";
 import Escrow from "../models/escrow.js";
 import { redisClient } from "../config/redis.js";
 import * as trackingService from "./tracking.service.js";
-
-
-const calculateAvailableAmount = async (campaignId, currentAmount) => {
-    const releasedEscrows = await Escrow.find({
-        campaign: campaignId,
-        request_status: "released"
-    });
-
-    const totalReleasedAmount = releasedEscrows.reduce((sum, escrow) => {
-        return sum + (escrow.withdrawal_request_amount || 0);
-    }, 0);
-
-    return currentAmount - totalReleasedAmount;
-};
+import * as escrowService from "./escrow.service.js";
 
 const checkAndCreateMilestoneWithdrawalRequest = async (campaign) => {
     const percentage = (campaign.current_amount / campaign.goal_amount) * 100;
@@ -74,7 +61,7 @@ const checkAndCreateMilestoneWithdrawalRequest = async (campaign) => {
     }
     
     // Tính số tiền available (current_amount - tổng các escrow đã released)
-    const availableAmount = await calculateAvailableAmount(campaign._id, campaign.current_amount);
+    const availableAmount = await escrowService.calculateAvailableAmount(campaign._id, campaign.current_amount);
     
     // Nếu không còn tiền available, không tạo request
     if (availableAmount <= 0) {
