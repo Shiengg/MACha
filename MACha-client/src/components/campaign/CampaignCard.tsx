@@ -59,24 +59,34 @@ export default function CampaignCard({ campaign, showCreator = false }: Campaign
 
   const getCategoryIcon = (category: string) => {
     const icons: { [key: string]: string } = {
-      'education': '📚',
-      'health': '🏥',
-      'environment': '🌱',
+      'children': '👶',
+      'elderly': '👴',
+      'poverty': '🏚️',
       'disaster': '🆘',
-      'community': '🤝',
+      'medical': '🏥',
+      'education': '📚',
+      'disability': '♿',
       'animal': '🐾',
+      'environment': '🌱',
+      'community': '🤝',
+      'other': '❤️',
     };
     return icons[category] || '❤️';
   };
 
   const getCategoryLabel = (category: string) => {
     const labels: { [key: string]: string } = {
-      'education': 'Giáo dục',
-      'health': 'Y tế',
-      'environment': 'Môi trường',
+      'children': 'Trẻ em',
+      'elderly': 'Người già',
+      'poverty': 'Người nghèo',
       'disaster': 'Thiên tai',
-      'community': 'Cộng đồng',
+      'medical': 'Y tế',
+      'education': 'Giáo dục',
+      'disability': 'Người khuyết tật',
       'animal': 'Động vật',
+      'environment': 'Môi trường',
+      'community': 'Cộng đồng',
+      'other': 'Khác',
     };
     return labels[category] || category;
   };
@@ -91,21 +101,21 @@ export default function CampaignCard({ campaign, showCreator = false }: Campaign
       if (amount % 1000000 === 0) {
         return `${(amount / 1000000).toFixed(0)} triệu`;
       } else {
-        return `${(amount / 1000000).toFixed(1)} triệu`;
+        return `${(amount / 1000000).toFixed(2)} triệu`;
       }
     }
     if (amount >= 1000000000 && amount < 1000000000000) {
       if (amount % 1000000000 === 0) {
         return `${(amount / 1000000000).toFixed(0)} tỷ`;
       } else {
-        return `${(amount / 1000000000).toFixed(1)} tỷ`;
+        return `${(amount / 1000000000).toFixed(2)} tỷ`;
       }
     }
     if (amount >= 1000000000000) {
       if (amount % 1000000000000 === 0) {
         return `${(amount / 1000000000000).toFixed(0)} nghìn tỷ`;
       } else {
-        return `${(amount / 1000000000000).toFixed(1)} nghìn tỷ`;
+        return `${(amount / 1000000000000).toFixed(2)} nghìn tỷ`;
       }
     }
     return `${amount.toLocaleString('vi-VN')}`;

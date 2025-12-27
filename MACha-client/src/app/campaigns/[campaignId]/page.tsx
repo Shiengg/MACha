@@ -5,11 +5,15 @@ import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import { campaignService, Campaign, CampaignUpdate, CreateCampaignUpdatePayload } from '@/services/campaign.service';
 import { donationService, Donation } from '@/services/donation.service';
+import { escrowService, Escrow, Vote } from '@/services/escrow.service';
 import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { cloudinaryService } from '@/services/cloudinary.service';
 import Image from 'next/image';
 import Swal from 'sweetalert2';
+import WithdrawalRequestCard from '@/components/escrow/WithdrawalRequestCard';
+import WithdrawalRequestModal from '@/components/escrow/WithdrawalRequestModal';
+import VotingSection from '@/components/escrow/VotingSection';
 
 function CampaignDetails() {
     const params = useParams();
@@ -24,7 +28,7 @@ function CampaignDetails() {
     const [donationsLoading, setDonationsLoading] = useState(false);
     const [updatesLoading, setUpdatesLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'story' | 'updates' | 'supporters'>('story');
+    const [activeTab, setActiveTab] = useState<'story' | 'updates' | 'supporters' | 'withdrawals'>('story');
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
@@ -32,6 +36,16 @@ function CampaignDetails() {
     const [showStickyBar, setShowStickyBar] = useState(false);
     const donateCardRef = useRef<HTMLDivElement>(null);
     const tabsRef = useRef<HTMLDivElement>(null);
+
+    // Withdrawal Request States
+    const [withdrawalRequests, setWithdrawalRequests] = useState<Escrow[]>([]);
+    const [activeWithdrawalRequest, setActiveWithdrawalRequest] = useState<Escrow | null>(null);
+    const [userVote, setUserVote] = useState<Vote | null>(null);
+    const [isEligibleToVote, setIsEligibleToVote] = useState(false);
+    const [availableAmount, setAvailableAmount] = useState(0);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [withdrawalRequestsLoading, setWithdrawalRequestsLoading] = useState(false);
+    const [isVoting, setIsVoting] = useState(false);
 
     const handleDonate = () => {
         router.push(`/campaigns/${campaignId}/donate`);
@@ -66,7 +80,7 @@ function CampaignDetails() {
     }, [campaign]);
 
     // Scroll to tabs section when clicking tab in sticky bar
-    const handleStickyTabClick = (tab: 'story' | 'updates' | 'supporters') => {
+    const handleStickyTabClick = (tab: 'story' | 'updates' | 'supporters' | 'withdrawals') => {
         setActiveTab(tab);
         if (tabsRef.current) {
             tabsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -290,6 +304,87 @@ function CampaignDetails() {
         };
         }, [socket, isConnected, campaignId]);
 
+    // Fetch withdrawal requests and check eligibility
+    useEffect(() => {
+        const fetchWithdrawalData = async () => {
+            if (!campaignId || !user) return;
+
+            try {
+                setWithdrawalRequestsLoading(true);
+
+                // Fetch withdrawal requests
+                const requests = await escrowService.getWithdrawalRequestsByCampaign(campaignId);
+                setWithdrawalRequests(requests);
+
+                // Find active withdrawal request (voting_in_progress)
+                const activeRequest = requests.find(
+                    (req) => req.request_status === 'voting_in_progress'
+                );
+                setActiveWithdrawalRequest(activeRequest || null);
+
+                // If there's an active request, fetch user vote
+                if (activeRequest) {
+                    try {
+                        const votes = await escrowService.getVotesByEscrow(activeRequest._id);
+                        const currentUserVote = votes.find(
+                            (vote) =>
+                                (typeof vote.donor === 'object' ? vote.donor._id : vote.donor) ===
+                                (user._id || user.id)
+                        );
+                        setUserVote(currentUserVote || null);
+                    } catch (err) {
+                        console.error('Error fetching user vote:', err);
+                        setUserVote(null);
+                    }
+                } else {
+                    setUserVote(null);
+                }
+
+                // Check eligibility: user must have donated at least 1% of goal_amount
+                if (campaign) {
+                    try {
+                        const userDonations = donations.filter(
+                            (donation) =>
+                                (typeof donation.donor === 'object'
+                                    ? donation.donor._id
+                                    : donation.donor) === (user._id || user.id) &&
+                                donation.payment_status === 'completed'
+                        );
+                        const totalDonated = userDonations.reduce((sum, d) => sum + d.amount, 0);
+                        const threshold = campaign.goal_amount * 0.01; // 1%
+                        setIsEligibleToVote(totalDonated >= threshold);
+                    } catch (err) {
+                        console.error('Error checking eligibility:', err);
+                        setIsEligibleToVote(false);
+                    }
+                }
+
+                // Recalculate available amount
+                if (campaign) {
+                    try {
+                        const amount = await campaignService.getAvailableAmount(campaignId);
+                        setAvailableAmount(amount);
+                    } catch (err) {
+                        console.error('Error calculating available amount:', err);
+                        if (campaign.available_amount !== undefined) {
+                            setAvailableAmount(campaign.available_amount);
+                        } else {
+                            setAvailableAmount(campaign.current_amount);
+                        }
+                    }
+                }
+            } catch (err: any) {
+                console.error('Error fetching withdrawal data:', err);
+            } finally {
+                setWithdrawalRequestsLoading(false);
+            }
+        };
+
+        if (campaignId && user && campaign) {
+            fetchWithdrawalData();
+        }
+    }, [campaignId, user, campaign, donations]);
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
     };
@@ -337,6 +432,135 @@ function CampaignDetails() {
         return `${hours}:${minutes}:${seconds} - ${day}/${month}/${year}`;
     };
 
+    // Withdrawal Request Handlers
+    const handleCreateRequest = () => {
+        if (!user || !campaign) return;
+        const isCreator = user._id === campaign.creator._id || user.id === campaign.creator._id;
+        if (!isCreator) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Không có quyền',
+                text: 'Chỉ creator của campaign mới có thể tạo withdrawal request',
+            });
+            return;
+        }
+        setShowCreateModal(true);
+    };
+
+    const handleSubmitRequest = async (escrow: Escrow) => {
+        try {
+            // Refresh withdrawal requests
+            const requests = await escrowService.getWithdrawalRequestsByCampaign(campaignId);
+            setWithdrawalRequests(requests);
+
+            // Update active request if needed
+            const activeRequest = requests.find(
+                (req) => req.request_status === 'voting_in_progress'
+            );
+            setActiveWithdrawalRequest(activeRequest || null);
+
+            // Recalculate available amount
+            if (campaign) {
+                const amount = await campaignService.getAvailableAmount(campaignId);
+                setAvailableAmount(amount);
+            }
+
+            // Refresh campaign to get updated current_amount
+            const updatedCampaign = await campaignService.getCampaignById(campaignId);
+            setCampaign(updatedCampaign);
+        } catch (err) {
+            console.error('Error refreshing data after creating request:', err);
+        }
+    };
+
+    const handleVote = async (escrowId: string, value: 'approve' | 'reject') => {
+        if (!user || isVoting) return;
+
+        try {
+            setIsVoting(true);
+            const vote = await escrowService.submitVote(escrowId, { value });
+
+            // Update user vote
+            setUserVote(vote);
+
+            // Refresh withdrawal request to get updated voting results
+            const updatedRequest = await escrowService.getWithdrawalRequestById(escrowId);
+            setActiveWithdrawalRequest(updatedRequest);
+            setWithdrawalRequests((prev) =>
+                prev.map((req) => (req._id === escrowId ? updatedRequest : req))
+            );
+
+            // Show success message
+            Swal.fire({
+                icon: 'success',
+                title: 'Thành công!',
+                text: `Bạn đã vote ${value === 'approve' ? 'Đồng ý' : 'Từ chối'} cho withdrawal request này`,
+                timer: 2000,
+                showConfirmButton: false,
+            });
+        } catch (err: any) {
+            console.error('Error submitting vote:', err);
+            const errorMessage =
+                err?.response?.data?.message ||
+                err?.message ||
+                'Không thể submit vote. Vui lòng thử lại sau.';
+            Swal.fire({
+                icon: 'error',
+                title: 'Lỗi',
+                text: errorMessage,
+            });
+        } finally {
+            setIsVoting(false);
+        }
+    };
+
+    const handleRefresh = async () => {
+        if (!campaignId || !user || !campaign) return;
+
+        try {
+            setWithdrawalRequestsLoading(true);
+
+            // Refresh withdrawal requests
+            const requests = await escrowService.getWithdrawalRequestsByCampaign(campaignId);
+            setWithdrawalRequests(requests);
+
+            // Update active request
+            const activeRequest = requests.find(
+                (req) => req.request_status === 'voting_in_progress'
+            );
+            setActiveWithdrawalRequest(activeRequest || null);
+
+            // Refresh user vote if active request exists
+            if (activeRequest) {
+                try {
+                    const votes = await escrowService.getVotesByEscrow(activeRequest._id);
+                    const currentUserVote = votes.find(
+                        (vote) =>
+                            (typeof vote.donor === 'object' ? vote.donor._id : vote.donor) ===
+                            (user._id || user.id)
+                    );
+                    setUserVote(currentUserVote || null);
+                } catch (err) {
+                    console.error('Error refreshing user vote:', err);
+                }
+            } else {
+                setUserVote(null);
+            }
+
+            // Recalculate available amount
+            const amount = await campaignService.getAvailableAmount(campaignId);
+            setAvailableAmount(amount);
+
+            // Refresh campaign
+            const updatedCampaign = await campaignService.getCampaignById(campaignId);
+            setCampaign(updatedCampaign);
+        } catch (err) {
+            console.error('Error refreshing data:', err);
+        } finally {
+            setWithdrawalRequestsLoading(false);
+        }
+    };
+
     // UpdatesTab Component
     const UpdatesTab = ({ campaignId, updates, setUpdates, updatesLoading, isCreator }: { campaignId: string, updates: CampaignUpdate[], setUpdates: React.Dispatch<React.SetStateAction<CampaignUpdate[]>>, updatesLoading: boolean, isCreator: boolean }) => {
         const [updateContent, setUpdateContent] = useState('');
@@ -345,15 +569,26 @@ function CampaignDetails() {
         const [isSubmitting, setIsSubmitting] = useState(false);
         const [showForm, setShowForm] = useState(false);
 
+        // Cleanup blob URL when component unmounts or imagePreview changes
+        useEffect(() => {
+            return () => {
+                if (imagePreview && imagePreview.startsWith('blob:')) {
+                    URL.revokeObjectURL(imagePreview);
+                }
+            };
+        }, [imagePreview]);
+
         const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
             const file = e.target.files?.[0];
             if (file) {
+                // Cleanup previous preview URL if exists
+                if (imagePreview && imagePreview.startsWith('blob:')) {
+                    URL.revokeObjectURL(imagePreview);
+                }
                 setSelectedImage(file);
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    setImagePreview(reader.result as string);
-                };
-                reader.readAsDataURL(file);
+                // Use URL.createObjectURL instead of FileReader for better performance and reliability
+                const previewUrl = URL.createObjectURL(file);
+                setImagePreview(previewUrl);
             }
         };
 
@@ -385,6 +620,10 @@ function CampaignDetails() {
                     if (exists) return prev;
                     return [newUpdate, ...prev];
                 });
+                // Cleanup blob URL before resetting state
+                if (imagePreview && imagePreview.startsWith('blob:')) {
+                    URL.revokeObjectURL(imagePreview);
+                }
                 setUpdateContent('');
                 setSelectedImage(null);
                 setImagePreview(null);
@@ -480,6 +719,10 @@ function CampaignDetails() {
                                         <button
                                             type="button"
                                             onClick={() => {
+                                                // Cleanup blob URL before clearing preview
+                                                if (imagePreview && imagePreview.startsWith('blob:')) {
+                                                    URL.revokeObjectURL(imagePreview);
+                                                }
                                                 setSelectedImage(null);
                                                 setImagePreview(null);
                                             }}
@@ -503,6 +746,10 @@ function CampaignDetails() {
                                     <button
                                         type="button"
                                         onClick={() => {
+                                            // Cleanup blob URL before resetting form
+                                            if (imagePreview && imagePreview.startsWith('blob:')) {
+                                                URL.revokeObjectURL(imagePreview);
+                                            }
                                             setShowForm(false);
                                             setUpdateContent('');
                                             setSelectedImage(null);
@@ -682,6 +929,16 @@ function CampaignDetails() {
                                     >
                                         Danh sách ủng hộ ({donations.length})
                                     </button>
+                                    <button
+                                        onClick={() => handleStickyTabClick('withdrawals')}
+                                        className={`px-4 py-2 text-sm font-medium transition rounded-lg ${
+                                            activeTab === 'withdrawals'
+                                                ? 'text-orange-500 bg-orange-50'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        Rút tiền ({withdrawalRequests.filter(req => req.request_status !== 'cancelled').length})
+                                    </button>
                                 </div>
 
                                 {/* Donate Button */}
@@ -737,10 +994,10 @@ function CampaignDetails() {
                         {/* Left Column - Main Content */}
                         <div className="lg:col-span-2 space-y-6">
                             {/* Progress Card */}
-                            <div className="bg-white rounded-2xl shadow-lg p-6">
+                            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
                                 <div className="flex justify-between items-end mb-3">
                                     <div>
-                                        <span className="text-gray-500 text-xl">Đã đạt được </span>
+                                        <span className="text-gray-500 dark:text-gray-400 text-xl">Đã đạt được </span>
                                         <span className="text-3xl font-bold text-orange-500">
                                             {formatCurrency(campaign.current_amount)}
                                         </span>
@@ -748,32 +1005,152 @@ function CampaignDetails() {
                                     
                                 </div>
 
-                                {/* Progress Bar */}
-                                <div className="h-3 bg-gray-200 rounded-full overflow-hidden mb-6">
-                                    <div 
-                                        className="h-full rounded-full transition-all duration-500"
-                                        style={{ 
-                                            width: `${progress}%`,
-                                            background: 'linear-gradient(90deg, #f97316 0%, #fb923c 100%)'
-                                        }}
-                                    />
+                                {/* Progress Bar with Milestone Markers */}
+                                <div className="relative mb-6">
+                                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-visible relative">
+                                        <div 
+                                            className="h-full rounded-full transition-all duration-500"
+                                            style={{ 
+                                                width: `${progress}%`,
+                                                background: 'linear-gradient(90deg, #f97316 0%, #fb923c 100%)'
+                                            }}
+                                        />
+                                        
+                                        {/* Milestone Markers */}
+                                        {campaign.milestones && campaign.milestones.length > 0 && campaign.milestones
+                                            .filter(m => m.percentage > 0)
+                                            .sort((a, b) => a.percentage - b.percentage)
+                                            .map((milestone, index) => {
+                                                const is100Percent = milestone.percentage === 100;
+                                                const milestoneAmount = (campaign.goal_amount * milestone.percentage) / 100;
+                                                const isReached = campaign.current_amount >= milestoneAmount;
+                                                
+                                                return (
+                                                    <div
+                                                        key={index}
+                                                        className="absolute top-0 transform -translate-x-1/2"
+                                                        style={{ left: `${milestone.percentage}%` }}
+                                                    >
+                                                        {/* Marker Line */}
+                                                        <div 
+                                                            className={`w-0.5 h-6 ${
+                                                                isReached
+                                                                    ? is100Percent 
+                                                                        ? 'bg-green-500 dark:bg-green-400' 
+                                                                        : 'bg-green-500 dark:bg-green-400'
+                                                                    : is100Percent 
+                                                                        ? 'bg-green-300 dark:bg-green-600' 
+                                                                        : 'bg-blue-400 dark:bg-blue-500'
+                                                            }`}
+                                                            style={{ marginTop: '-3px' }}
+                                                        />
+                                                        
+                                                        {/* Marker Dot */}
+                                                        <div 
+                                                            className={`w-4 h-4 rounded-full border-2 border-white dark:border-gray-800 shadow-lg transform -translate-x-1/2 ${
+                                                                isReached
+                                                                    ? is100Percent 
+                                                                        ? 'bg-green-500 dark:bg-green-400' 
+                                                                        : 'bg-green-500 dark:bg-green-400'
+                                                                    : is100Percent 
+                                                                        ? 'bg-green-300 dark:bg-green-600' 
+                                                                        : 'bg-blue-400 dark:bg-blue-500'
+                                                            }`}
+                                                            style={{ marginTop: '-10px' }}
+                                                        />
+                                                        
+                                                        {/* Percentage Label */}
+                                                        <div 
+                                                            className={`absolute top-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap ${
+                                                                isReached
+                                                                    ? 'text-green-600 dark:text-green-400'
+                                                                    : is100Percent
+                                                                        ? 'text-green-500 dark:text-green-400'
+                                                                        : 'text-blue-600 dark:text-blue-400'
+                                                            }`}
+                                                        >
+                                                            <div className={`text-xs font-bold px-2 py-1 rounded ${
+                                                                isReached
+                                                                    ? 'bg-green-100 dark:bg-green-900/30'
+                                                                    : is100Percent
+                                                                        ? 'bg-green-50 dark:bg-green-900/20'
+                                                                        : 'bg-blue-100 dark:bg-blue-900/30'
+                                                            }`}>
+                                                                {milestone.percentage}%
+                                                                {isReached && (
+                                                                    <span className="ml-1">✓</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                    </div>
+                                    
+                                    {/* Milestone Info Below */}
+                                    {campaign.milestones && campaign.milestones.length > 0 && (
+                                        <div className="mt-8 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                Các mốc giải ngân:
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {campaign.milestones
+                                                    .filter(m => m.percentage > 0)
+                                                    .sort((a, b) => a.percentage - b.percentage)
+                                                    .map((milestone, index) => {
+                                                        const is100Percent = milestone.percentage === 100;
+                                                        const milestoneAmount = (campaign.goal_amount * milestone.percentage) / 100;
+                                                        const isReached = campaign.current_amount >= milestoneAmount;
+                                                        
+                                                        return (
+                                                            <div
+                                                                key={index}
+                                                                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                                                                    isReached
+                                                                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                                                                        : is100Percent
+                                                                            ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
+                                                                            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                                                }`}
+                                                            >
+                                                                {isReached && (
+                                                                    <span className="text-green-600 dark:text-green-400">✓</span>
+                                                                )}
+                                                                <span className="font-bold">{milestone.percentage}%</span>
+                                                                <span className="text-gray-500 dark:text-gray-400">
+                                                                    ({milestoneAmount.toLocaleString('vi-VN')}đ)
+                                                                </span>
+                                                                {milestone.commitment_days > 0 && (
+                                                                    <span className="text-gray-500 dark:text-gray-400">
+                                                                        • {milestone.commitment_days} ngày
+                                                                    </span>
+                                                                )}
+                                                                {isReached && (
+                                                                    <span className="text-green-600 dark:text-green-400 font-semibold">Đã đạt</span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Stats */}
                                 <div className="grid grid-cols-3 gap-4">
-                                    <div className="text-center p-4 bg-gray-50 rounded-xl">
+                                    <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
                                         <div className="text-2xl font-bold text-orange-500">{donations.length}</div>
-                                        <div className="text-gray-500 text-sm">Lượt ủng hộ</div>
+                                        <div className="text-gray-500 dark:text-gray-400 text-sm">Lượt ủng hộ</div>
                                     </div>
-                                    <div className="text-center p-4 bg-gray-50 rounded-xl">
+                                    <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
                                         <div className="text-2xl font-bold text-green-500">
                                             {daysLeft !== null ? daysLeft : '∞'}
                                         </div>
-                                        <div className="text-gray-500 text-sm">Ngày còn lại</div>
+                                        <div className="text-gray-500 dark:text-gray-400 text-sm">Ngày còn lại</div>
                                     </div>
-                                    <div className="text-center p-4 bg-gray-50 rounded-xl">
+                                    <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
                                         <div className="text-2xl font-bold text-blue-500">283</div>
-                                        <div className="text-gray-500 text-sm">Lượt chia sẻ</div>
+                                        <div className="text-gray-500 dark:text-gray-400 text-sm">Lượt chia sẻ</div>
                                     </div>
                                 </div>
                             </div>
@@ -824,6 +1201,21 @@ function CampaignDetails() {
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                             </svg>
                                             Danh sách ủng hộ ({donations.length})
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('withdrawals')}
+                                        className={`flex-1 py-4 px-6 text-center font-medium transition ${
+                                            activeTab === 'withdrawals'
+                                                ? 'text-orange-500 border-b-2 border-orange-500 bg-orange-50/50'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                    >
+                                        <span className="flex items-center justify-center gap-2">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Rút tiền ({withdrawalRequests.filter(req => req.request_status !== 'cancelled').length})
                                         </span>
                                     </button>
                                 </div>
@@ -932,36 +1324,147 @@ function CampaignDetails() {
                                             )}
 
                                             {/* Timeline */}
-                                            <div className="bg-gray-50 rounded-xl p-6">
-                                                <div className="flex items-center gap-2 mb-4">
-                                                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
-                                                    <h3 className="font-bold text-gray-900">Tiến độ dự kiến</h3>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                                                        <span className="text-sm text-gray-700">Tháng 10/2025: Hoàn thành gây quỹ</span>
+                                            {campaign.expected_timeline && campaign.expected_timeline.length > 0 && (
+                                                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6">
+                                                    <div className="flex items-center gap-2 mb-4">
+                                                        <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        <h3 className="font-bold text-gray-900 dark:text-white">Tiến độ dự kiến</h3>
                                                     </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                                                        <span className="text-sm text-gray-700">Tháng 11/2025: Khởi công xây dựng</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-3 h-3 rounded-full bg-blue-400"></div>
-                                                        <span className="text-sm text-gray-700">Tháng 12/2025: Hoàn thiện cơ sở vật chất</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-3 h-3 rounded-full bg-blue-300"></div>
-                                                        <span className="text-sm text-gray-700">Tháng 01/2026: Khánh thành và bàn giao</span>
+                                                    <div className="space-y-3">
+                                                        {campaign.expected_timeline.map((item, index) => (
+                                                            <div key={index} className="flex items-center gap-3">
+                                                                <div className={`w-3 h-3 rounded-full ${
+                                                                    index === 0 ? 'bg-green-500' :
+                                                                    index === campaign.expected_timeline!.length - 1 ? 'bg-blue-300' :
+                                                                    'bg-blue-500'
+                                                                }`}></div>
+                                                                <span className="text-sm text-gray-700 dark:text-gray-300">
+                                                                    {item.month}: {item.description}
+                                                                </span>
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     )}
 
                                     {activeTab === 'updates' && <UpdatesTab campaignId={campaignId} updates={updates} setUpdates={setUpdates} updatesLoading={updatesLoading} isCreator={!!(user && campaign && user._id === campaign.creator._id)} />}
+
+                                    {activeTab === 'withdrawals' && (
+                                        <div className="space-y-6">
+                                            {/* Header with Create Button */}
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                                        Yêu cầu rút tiền
+                                                    </h3>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                        Quản lý các yêu cầu rút tiền và vote cho withdrawal requests
+                                                    </p>
+                                                </div>
+                                                {user && campaign && (user._id === campaign.creator._id || user.id === campaign.creator._id) && (
+                                                    <button
+                                                        onClick={handleCreateRequest}
+                                                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all flex items-center gap-2 shadow-md hover:shadow-lg"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                        </svg>
+                                                        Tạo yêu cầu rút tiền
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {/* Available Amount Display */}
+                                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                                            Số tiền có sẵn để rút
+                                                        </p>
+                                                        <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
+                                                            {formatCurrency(availableAmount)}
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        onClick={handleRefresh}
+                                                        disabled={withdrawalRequestsLoading}
+                                                        className="px-4 py-2 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-all flex items-center gap-2 border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                        </svg>
+                                                        Làm mới
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Loading State */}
+                                            {withdrawalRequestsLoading && (
+                                                <div className="flex items-center justify-center py-12">
+                                                    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                                    <span className="ml-3 text-gray-600 dark:text-gray-400">Đang tải...</span>
+                                                </div>
+                                            )}
+
+                                            {/* Active Withdrawal Request Voting Section */}
+                                            {!withdrawalRequestsLoading && activeWithdrawalRequest && (
+                                                <div className="mb-6">
+                                                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                                                        Đang trong thời gian vote
+                                                    </h4>
+                                                    <VotingSection
+                                                        escrow={activeWithdrawalRequest}
+                                                        userVote={userVote}
+                                                        onVote={handleVote}
+                                                        isEligible={isEligibleToVote}
+                                                        isVoting={isVoting}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Withdrawal Requests List */}
+                                            {!withdrawalRequestsLoading && (() => {
+                                                // Filter out cancelled requests - chỉ hiển thị các requests chưa bị hủy
+                                                const activeRequests = withdrawalRequests.filter(
+                                                    (req) => req.request_status !== 'cancelled'
+                                                );
+
+                                                return (
+                                                    <div className="space-y-4">
+                                                        {activeRequests.length === 0 ? (
+                                                            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-8 text-center">
+                                                                <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                                <p className="text-gray-600 dark:text-gray-400">
+                                                                    Chưa có yêu cầu rút tiền nào
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            activeRequests.map((escrow) => {
+                                                                const isCreator = user && campaign && (user._id === campaign.creator._id || user.id === campaign.creator._id);
+                                                                const userVoteForRequest =
+                                                                    escrow._id === activeWithdrawalRequest?._id ? userVote : null;
+
+                                                                return (
+                                                                    <WithdrawalRequestCard
+                                                                        key={escrow._id}
+                                                                        escrow={escrow}
+                                                                        userVote={userVoteForRequest}
+                                                                        isCreator={isCreator || false}
+                                                                    />
+                                                                );
+                                                            })
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    )}
 
                                     {activeTab === 'supporters' && (() => {
                                         // Filter donations based on search query
@@ -1294,6 +1797,24 @@ function CampaignDetails() {
                         </div>
                     </div>
                 </div>
+
+                {/* Withdrawal Request Modal */}
+                {campaign && user && (
+                    <WithdrawalRequestModal
+                        isOpen={showCreateModal}
+                        onClose={() => setShowCreateModal(false)}
+                        campaignId={campaignId}
+                        availableAmount={availableAmount}
+                        onSuccess={handleSubmitRequest}
+                        existingPendingRequests={withdrawalRequests.filter(
+                            (req) =>
+                                req.request_status === 'pending_voting' ||
+                                req.request_status === 'voting_in_progress' ||
+                                req.request_status === 'voting_completed' ||
+                                req.request_status === 'admin_approved'
+                        )}
+                    />
+                )}
             </div>
         </ProtectedRoute>
     );

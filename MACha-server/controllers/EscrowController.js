@@ -139,3 +139,64 @@ export const rejectWithdrawalRequest = async (req, res) => {
     }
 };
 
+export const getWithdrawalRequestsByCampaign = async (req, res) => {
+    try {
+        const { campaignId } = req.params;
+        const { status } = req.query;
+        
+        const escrows = await escrowService.getWithdrawalRequestsByCampaign(campaignId, status || null);
+        
+        return res.status(HTTP_STATUS.OK).json({
+            escrows,
+            count: escrows.length
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message || "Internal server error"
+        });
+    }
+};
+
+/**
+ * Lấy chi tiết một withdrawal request theo ID
+ * GET /api/escrow/:escrowId
+ */
+export const getWithdrawalRequestById = async (req, res) => {
+    try {
+        const { escrowId } = req.params;
+        
+        const escrow = await escrowService.getWithdrawalRequestById(escrowId);
+        
+        if (!escrow) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                message: "Withdrawal request not found"
+            });
+        }
+        
+        return res.status(HTTP_STATUS.OK).json({
+            escrow
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message || "Internal server error"
+        });
+    }
+};
+
+export const getVotesByEscrow = async (req, res) => {
+    try {
+        const { escrowId } = req.params;
+        
+        const votes = await escrowService.getVotesByEscrow(escrowId);
+        
+        return res.status(HTTP_STATUS.OK).json({
+            votes,
+            count: votes.length
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message || "Internal server error"
+        });
+    }
+};
+

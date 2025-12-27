@@ -45,6 +45,10 @@ export interface Campaign {
   banner_image: string;
   gallery_images?: string[];
   proof_documents_url: string;
+  milestones?: Milestone[];
+  expected_timeline?: TimelineItem[];
+  approved_by?: string;
+  rejected_by?: string;
   rejection_reason?: string;
   approved_at?: string;
   rejected_at?: string;
@@ -52,6 +56,19 @@ export interface Campaign {
   cancelled_at?: string;
   createdAt: string;
   updatedAt: string;
+  // Escrow-related fields
+  available_amount?: number; // Số tiền có thể rút (current_amount - total released amount)
+}
+
+export interface Milestone {
+  percentage: number;
+  commitment_days: number;
+  commitment_description: string;
+}
+
+export interface TimelineItem {
+  month: string;
+  description: string;
 }
 
 export interface CreateCampaignPayload {
@@ -76,6 +93,8 @@ export interface CreateCampaignPayload {
   banner_image: string;
   gallery_images?: string[];
   proof_documents_url: string;
+  milestones: Milestone[];
+  expected_timeline?: TimelineItem[];
 }
 
 export interface UpdateCampaignPayload {
@@ -175,6 +194,30 @@ export const campaignService = {
 
   async deleteCampaignUpdate(updateId: string): Promise<void> {
     await apiClient.delete(DELETE_CAMPAIGN_UPDATE_ROUTE(updateId));
+  },
+
+  async getAvailableAmount(campaignId: string): Promise<number> {
+    try {
+
+      const { escrowService } = await import('./escrow.service');
+      
+      const campaign = await this.getCampaignById(campaignId);
+      
+      const releasedRequests = await escrowService.getWithdrawalRequestsByCampaign(
+        campaignId,
+        'released'
+      );
+      
+      const totalReleased = releasedRequests.reduce(
+        (sum, request) => sum + (request.withdrawal_request_amount || 0),
+        0
+      );
+      
+      return campaign.current_amount - totalReleased;
+    } catch (error: any) {
+      console.error('Error calculating available amount:', error);
+      throw error;
+    }
   },
 };
 

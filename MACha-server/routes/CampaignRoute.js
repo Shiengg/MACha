@@ -14,6 +14,7 @@ import {
     rejectCampaign,
     createWithdrawalRequest
 } from "../controllers/CampaignController.js";
+import { getWithdrawalRequestsByCampaign } from "../controllers/EscrowController.js";
 import {
     createCampaignUpdate,
     getCampaignUpdates,
@@ -44,6 +45,7 @@ campaignRoutes.get('/:campaignId/updates', RateLimitMiddleware.rateLimitByIP(100
 campaignRoutes.delete('/updates/:updateId', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), deleteCampaignUpdate);
 
 // Withdrawal Requests routes
+campaignRoutes.get('/:campaignId/withdrawal-requests', RateLimitMiddleware.rateLimitByIP(100, 60), getWithdrawalRequestsByCampaign);
 campaignRoutes.post('/:campaignId/withdrawal-requests', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createWithdrawalRequest);
 
 /**

@@ -116,6 +116,43 @@ const campaignSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    approved_by: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null
+    },
+    rejected_by: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null
+    },
+    milestones: [{
+        percentage: {
+            type: Number,
+            required: true,
+            min: 1,
+            max: 100
+        },
+        commitment_days: {
+            type: Number,
+            required: true,
+            min: 1
+        },
+        commitment_description: {
+            type: String,
+            required: true
+        }
+    }],
+    expected_timeline: [{
+        month: {
+            type: String,
+            required: true
+        },
+        description: {
+            type: String,
+            required: true
+        }
+    }],
     total_donations_count: {
         type: Number,
         default: 0,

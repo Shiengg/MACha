@@ -5,7 +5,7 @@ import Donation from "../models/donation.js";
 import Vote from "../models/vote.js";
 import { redisClient } from "../config/redis.js";
 
-const VOTING_DURATION_DAYS = 7;
+const VOTING_DURATION_DAYS = 3;
 
 
 export const getTotalReleasedAmount = async (campaignId) => {
@@ -538,4 +538,119 @@ export const rejectWithdrawalRequest = async (escrowId, adminId, rejectionReason
         escrow: escrow,
         message: "Withdrawal request đã bị từ chối"
     };
+};
+
+
+export const getWithdrawalRequestsByCampaign = async (campaignId, status = null) => {
+    const query = { campaign: campaignId };
+    if (status) {
+        query.request_status = status;
+    }
+    
+    const escrows = await Escrow.find(query)
+        .populate("campaign", "title goal_amount current_amount creator")
+        .populate("requested_by", "username email fullname avatar")
+        .populate("admin_reviewed_by", "username fullname")
+        .sort({ createdAt: -1 });
+    
+    // Tính voting results cho mỗi escrow
+    const escrowsWithDetails = await Promise.all(
+        escrows.map(async (escrow) => {
+            const votes = await Vote.find({ escrow: escrow._id });
+            
+            let totalApproveWeight = 0;
+            let totalRejectWeight = 0;
+            let approveCount = 0;
+            let rejectCount = 0;
+            
+            votes.forEach(vote => {
+                if (vote.value === "approve") {
+                    totalApproveWeight += vote.vote_weight || 0;
+                    approveCount++;
+                } else if (vote.value === "reject") {
+                    totalRejectWeight += vote.vote_weight || 0;
+                    rejectCount++;
+                }
+            });
+            
+            const totalWeight = totalApproveWeight + totalRejectWeight;
+            const approvePercentage = totalWeight > 0 ? (totalApproveWeight / totalWeight) * 100 : 0;
+            const rejectPercentage = totalWeight > 0 ? (totalRejectWeight / totalWeight) * 100 : 0;
+            
+            return {
+                ...escrow.toObject(),
+                votingResults: {
+                    totalVotes: votes.length,
+                    approveCount,
+                    rejectCount,
+                    totalApproveWeight,
+                    totalRejectWeight,
+                    approvePercentage: approvePercentage.toFixed(2),
+                    rejectPercentage: rejectPercentage.toFixed(2)
+                }
+            };
+        })
+    );
+    
+    return escrowsWithDetails;
+};
+
+/**
+ * Lấy chi tiết một withdrawal request theo ID
+ * @param {string} escrowId - ID của escrow
+ * @returns {Promise<Object|null>} Escrow object với thông tin đầy đủ hoặc null
+ */
+export const getWithdrawalRequestById = async (escrowId) => {
+    const escrow = await Escrow.findById(escrowId)
+        .populate("campaign", "title goal_amount current_amount creator")
+        .populate("requested_by", "username email fullname avatar")
+        .populate("admin_reviewed_by", "username fullname");
+    
+    if (!escrow) {
+        return null;
+    }
+    
+    // Tính voting results
+    const votes = await Vote.find({ escrow: escrowId });
+    
+    let totalApproveWeight = 0;
+    let totalRejectWeight = 0;
+    let approveCount = 0;
+    let rejectCount = 0;
+    
+    votes.forEach(vote => {
+        if (vote.value === "approve") {
+            totalApproveWeight += vote.vote_weight || 0;
+            approveCount++;
+        } else if (vote.value === "reject") {
+            totalRejectWeight += vote.vote_weight || 0;
+            rejectCount++;
+        }
+    });
+    
+    const totalWeight = totalApproveWeight + totalRejectWeight;
+    const approvePercentage = totalWeight > 0 ? (totalApproveWeight / totalWeight) * 100 : 0;
+    const rejectPercentage = totalWeight > 0 ? (totalRejectWeight / totalWeight) * 100 : 0;
+    
+    return {
+        ...escrow.toObject(),
+        votingResults: {
+            totalVotes: votes.length,
+            approveCount,
+            rejectCount,
+            totalApproveWeight,
+            totalRejectWeight,
+            approvePercentage: approvePercentage.toFixed(2),
+            rejectPercentage: rejectPercentage.toFixed(2)
+        }
+    };
+};
+
+
+export const getVotesByEscrow = async (escrowId) => {
+    const votes = await Vote.find({ escrow: escrowId })
+        .populate("donor", "username fullname avatar")
+        .sort({ createdAt: -1 });
+    
+    return votes;
 };

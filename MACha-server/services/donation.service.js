@@ -5,23 +5,114 @@ import { redisClient } from "../config/redis.js";
 import * as trackingService from "./tracking.service.js";
 import * as escrowService from "./escrow.service.js";
 
-const checkAndCreateMilestoneWithdrawalRequest = async (campaign) => {
+const checkAndCreateMilestoneWithdrawalRequest = async (campaign, isExpired = false) => {
     const percentage = (campaign.current_amount / campaign.goal_amount) * 100;
     
-    const milestones = [50, 75, 100];
-    
-
-    const achievedMilestone = milestones
-        .sort((a, b) => b - a)
-        .find(milestone => percentage >= milestone);
-    
-    if (!achievedMilestone) {
+    // Sử dụng milestones từ campaign thay vì hardcoded
+    if (!campaign.milestones || campaign.milestones.length === 0) {
         return null;
     }
     
+    // Nếu campaign đã hết hạn, chỉ tạo request cho mốc 100% (nếu có tiền)
+    if (isExpired) {
+        const milestone100 = campaign.milestones.find(m => m.percentage === 100);
+        if (!milestone100) {
+            console.log(`[Milestone] Campaign ${campaign._id} đã hết hạn nhưng không có mốc 100%`);
+            return null;
+        }
+        
+        // Kiểm tra xem đã có request cho mốc 100% chưa
+        const existingRequest = await Escrow.findOne({
+            campaign: campaign._id,
+            milestone_percentage: 100,
+            auto_created: true,
+            request_status: {
+                $in: [
+                    "pending_voting",
+                    "voting_in_progress",
+                    "voting_completed",
+                    "admin_approved"
+                ]
+            }
+        });
+        
+        if (existingRequest) {
+            return null;
+        }
+        
+        // Tính số tiền available
+        const availableAmount = await escrowService.calculateAvailableAmount(campaign._id, campaign.current_amount);
+        
+        if (availableAmount <= 0) {
+            console.log(`[Milestone] Campaign ${campaign._id} đã hết hạn nhưng không có tiền available (${availableAmount})`);
+            return null;
+        }
+        
+        // Hủy các request của các mốc thấp hơn
+        await Escrow.updateMany(
+            {
+                campaign: campaign._id,
+                milestone_percentage: { $lt: 100 },
+                auto_created: true,
+                request_status: {
+                    $in: [
+                        "pending_voting",
+                        "voting_in_progress",
+                        "voting_completed",
+                        "admin_approved"
+                    ]
+                }
+            },
+            {
+                request_status: "cancelled"
+            }
+        );
+        
+        // Tạo request cho mốc 100%
+        const requestReason = milestone100.commitment_description 
+            ? `Tạo yêu cầu rút tiền khi campaign hết hạn. Cam kết: ${milestone100.commitment_description}`
+            : `Tạo yêu cầu rút tiền khi campaign hết hạn`;
+        
+        const withdrawalRequest = await Escrow.create({
+            campaign: campaign._id,
+            requested_by: campaign.creator,
+            withdrawal_request_amount: availableAmount,
+            request_reason: requestReason,
+            request_status: "pending_voting",
+            total_amount: campaign.current_amount,
+            remaining_amount: availableAmount,
+            auto_created: true,
+            milestone_percentage: 100
+        });
+        
+        const now = new Date();
+        const votingEndDate = new Date(now);
+        votingEndDate.setDate(votingEndDate.getDate() + 7); // 7 ngày
+        withdrawalRequest.request_status = "voting_in_progress";
+        withdrawalRequest.voting_start_date = now;
+        withdrawalRequest.voting_end_date = votingEndDate;
+        await withdrawalRequest.save();
+        
+        console.log(`[Milestone] Tạo withdrawal request tự động cho campaign ${campaign._id} khi hết hạn (mốc 100%)`);
+        
+        return withdrawalRequest;
+    }
+    
+    // Logic bình thường cho khi đạt milestone
+    // Sắp xếp milestones theo percentage giảm dần và tìm milestone đạt được
+    const milestones = campaign.milestones.map(m => m.percentage).sort((a, b) => b - a);
+    const achievedMilestonePercentage = milestones.find(milestone => percentage >= milestone);
+    
+    if (!achievedMilestonePercentage) {
+        return null;
+    }
+    
+    // Tìm milestone object để lấy commitment_description
+    const achievedMilestone = campaign.milestones.find(m => m.percentage === achievedMilestonePercentage);
+    
     const existingRequest = await Escrow.findOne({
         campaign: campaign._id,
-        milestone_percentage: achievedMilestone,
+        milestone_percentage: achievedMilestonePercentage,
         auto_created: true,
         request_status: {
             $in: [
@@ -40,7 +131,7 @@ const checkAndCreateMilestoneWithdrawalRequest = async (campaign) => {
     const lowerMilestoneRequests = await Escrow.updateMany(
         {
             campaign: campaign._id,
-            milestone_percentage: { $lt: achievedMilestone },
+            milestone_percentage: { $lt: achievedMilestonePercentage },
             auto_created: true,
             request_status: {
                 $in: [
@@ -57,7 +148,7 @@ const checkAndCreateMilestoneWithdrawalRequest = async (campaign) => {
     );
     
     if (lowerMilestoneRequests.modifiedCount > 0) {
-        console.log(`[Milestone] Đã hủy ${lowerMilestoneRequests.modifiedCount} withdrawal request(s) có milestone thấp hơn ${achievedMilestone}% cho campaign ${campaign._id}`);
+        console.log(`[Milestone] Đã hủy ${lowerMilestoneRequests.modifiedCount} withdrawal request(s) có milestone thấp hơn ${achievedMilestonePercentage}% cho campaign ${campaign._id}`);
     }
     
     // Tính số tiền available (current_amount - tổng các escrow đã released)
@@ -69,16 +160,21 @@ const checkAndCreateMilestoneWithdrawalRequest = async (campaign) => {
         return null;
     }
     
+    // Tạo request reason với commitment description
+    const requestReason = achievedMilestone.commitment_description 
+        ? `Tạo yêu cầu rút tiền khi campaign đạt ${achievedMilestonePercentage}% mục tiêu. Cam kết: ${achievedMilestone.commitment_description}`
+        : `Tạo yêu cầu rút tiền khi campaign đạt ${achievedMilestonePercentage}% mục tiêu`;
+    
     const withdrawalRequest = await Escrow.create({
         campaign: campaign._id,
         requested_by: campaign.creator,
         withdrawal_request_amount: availableAmount,
-        request_reason: `Tạo yêu cầu rút tiền khi campaign đạt ${achievedMilestone}% mục tiêu`,
+        request_reason: requestReason,
         request_status: "pending_voting",
         total_amount: campaign.current_amount,
         remaining_amount: availableAmount,
         auto_created: true,
-        milestone_percentage: achievedMilestone
+        milestone_percentage: achievedMilestonePercentage
     });
     
     const now = new Date();
@@ -89,7 +185,7 @@ const checkAndCreateMilestoneWithdrawalRequest = async (campaign) => {
     withdrawalRequest.voting_end_date = votingEndDate;
     await withdrawalRequest.save();
     
-    console.log(`[Milestone] Tạo withdrawal request tự động cho campaign ${campaign._id} khi đạt ${achievedMilestone}% mục tiêu`);
+    console.log(`[Milestone] Tạo withdrawal request tự động cho campaign ${campaign._id} khi đạt ${achievedMilestonePercentage}% mục tiêu`);
     
     return withdrawalRequest;
 };
