@@ -156,27 +156,102 @@ export default function AdminWithdrawalRequests() {
   };
 
   const handleReject = async (escrowId: string) => {
-    const { value: reason } = await Swal.fire({
+    const result = await Swal.fire({
       title: 'Từ chối yêu cầu rút tiền',
-      input: 'textarea',
-      inputLabel: 'Lý do từ chối',
-      inputPlaceholder: 'Nhập lý do từ chối...',
-      inputAttributes: {
-        'aria-label': 'Nhập lý do từ chối',
-      },
+      html: `
+        <div style="text-align: left; margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">Lý do từ chối</label>
+          <textarea id="rejection-reason" placeholder="Nhập lý do từ chối..." style="width: 100%; min-height: 100px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; resize: vertical;"></textarea>
+          <div id="reason-error" style="color: #dc2626; font-size: 14px; margin-top: 5px; display: none;"></div>
+        </div>
+        <div style="text-align: left; margin-bottom: 15px; margin-top: 20px;">
+          <label style="display: flex; align-items: center; cursor: pointer; color: #374151;">
+            <input type="checkbox" id="terms-checkbox-reject" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+            <span>Tôi cam kết chịu trách nhiệm với quyết định của mình</span>
+          </label>
+        </div>
+        <div style="text-align: center; margin-top: 10px;">
+          <a href="/terms" target="_blank" style="color: #2563eb; text-decoration: underline; font-size: 14px;">
+            Xem điều khoản cam kết
+          </a>
+        </div>
+      `,
       showCancelButton: true,
       confirmButtonColor: '#dc2626',
       cancelButtonColor: '#6b7280',
       confirmButtonText: 'Từ chối',
       cancelButtonText: 'Hủy',
-      inputValidator: (value) => {
-        if (!value || value.trim().length < 10) {
-          return 'Bạn cần nhập lý do từ chối (ít nhất 10 ký tự)!';
+      didOpen: () => {
+        const checkbox = document.getElementById('terms-checkbox-reject') as HTMLInputElement;
+        const reasonInput = document.getElementById('rejection-reason') as HTMLTextAreaElement;
+        const confirmButton = Swal.getConfirmButton();
+        const errorDiv = document.getElementById('reason-error');
+        
+        // Disable button ban đầu
+        if (confirmButton) {
+          confirmButton.disabled = true;
+          confirmButton.style.opacity = '0.5';
+          confirmButton.style.cursor = 'not-allowed';
+        }
+        
+        const validateAndUpdateButton = () => {
+          const reason = reasonInput?.value?.trim() || '';
+          const isCheckboxChecked = checkbox?.checked || false;
+          const isValid = reason.length >= 10 && isCheckboxChecked;
+          
+          if (confirmButton) {
+            if (isValid) {
+              confirmButton.disabled = false;
+              confirmButton.style.opacity = '1';
+              confirmButton.style.cursor = 'pointer';
+            } else {
+              confirmButton.disabled = true;
+              confirmButton.style.opacity = '0.5';
+              confirmButton.style.cursor = 'not-allowed';
+            }
+          }
+          
+          // Update error message
+          if (errorDiv) {
+            if (reason.length > 0 && reason.length < 10) {
+              errorDiv.textContent = 'Lý do từ chối phải có ít nhất 10 ký tự';
+              errorDiv.style.display = 'block';
+            } else {
+              errorDiv.style.display = 'none';
+            }
+          }
+        };
+        
+        // Add event listeners
+        if (checkbox) {
+          checkbox.addEventListener('change', validateAndUpdateButton);
+        }
+        if (reasonInput) {
+          reasonInput.addEventListener('input', validateAndUpdateButton);
         }
       },
+      preConfirm: () => {
+        const checkbox = document.getElementById('terms-checkbox-reject') as HTMLInputElement;
+        const reasonInput = document.getElementById('rejection-reason') as HTMLTextAreaElement;
+        const reason = reasonInput?.value?.trim() || '';
+        
+        if (!checkbox || !checkbox.checked) {
+          Swal.showValidationMessage('Vui lòng xác nhận cam kết trách nhiệm');
+          return false;
+        }
+        
+        if (!reason || reason.length < 10) {
+          Swal.showValidationMessage('Vui lòng nhập lý do từ chối (ít nhất 10 ký tự)');
+          return false;
+        }
+        
+        return reason;
+      },
+      allowOutsideClick: () => !Swal.isLoading(),
     });
 
-    if (reason) {
+    if (result.isConfirmed && result.value) {
+      const reason = result.value;
       try {
         setIsProcessing(true);
         await rejectWithdrawalRequest(escrowId, reason);

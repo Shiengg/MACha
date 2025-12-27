@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { getAllCampaigns, approveCampaign, rejectCampaign, Campaign } from '@/services/admin/campaign.service';
 import Swal from 'sweetalert2';
 
 export default function AdminCampaignApproval() {
+  const router = useRouter();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,6 +62,10 @@ export default function AdminCampaignApproval() {
         Swal.fire('Error', error?.response?.data?.message || 'Failed to approve campaign', 'error');
       }
     }
+  };
+
+  const handleViewDetails = (campaignId: string) => {
+    router.push(`/admin/campaigns/${campaignId}`);
   };
 
   const handleReject = async (id: string) => {
@@ -356,6 +362,7 @@ export default function AdminCampaignApproval() {
                               </>
                             ) : (
                               <button
+                                onClick={() => handleViewDetails(campaign._id)}
                                 className="px-3 py-1 bg-blue-900/30 text-blue-400 rounded-lg text-sm hover:bg-blue-900/50 transition-all"
                               >
                                 Xem chi tiết

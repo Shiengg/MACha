@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { getAllUsers, User } from '@/services/admin/user.service';
 import Swal from 'sweetalert2';
 
 export default function AdminUsers() {
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -14,6 +16,8 @@ export default function AdminUsers() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -23,6 +27,30 @@ export default function AdminUsers() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, roleFilter, sortBy]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      Object.entries(menuRefs.current).forEach(([userId, ref]) => {
+        if (ref && !ref.contains(target) && openMenuId === userId) {
+          setOpenMenuId(null);
+        }
+      });
+    };
+
+    if (openMenuId) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [openMenuId]);
+
+  const handleViewDetails = (userId: string) => {
+    setOpenMenuId(null);
+    router.push(`/admin/users/${userId}`);
+  };
 
   const fetchUsers = async () => {
     try {
@@ -265,11 +293,33 @@ export default function AdminUsers() {
                         </td>
                         <td className="px-6 py-4">{getKYCStatusBadge(user.kyc_status)}</td>
                         <td className="px-6 py-4">
-                          <button className="text-gray-400 hover:text-white transition-all">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                            </svg>
-                          </button>
+                          <div className="relative" ref={(el) => { menuRefs.current[user._id] = el; }}>
+                            <button
+                              onClick={() => setOpenMenuId(openMenuId === user._id ? null : user._id)}
+                              className="text-gray-400 hover:text-white transition-all"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                              </svg>
+                            </button>
+                            {openMenuId === user._id && (
+                              <div 
+                                className="absolute right-0 mt-2 w-48 bg-[#1a1f2e] border border-gray-700 rounded-lg shadow-lg z-50"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewDetails(user._id);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-700 transition-all rounded-lg"
+                                >
+                                  Xem chi tiết
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
