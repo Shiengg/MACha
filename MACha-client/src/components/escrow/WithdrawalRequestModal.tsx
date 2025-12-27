@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { escrowService, Escrow } from '@/services/escrow.service';
+import { formatEscrowError, formatCurrencyVND } from '@/utils/escrow.utils';
 import Swal from 'sweetalert2';
 
 interface WithdrawalRequestModalProps {
@@ -87,12 +88,6 @@ export default function WithdrawalRequestModal({
     return () => document.removeEventListener('keydown', handleEsc);
   }, [isOpen, isSubmitting, onClose]);
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(amount);
-  };
 
   const validateForm = (): boolean => {
     const newErrors: typeof errors = {};
@@ -103,7 +98,7 @@ export default function WithdrawalRequestModal({
     if (!amount || amountValue <= 0) {
       newErrors.amount = 'Số tiền phải lớn hơn 0';
     } else if (amountValue > availableAmount) {
-      newErrors.amount = `Số tiền không được vượt quá số tiền có sẵn (${formatAmount(availableAmount)})`;
+      newErrors.amount = `Số tiền không được vượt quá số tiền có sẵn (${formatCurrencyVND(availableAmount)})`;
     }
 
     // Validate reason
@@ -179,13 +174,15 @@ export default function WithdrawalRequestModal({
         request_reason: reason.trim(),
       });
 
-      // Success
+      // Success toast
       await Swal.fire({
         icon: 'success',
         title: 'Thành công!',
-        text: 'Yêu cầu rút tiền đã được tạo thành công',
+        text: 'Yêu cầu rút tiền đã được tạo thành công. Yêu cầu sẽ được gửi đến các donors để vote.',
         confirmButtonText: 'Đóng',
         confirmButtonColor: '#2563eb',
+        timer: 3000,
+        timerProgressBar: true,
       });
 
       // Call success callback
@@ -198,23 +195,23 @@ export default function WithdrawalRequestModal({
     } catch (error: any) {
       console.error('Error creating withdrawal request:', error);
 
-      // Extract error message
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        'Không thể tạo yêu cầu rút tiền. Vui lòng thử lại sau.';
+      // Format error message using utility
+      const errorMessage = formatEscrowError(error);
+      const errorCode = error?.response?.data?.error;
 
-      // Check if it's a validation error with availableAmount
+      // Handle specific error cases
       if (error?.response?.data?.availableAmount !== undefined) {
+        const availableAmountFromError = error.response.data.availableAmount;
         setErrors({
-          amount: `Số tiền không được vượt quá số tiền có sẵn (${formatAmount(error.response.data.availableAmount)})`,
+          amount: `Số tiền không được vượt quá số tiền có sẵn (${formatCurrencyVND(availableAmountFromError)})`,
         });
-      } else if (error?.response?.data?.error === 'PENDING_REQUEST_EXISTS') {
+      } else if (errorCode === 'PENDING_REQUEST_EXISTS' || errorCode === 'INSUFFICIENT_FUNDS') {
+        // These errors should be shown in form, not as toast
         setErrors({
           general: errorMessage,
         });
       } else {
-        // Show error alert
+        // Show error toast for other errors
         await Swal.fire({
           icon: 'error',
           title: 'Lỗi',
@@ -292,7 +289,7 @@ export default function WithdrawalRequestModal({
                   Số tiền có sẵn để rút
                 </p>
                                                     <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-                                                        {formatAmount(availableAmount || 0)}
+                                                        {formatCurrencyVND(availableAmount || 0)}
                                                     </p>
               </div>
               <CheckCircle2 className="w-8 h-8 text-green-500 dark:text-green-400" />
@@ -330,7 +327,7 @@ export default function WithdrawalRequestModal({
             {amountValue > 0 && !errors.amount && (
               <div className="mt-2 space-y-1">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Số tiền: <span className="font-semibold">{formatAmount(amountValue)}</span>
+                  Số tiền: <span className="font-semibold">{formatCurrencyVND(amountValue)}</span>
                 </p>
                 {availableAmount > 0 && (
                   <div className="flex items-center gap-2">

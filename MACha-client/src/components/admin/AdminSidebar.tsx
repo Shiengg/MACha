@@ -19,6 +19,7 @@ export default function AdminSidebar() {
     { icon: '👥', label: 'Quản lý người dùng', href: '/admin/users' },
     { icon: '🚀', label: 'Quản lý campaign', href: '/admin/campaigns' },
     { icon: '✓', label: 'Duyệt người dùng', href: '/admin/kyc' },
+    { icon: '💸', label: 'Yêu cầu rút tiền', href: '/admin/withdrawal-requests' },
     { icon: '⚙️', label: 'Cài đặt', href: '/admin/settings' },
   ];
 

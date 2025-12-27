@@ -452,50 +452,18 @@ export const approveWithdrawalRequest = async (escrowId, adminId) => {
     
     const now = new Date();
     
+    // Chỉ set status thành admin_approved, chưa release tiền
+    // Owner sẽ cần xem và release sau đó
     escrow.request_status = "admin_approved";
     escrow.admin_reviewed_by = adminId;
     escrow.admin_reviewed_at = now;
+    escrow.approved_at = now;
     await escrow.save();
-    
-    // TODO: Tích hợp payment gateway để chuyển tiền
-    // SePay hiện tại chỉ hỗ trợ nhận tiền từ donor, không có API để transfer money
-    // Có thể cần tích hợp bank transfer API hoặc payment gateway khác
-    // Tạm thời, giả sử payment thành công và update status thành "released"
-    
-    // Simulate payment success (TODO: Replace with actual payment gateway integration)
-    try {
-        // TODO: Implement actual payment transfer logic here
-        // Example:
-        // const paymentResult = await transferMoney({
-        //     recipientBankAccount: campaign.creator.bank_account,
-        //     amount: escrow.withdrawal_request_amount,
-        //     ...
-        // });
-        
-        // If payment successful:
-        escrow.request_status = "released";
-        escrow.released_at = new Date();
-        await escrow.save();
-        
-        // Update campaign: trừ current_amount (hoặc maintain separate released_amount field)
-        // Note: campaign.current_amount không nên trừ vì nó là tổng số tiền đã nhận
-        // Có thể cần thêm field released_amount vào campaign model
-        
-    } catch (paymentError) {
-        // Nếu payment failed, giữ nguyên status "admin_approved"
-        console.error('Payment transfer failed:', paymentError);
-        return {
-            success: false,
-            error: "PAYMENT_FAILED",
-            message: "Chuyển tiền thất bại. Vui lòng thử lại sau.",
-            escrow: escrow
-        };
-    }
     
     return {
         success: true,
         escrow: escrow,
-        message: "Withdrawal request đã được approve và tiền đã được chuyển"
+        message: "Withdrawal request đã được admin duyệt. Chờ owner xem và release tiền."
     };
 };
 
