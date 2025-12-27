@@ -10,6 +10,8 @@ import { connectRedis } from './config/redis.js';
 import { setupSwagger } from './docs/swagger.js';
 import * as routes from './routes/index.js';
 import './jobs/cleanupUnverifiedUsers.job.js';
+import './jobs/finalizeVotingPeriods.job.js';
+import './jobs/processExpiredCampaigns.job.js';
 
 import { initSubscribers } from './subscribers/initSubscriber.js';
 import User from './models/user.js';
@@ -51,6 +53,8 @@ app.use("/api/comments", routes.commentRoutes);
 app.use("/api/likes", routes.likeRoutes);
 app.use("/api/campaigns", routes.campaignRoutes);
 app.use("/api/donations", routes.donationRoutes);
+app.use("/api/escrow", routes.escrowRoutes);
+app.use("/api/admin", routes.adminEscrowRoutes);
 app.use("/api/notifications", routes.notificationRoute);
 app.use("/api/hashtags", routes.hashtagRoutes);
 app.use("/api/conversations", routes.conversationRoutes);

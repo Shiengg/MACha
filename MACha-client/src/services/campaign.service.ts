@@ -9,6 +9,9 @@ import {
   GET_CAMPAIGNS_BY_CATEGORY_ROUTE,
   GET_ACTIVE_CATEGORIES_ROUTE,
   GET_CAMPAIGNS_BY_CREATOR_ROUTE,
+  CREATE_CAMPAIGN_UPDATE_ROUTE,
+  GET_CAMPAIGN_UPDATES_ROUTE,
+  DELETE_CAMPAIGN_UPDATE_ROUTE,
 } from '@/constants/api';
 
 export interface Campaign {
@@ -42,6 +45,10 @@ export interface Campaign {
   banner_image: string;
   gallery_images?: string[];
   proof_documents_url: string;
+  milestones?: Milestone[];
+  expected_timeline?: TimelineItem[];
+  approved_by?: string;
+  rejected_by?: string;
   rejection_reason?: string;
   approved_at?: string;
   rejected_at?: string;
@@ -49,6 +56,19 @@ export interface Campaign {
   cancelled_at?: string;
   createdAt: string;
   updatedAt: string;
+  // Escrow-related fields
+  available_amount?: number; // Số tiền có thể rút (current_amount - total released amount)
+}
+
+export interface Milestone {
+  percentage: number;
+  commitment_days: number;
+  commitment_description: string;
+}
+
+export interface TimelineItem {
+  month: string;
+  description: string;
 }
 
 export interface CreateCampaignPayload {
@@ -73,6 +93,8 @@ export interface CreateCampaignPayload {
   banner_image: string;
   gallery_images?: string[];
   proof_documents_url: string;
+  milestones: Milestone[];
+  expected_timeline?: TimelineItem[];
 }
 
 export interface UpdateCampaignPayload {
@@ -89,6 +111,26 @@ export interface UpdateCampaignPayload {
 export interface CategoryWithCount {
   category: string;
   count: number;
+}
+
+export interface CampaignUpdate {
+  _id: string;
+  campaign: string;
+  creator: {
+    _id: string;
+    username: string;
+    fullname?: string;
+    avatar_url?: string;
+  };
+  content?: string;
+  image_url?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCampaignUpdatePayload {
+  content?: string;
+  image_url?: string;
 }
 
 export const campaignService = {
@@ -138,6 +180,44 @@ export const campaignService = {
   async cancelCampaign(id: string, reason: string): Promise<Campaign> {
     const response = await apiClient.post(CANCEL_CAMPAIGN_ROUTE(id), { reason });
     return response.data.campaign;
+  },
+
+  async createCampaignUpdate(campaignId: string, payload: CreateCampaignUpdatePayload): Promise<CampaignUpdate> {
+    const response = await apiClient.post(CREATE_CAMPAIGN_UPDATE_ROUTE(campaignId), payload);
+    return response.data.update;
+  },
+
+  async getCampaignUpdates(campaignId: string): Promise<CampaignUpdate[]> {
+    const response = await apiClient.get(GET_CAMPAIGN_UPDATES_ROUTE(campaignId));
+    return response.data.updates;
+  },
+
+  async deleteCampaignUpdate(updateId: string): Promise<void> {
+    await apiClient.delete(DELETE_CAMPAIGN_UPDATE_ROUTE(updateId));
+  },
+
+  async getAvailableAmount(campaignId: string): Promise<number> {
+    try {
+
+      const { escrowService } = await import('./escrow.service');
+      
+      const campaign = await this.getCampaignById(campaignId);
+      
+      const releasedRequests = await escrowService.getWithdrawalRequestsByCampaign(
+        campaignId,
+        'released'
+      );
+      
+      const totalReleased = releasedRequests.reduce(
+        (sum, request) => sum + (request.withdrawal_request_amount || 0),
+        0
+      );
+      
+      return campaign.current_amount - totalReleased;
+    } catch (error: any) {
+      console.error('Error calculating available amount:', error);
+      throw error;
+    }
   },
 };
 

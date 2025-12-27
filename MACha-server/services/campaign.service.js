@@ -329,6 +329,7 @@ export const approveCampaign = async (campaignId, adminId) => {
 
     campaign.status = 'active';
     campaign.approved_at = new Date();
+    campaign.approved_by = adminId;
     await campaign.save();
 
     await Promise.all([
@@ -367,6 +368,7 @@ export const rejectCampaign = async (campaignId, adminId, reason) => {
     campaign.status = 'rejected';
     campaign.rejection_reason = reason;
     campaign.rejected_at = new Date();
+    campaign.rejected_by = adminId;
     await campaign.save();
 
     await Promise.all([
@@ -377,4 +379,154 @@ export const rejectCampaign = async (campaignId, adminId, reason) => {
     ]);
 
     return { success: true, campaign };
+}
+
+export const processExpiredCampaigns = async () => {
+    const now = new Date();
+    
+    // Tìm các campaign đã hết hạn và vẫn đang active
+    const expiredCampaigns = await Campaign.find({
+        status: 'active',
+        end_date: { $lte: now },
+        current_amount: { $gt: 0 } // Chỉ xử lý campaign có tiền
+    }).populate('creator', 'username');
+    
+    const results = [];
+    
+    for (const campaign of expiredCampaigns) {
+        try {
+            // Kiểm tra xem đã có withdrawal request cho mốc 100% chưa
+            // Kiểm tra cả các request đang active (không bao gồm cancelled và admin_rejected)
+            // Vì nếu đã có request đang active thì không cần tạo lại
+            const Escrow = (await import('../models/escrow.js')).default;
+            const existing100PercentRequest = await Escrow.findOne({
+                campaign: campaign._id,
+                milestone_percentage: 100,
+                auto_created: true,
+                request_status: {
+                    $in: [
+                        "pending_voting",
+                        "voting_in_progress",
+                        "voting_completed",
+                        "admin_approved",
+                        "released"
+                    ]
+                }
+            });
+            
+            if (existing100PercentRequest) {
+                console.log(`[Expired Campaign] Campaign ${campaign._id} đã có withdrawal request cho mốc 100% (status: ${existing100PercentRequest.request_status}), bỏ qua`);
+                continue;
+            }
+            
+            // Kiểm tra thêm: nếu đã có request cho mốc 100% dù ở bất kỳ trạng thái nào (trừ cancelled)
+            // để tránh tạo duplicate nếu request đã bị reject nhưng vẫn còn trong DB
+            const any100PercentRequest = await Escrow.findOne({
+                campaign: campaign._id,
+                milestone_percentage: 100,
+                auto_created: true,
+                request_status: { $ne: "cancelled" } // Không tính cancelled
+            });
+            
+            if (any100PercentRequest && any100PercentRequest.request_status !== "admin_rejected") {
+                // Nếu có request đang active hoặc đã released, không tạo lại
+                console.log(`[Expired Campaign] Campaign ${campaign._id} đã có withdrawal request cho mốc 100% (status: ${any100PercentRequest.request_status}), bỏ qua`);
+                continue;
+            }
+            
+            // Tạo withdrawal request cho mốc 100% nếu campaign có milestones
+            if (campaign.milestones && campaign.milestones.length > 0) {
+                const milestone100 = campaign.milestones.find(m => m.percentage === 100);
+                
+                if (milestone100) {
+                    const { calculateAvailableAmount } = await import('./escrow.service.js');
+                    const availableAmount = await calculateAvailableAmount(campaign._id, campaign.current_amount);
+                    
+                    if (availableAmount > 0) {
+                        // Hủy các request của các mốc thấp hơn
+                        await Escrow.updateMany(
+                            {
+                                campaign: campaign._id,
+                                milestone_percentage: { $lt: 100 },
+                                auto_created: true,
+                                request_status: {
+                                    $in: [
+                                        "pending_voting",
+                                        "voting_in_progress",
+                                        "voting_completed",
+                                        "admin_approved"
+                                    ]
+                                }
+                            },
+                            {
+                                request_status: "cancelled"
+                            }
+                        );
+                        
+                        // Tạo request cho mốc 100%
+                        const requestReason = milestone100.commitment_description 
+                            ? `Tạo yêu cầu rút tiền khi campaign hết hạn. Cam kết: ${milestone100.commitment_description}`
+                            : `Tạo yêu cầu rút tiền khi campaign hết hạn`;
+                        
+                        const withdrawalRequest = await Escrow.create({
+                            campaign: campaign._id,
+                            requested_by: campaign.creator._id || campaign.creator,
+                            withdrawal_request_amount: availableAmount,
+                            request_reason: requestReason,
+                            request_status: "pending_voting",
+                            total_amount: campaign.current_amount,
+                            remaining_amount: availableAmount,
+                            auto_created: true,
+                            milestone_percentage: 100
+                        });
+                        
+                        const votingEndDate = new Date(now);
+                        votingEndDate.setDate(votingEndDate.getDate() + 7); // 7 ngày
+                        withdrawalRequest.request_status = "voting_in_progress";
+                        withdrawalRequest.voting_start_date = now;
+                        withdrawalRequest.voting_end_date = votingEndDate;
+                        await withdrawalRequest.save();
+                        
+                        console.log(`[Expired Campaign] Tạo withdrawal request tự động cho campaign ${campaign._id} khi hết hạn (mốc 100%)`);
+                        
+                        results.push({
+                            campaignId: campaign._id.toString(),
+                            success: true,
+                            withdrawalRequestId: withdrawalRequest._id.toString()
+                        });
+                    } else {
+                        console.log(`[Expired Campaign] Campaign ${campaign._id} đã hết hạn nhưng không có tiền available`);
+                        results.push({
+                            campaignId: campaign._id.toString(),
+                            success: false,
+                            error: 'NO_AVAILABLE_AMOUNT'
+                        });
+                    }
+                } else {
+                    console.log(`[Expired Campaign] Campaign ${campaign._id} đã hết hạn nhưng không có mốc 100%`);
+                    results.push({
+                        campaignId: campaign._id.toString(),
+                        success: false,
+                        error: 'NO_100_PERCENT_MILESTONE'
+                    });
+                }
+            } else {
+                console.log(`[Expired Campaign] Campaign ${campaign._id} đã hết hạn nhưng không có milestones`);
+                results.push({
+                    campaignId: campaign._id.toString(),
+                    success: false,
+                    error: 'NO_MILESTONES'
+                });
+            }
+        } catch (error) {
+            console.error(`[Expired Campaign] Error processing campaign ${campaign._id}:`, error);
+            results.push({
+                campaignId: campaign._id.toString(),
+                success: false,
+                error: error.message
+            });
+        }
+    }
+    
+    return results;
 }

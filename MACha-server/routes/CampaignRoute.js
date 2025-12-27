@@ -11,8 +11,15 @@ import {
     cancelCampaign,
     getPendingCampaigns,
     approveCampaign,
-    rejectCampaign
+    rejectCampaign,
+    createWithdrawalRequest
 } from "../controllers/CampaignController.js";
+import { getWithdrawalRequestsByCampaign } from "../controllers/EscrowController.js";
+import {
+    createCampaignUpdate,
+    getCampaignUpdates,
+    deleteCampaignUpdate
+} from "../controllers/CampaignUpdateController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { checkRole } from "../middlewares/checkRole.js";
 import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
@@ -31,6 +38,15 @@ campaignRoutes.delete('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(
 campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), cancelCampaign);
 campaignRoutes.post('/:id/approve', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), approveCampaign);
 campaignRoutes.post('/:id/reject', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), rejectCampaign);
+
+// Campaign Updates routes
+campaignRoutes.post('/:campaignId/updates', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createCampaignUpdate);
+campaignRoutes.get('/:campaignId/updates', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignUpdates);
+campaignRoutes.delete('/updates/:updateId', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), deleteCampaignUpdate);
+
+// Withdrawal Requests routes
+campaignRoutes.get('/:campaignId/withdrawal-requests', RateLimitMiddleware.rateLimitByIP(100, 60), getWithdrawalRequestsByCampaign);
+campaignRoutes.post('/:campaignId/withdrawal-requests', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createWithdrawalRequest);
 
 /**
  * @swagger

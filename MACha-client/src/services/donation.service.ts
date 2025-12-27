@@ -4,6 +4,7 @@ import { GET_DONATIONS_BY_CAMPAIGN_ROUTE } from '@/constants/api';
 export interface Donor {
   _id: string;
   username: string;
+  fullname?: string;
   avatar_url?: string;
 }
 

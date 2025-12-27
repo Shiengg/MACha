@@ -56,6 +56,9 @@ export const GET_ACTIVE_CATEGORIES_ROUTE = `${CAMPAIGN_ROUTE}/categories/active`
 export const GET_PENDING_CAMPAIGNS_ROUTE = `${CAMPAIGN_ROUTE}/pending`;
 export const APPROVE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/approve`;
 export const REJECT_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/reject`;
+export const CREATE_CAMPAIGN_UPDATE_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/updates`;
+export const GET_CAMPAIGN_UPDATES_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/updates`;
+export const DELETE_CAMPAIGN_UPDATE_ROUTE = (updateId: string) => `${CAMPAIGN_ROUTE}/updates/${updateId}`;
 
 export const KYC_ROUTE = `${USER_ROUTE}/kyc`;
 export const GET_PENDING_KYC_ROUTE = `${KYC_ROUTE}/pending`;
@@ -80,3 +83,15 @@ export const GET_CONVERSATIONS_ROUTE = `${CONVERSATION_ROUTE}`;
 export const MESSAGE_ROUTE = "api/messages";
 export const SEND_MESSAGE_ROUTE = (conversationId: string) => `${MESSAGE_ROUTE}/${conversationId}`;
 export const GET_MESSAGES_ROUTE = (conversationId: string) => `${MESSAGE_ROUTE}/${conversationId}`;
+
+export const ESCROW_ROUTE = "api/escrow";
+export const CREATE_WITHDRAWAL_REQUEST_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/withdrawal-requests`;
+export const GET_WITHDRAWAL_REQUESTS_BY_CAMPAIGN_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/withdrawal-requests`;
+export const GET_WITHDRAWAL_REQUEST_BY_ID_ROUTE = (escrowId: string) => `${ESCROW_ROUTE}/${escrowId}`;
+export const SUBMIT_VOTE_ROUTE = (escrowId: string) => `${ESCROW_ROUTE}/${escrowId}/vote`;
+export const GET_VOTES_BY_ESCROW_ROUTE = (escrowId: string) => `${ESCROW_ROUTE}/${escrowId}/votes`;
+
+export const ADMIN_ESCROW_ROUTE = "api/admin";
+export const ADMIN_GET_WITHDRAWAL_REQUESTS_ROUTE = `${ADMIN_ESCROW_ROUTE}/withdrawal-requests`;
+export const ADMIN_APPROVE_WITHDRAWAL_REQUEST_ROUTE = (escrowId: string) => `${ADMIN_ESCROW_ROUTE}/withdrawal-requests/${escrowId}/approve`;
+export const ADMIN_REJECT_WITHDRAWAL_REQUEST_ROUTE = (escrowId: string) => `${ADMIN_ESCROW_ROUTE}/withdrawal-requests/${escrowId}/reject`;

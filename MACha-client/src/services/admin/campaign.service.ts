@@ -6,6 +6,7 @@ import {
   APPROVE_CAMPAIGN_ROUTE,
   REJECT_CAMPAIGN_ROUTE,
 } from '@/constants/api';
+import { Milestone } from '../campaign.service';
 
 export interface Campaign {
   _id: string;
@@ -28,6 +29,9 @@ export interface Campaign {
   rejection_reason?: string;
   approved_at?: string;
   rejected_at?: string;
+  milestones?: Milestone[];
+  approved_by?: string;
+  rejected_by?: string;
   createdAt: string;
   updatedAt: string;
 }
