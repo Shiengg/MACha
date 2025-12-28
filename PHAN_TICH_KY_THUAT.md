@@ -10,7 +10,7 @@ MACha là một nền tảng crowdfunding (gây quỹ cộng đồng) với hệ
 
 ### 2.1. Kiến trúc tổng thể
 
-Hệ thống được xây dựng theo mô hình **Microservices Architecture** với các thành phần chính:
+Hệ thống được xây dựng theo mô hình **Client-Server Architecture** với các thành phần chính:
 
 - **Backend Server (Node.js/Express)**: Xử lý API, business logic
 - **Worker Process**: Xử lý background jobs (email, notifications)
@@ -26,11 +26,8 @@ Hệ thống được xây dựng theo mô hình **Microservices Architecture** 
 **Mô tả**: Hệ thống cho phép creator tạo withdrawal request để rút tiền từ campaign. Các nhà tài trợ (donors) sẽ bỏ phiếu để quyết định có cho phép rút tiền hay không.
 
 **Thuật toán Weighted Voting**:
-- Mỗi donor có quyền bỏ phiếu dựa trên số tiền đã quyên góp
+- Mỗi donor khi donate có quyền bỏ phiếu.
 - Vote weight = Tổng số tiền đã donate của donor
-- Kết quả được tính dựa trên tỷ lệ phần trăm của tổng vote weight:
-  - `approvePercentage = (totalApproveWeight / totalWeight) * 100`
-  - `rejectPercentage = (totalRejectWeight / totalWeight) * 100`
 - Ngưỡng chấp nhận: ≥ 50% approve weight
 
 **Implementation**:
@@ -62,11 +59,11 @@ export const submitVote = async (escrowId, userId, value) => {
 
 **Nhược điểm**:
 - Có thể bị ảnh hưởng bởi một vài donor lớn
-- Cần có cơ chế bảo vệ chống manipulation
+- Cần có cơ chế bảo vệ chống manipulation.
 
 #### 2.2.2. Hệ thống Milestone tự động
 
-**Mô tả**: Khi campaign đạt đến các mốc phần trăm nhất định (ví dụ: 25%, 50%, 75%, 100%), hệ thống tự động tạo withdrawal request.
+**Mô tả**: Khi campaign đạt đến các mốc phần trăm nhất định (do creator khai báo khi tạo campaign), hệ thống tự động tạo withdrawal request.
 
 **Thuật toán**:
 1. Khi có donation mới, tính `percentage = (current_amount / goal_amount) * 100`
@@ -466,14 +463,12 @@ io.on('connection', async (socket) => {
 - CORS configuration
 - SQL/NoSQL injection prevention
 - XSS prevention
-- CSRF protection
 
 **Performance Optimization**:
 - Database indexing
 - Query optimization
 - Caching strategies
 - Connection pooling
-- Load balancing concepts
 
 ### 3.3. Độ phức tạp về maintenance
 
@@ -488,10 +483,6 @@ io.on('connection', async (socket) => {
 - Cần quản lý version updates, security patches
 
 **Testing Complexity**:
-- Unit tests cho business logic
-- Integration tests cho API endpoints
-- E2E tests cho user flows
-- Load testing cho performance
 
 ---
 
@@ -542,30 +533,6 @@ io.on('connection', async (socket) => {
 
 ### 4.2. Đánh giá hiệu năng (Performance Evaluation)
 
-#### 4.2.1. Metrics
-
-**Response Time**:
-- API endpoints: < 200ms (với cache)
-- Database queries: < 100ms (với indexes)
-- Real-time events: < 50ms (Socket.IO)
-
-**Throughput**:
-- API requests: ~1000 req/s (với load balancing)
-- WebSocket connections: ~10,000 concurrent
-- Background jobs: ~100 jobs/s
-
-**Cache Hit Rate**:
-- Target: > 80% cho frequently accessed data
-- Campaigns list: ~90% hit rate
-- Campaign detail: ~85% hit rate
-
-**Database Performance**:
-- Query time: < 100ms (với indexes)
-- Connection pool: 10-20 connections
-- Index coverage: 100% cho frequently queried fields
-
-#### 4.2.2. Load Testing
-
 **Tools**: Apache JMeter, Artillery, k6
 
 **Scenarios**:
@@ -595,7 +562,7 @@ io.on('connection', async (socket) => {
 - ✅ SQL/NoSQL injection prevention (Mongoose)
 - ✅ XSS prevention (React auto-escaping)
 - ✅ CORS configuration
-- ✅ Rate limiting (có thể thêm)
+- ✅ Rate limiting
 
 **Payment Security**:
 - ✅ SePay integration (PCI-DSS compliant)
@@ -628,7 +595,7 @@ io.on('connection', async (socket) => {
 
 #### 4.5.1. Functional Results
 
-✅ **Hoàn thành 100% các chức năng chính**:
+✅ **Hoàn thành các chức năng chính**:
 - User authentication & authorization
 - Campaign management (CRUD)
 - Donation system với payment integration
@@ -703,7 +670,7 @@ io.on('connection', async (socket) => {
 - ✅ Indexing cho performance
 
 **Nhược điểm**:
-- ❌ Không có transactions (trước MongoDB 4.0, hiện tại đã có)
+- ❌ Không có transactions
 - ❌ Memory usage cao
 - ❌ Không phù hợp cho relational data phức tạp
 
@@ -1028,43 +995,6 @@ io.on('connection', async (socket) => {
 - ✅ Catch errors early
 - ✅ Enforce best practices
 
-### 5.4. So sánh với các alternatives
-
-#### 5.4.1. Backend: Node.js vs Python (Django/Flask) vs Java (Spring)
-
-| Tiêu chí | Node.js | Python | Java |
-|----------|---------|--------|------|
-| Performance (I/O) | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ |
-| Real-time | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ |
-| Ecosystem | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-| Learning curve | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ |
-| Type safety | ⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
-
-**Lý do chọn Node.js**: Phù hợp cho real-time, I/O-intensive, dễ học
-
-#### 5.4.2. Database: MongoDB vs PostgreSQL
-
-| Tiêu chí | MongoDB | PostgreSQL |
-|----------|---------|------------|
-| Schema flexibility | ⭐⭐⭐⭐⭐ | ⭐⭐ |
-| Relational queries | ⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Horizontal scaling | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| ACID transactions | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Aggregation | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-
-**Lý do chọn MongoDB**: Schema flexibility, phù hợp cho document-based data
-
-#### 5.4.3. Frontend: Next.js vs Create React App vs Vite
-
-| Tiêu chí | Next.js | CRA | Vite |
-|----------|---------|-----|------|
-| SSR/SSG | ⭐⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐ |
-| Performance | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ |
-| Developer experience | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Learning curve | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-
-**Lý do chọn Next.js**: Cần SSR cho SEO, performance tốt
-
 ---
 
 ## 6. KẾT LUẬN
@@ -1081,7 +1011,7 @@ Dự án MACha đã áp dụng thành công các phương pháp và công nghệ
 
 ### 6.2. Điểm mạnh
 
-1. **Architecture**: Event-driven, microservices-ready
+1. **Architecture**: Event-driven
 2. **Performance**: Caching, indexing, optimization
 3. **Scalability**: Horizontal scaling với workers, Redis
 4. **Real-time**: Socket.IO cho live updates
