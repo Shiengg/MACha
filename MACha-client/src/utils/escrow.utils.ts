@@ -151,23 +151,17 @@ export const formatVotingPercentage = (percentage: number | string): string => {
 /**
  * Check user có đủ điều kiện vote không
  * @param donations - Array của donations từ user
- * @param threshold - Số tiền tối thiểu cần donate (thường là 1% của goal_amount)
- * @returns true nếu user đủ điều kiện, false nếu không
+ * @returns true nếu user đã donate (bất kỳ số tiền nào), false nếu không
  */
 export const checkEligibilityToVote = (
-  donations: Array<{ amount: number; payment_status?: string }>,
-  threshold: number
+  donations: Array<{ amount: number; payment_status?: string }>
 ): boolean => {
   if (!donations || donations.length === 0) {
     return false;
   }
 
-  // Tính tổng số tiền đã donate (chỉ tính các donation đã completed)
-  const totalDonated = donations
-    .filter((donation) => donation.payment_status === 'completed')
-    .reduce((sum, donation) => sum + donation.amount, 0);
-
-  return totalDonated >= threshold;
+  // Chỉ cần có ít nhất 1 donation đã completed là được vote
+  return donations.some((donation) => donation.payment_status === 'completed');
 };
 
 /**
@@ -203,7 +197,7 @@ export const formatEscrowError = (error: any): string => {
       ESCROW_NOT_FOUND: 'Không tìm thấy yêu cầu rút tiền',
       VOTING_NOT_IN_PROGRESS: 'Yêu cầu rút tiền không đang trong thời gian vote',
       VOTING_PERIOD_EXPIRED: 'Thời gian vote đã kết thúc',
-      NOT_ELIGIBLE_TO_VOTE: 'Bạn không đủ điều kiện để vote (cần donate ít nhất 1% mục tiêu)',
+      NOT_ELIGIBLE_TO_VOTE: 'Bạn cần đã donate cho campaign này để có quyền vote',
     };
 
     return errorMessages[errorCode] || 'Đã xảy ra lỗi';

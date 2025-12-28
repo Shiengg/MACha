@@ -341,7 +341,7 @@ function CampaignDetails() {
                     setUserVote(null);
                 }
 
-                // Check eligibility: user must have donated at least 1% of goal_amount
+                // Check eligibility: user chỉ cần đã donate (bất kỳ số tiền nào)
                 if (campaign) {
                     try {
                         const userDonations = donations.filter(
@@ -351,9 +351,8 @@ function CampaignDetails() {
                                     : donation.donor) === (user._id || user.id) &&
                                 donation.payment_status === 'completed'
                         );
-                        const totalDonated = userDonations.reduce((sum, d) => sum + d.amount, 0);
-                        const threshold = campaign.goal_amount * 0.01; // 1%
-                        setIsEligibleToVote(totalDonated >= threshold);
+                        // Chỉ cần có ít nhất 1 donation completed là được vote
+                        setIsEligibleToVote(userDonations.length > 0);
                     } catch (err) {
                         console.error('Error checking eligibility:', err);
                         setIsEligibleToVote(false);

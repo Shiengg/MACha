@@ -161,9 +161,7 @@ export const getEligibleVoters = async (campaignId) => {
         return [];
     }
     
-    const thresholdPercentage = 0.01;
-    const thresholdAmount = campaign.goal_amount * thresholdPercentage;
-    
+    // Chỉ cần đã donate (bất kỳ số tiền nào) là được vote
     const eligibleVoters = await Donation.aggregate([
         {
             $match: {
@@ -175,11 +173,6 @@ export const getEligibleVoters = async (campaignId) => {
             $group: {
                 _id: "$donor",
                 totalDonatedAmount: { $sum: "$amount" }
-            }
-        },
-        {
-            $match: {
-                totalDonatedAmount: { $gte: thresholdAmount }
             }
         },
         {
