@@ -6,6 +6,7 @@ import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { getAllUsers, User } from '@/services/admin/user.service';
 import Swal from 'sweetalert2';
+import { MoreVertical, ChevronDown } from 'lucide-react';
 
 export default function AdminUsers() {
   const router = useRouter();
@@ -17,6 +18,9 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [sortColumn, setSortColumn] = useState<'dateAdded' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const itemsPerPage = 10;
 
@@ -82,6 +86,13 @@ export default function AdminUsers() {
       return matchesSearch && matchesStatus && matchesRole;
     })
     .sort((a, b) => {
+      // Apply column sorting if set
+      if (sortColumn === 'dateAdded') {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+      // Default sorting by createdAt
       const dateA = new Date(a.createdAt).getTime();
       const dateB = new Date(b.createdAt).getTime();
       return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
@@ -129,218 +140,275 @@ export default function AdminUsers() {
     return pages;
   };
 
-  const getKYCStatusBadge = (status: string) => {
-    switch (status) {
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  const getRoleTag = (user: User) => {
+    if (user.role === 'admin') {
+      return { label: 'Admin', bgColor: 'bg-green-50', textColor: 'text-green-700' };
+    } else if (user.role === 'org') {
+      return { label: 'Tổ chức', bgColor: 'bg-purple-50', textColor: 'text-purple-700' };
+    } else {
+      return { label: 'Người dùng', bgColor: 'bg-blue-50', textColor: 'text-blue-700' };
+    }
+  };
+
+  const getKYCTag = (user: User) => {
+    switch (user.kyc_status) {
       case 'verified':
-        return <span className="px-3 py-1 bg-green-900/30 text-green-500 rounded-full text-sm">Đã xác thực</span>;
+        return { label: 'Đã xác thực', bgColor: 'bg-emerald-50', textColor: 'text-emerald-700' };
       case 'pending':
-        return <span className="px-3 py-1 bg-yellow-900/30 text-yellow-500 rounded-full text-sm">Chờ duyệt</span>;
+        return { label: 'Chờ duyệt', bgColor: 'bg-amber-50', textColor: 'text-amber-700' };
       case 'rejected':
-        return <span className="px-3 py-1 bg-red-900/30 text-red-500 rounded-full text-sm">Từ chối</span>;
-      case 'unverified':
-        return <span className="px-3 py-1 bg-gray-900/30 text-gray-500 rounded-full text-sm">Chưa xác thực</span>;
+        return { label: 'Từ chối', bgColor: 'bg-red-50', textColor: 'text-red-700' };
       default:
-        return <span className="px-3 py-1 bg-gray-900/30 text-gray-500 rounded-full text-sm">{status}</span>;
+        return { label: 'Chưa xác thực', bgColor: 'bg-gray-50', textColor: 'text-gray-700' };
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedUsers(new Set(paginatedUsers.map(u => u._id)));
+    } else {
+      setSelectedUsers(new Set());
+    }
+  };
+
+  const handleSelectUser = (userId: string, checked: boolean) => {
+    const newSelected = new Set(selectedUsers);
+    if (checked) {
+      newSelected.add(userId);
+    } else {
+      newSelected.delete(userId);
+    }
+    setSelectedUsers(newSelected);
+  };
+
+  const handleSort = (column: 'dateAdded') => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1419]">
+    <div className="min-h-screen bg-gray-50">
       <AdminSidebar />
       <AdminHeader />
       
       <div className="ml-64 pt-16">
         <div className="p-8">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-2">Quản lý người dùng</h1>
-              <p className="text-gray-400">Quản lý, tìm kiếm và lọc người dùng trong hệ thống.</p>
-            </div>
-            
+          <div className="mb-8">
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2">Quản lý người dùng</h1>
+            <p className="text-gray-600">Quản lý, tìm kiếm và lọc người dùng trong hệ thống.</p>
           </div>
 
-          <div className="bg-[#1a1f2e] rounded-lg border border-gray-700">
-            <div className="p-6 border-b border-gray-700">
-              <div className="flex items-center gap-4">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    placeholder="Tìm kiếm theo tên, email..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg pl-10 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          {/* Filters */}
+          <div className="bg-white rounded-lg border border-gray-200 mb-6 p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm theo tên, email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-gray-50 text-gray-900 px-4 py-2.5 rounded-lg pl-10 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <svg
+                  className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
-                  <svg
-                    className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                </div>
-                <div className="relative">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="all">Trạng thái: Tất cả</option>
-                    <option value="verified">Đã xác thực</option>
-                    <option value="pending">Chờ duyệt</option>
-                    <option value="rejected">Từ chối</option>
-                    <option value="unverified">Chưa xác thực</option>
-                  </select>
-                  <svg className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-                <div className="relative">
-                  <select
-                    value={roleFilter}
-                    onChange={(e) => setRoleFilter(e.target.value)}
-                    className="px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="all">Vai trò: Tất cả</option>
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                  <svg className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-                <div className="relative">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
-                    className="px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="newest">Mới nhất</option>
-                    <option value="oldest">Cũ nhất</option>
-                  </select>
-                  <svg className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-                <button className="p-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                </button>
+                </svg>
+              </div>
+              <div className="relative">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-200 appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">Trạng thái: Tất cả</option>
+                  <option value="verified">Đã xác thực</option>
+                  <option value="pending">Chờ duyệt</option>
+                  <option value="rejected">Từ chối</option>
+                  <option value="unverified">Chưa xác thực</option>
+                </select>
+                <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+              </div>
+              <div className="relative">
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="px-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-200 appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">Vai trò: Tất cả</option>
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                  <option value="org">Tổ chức</option>
+                </select>
+                <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
               </div>
             </div>
+          </div>
 
+          {/* Table */}
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="text-center">
                     <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-400">Loading users...</p>
+                    <p className="text-gray-600">Đang tải dữ liệu...</p>
                   </div>
                 </div>
               ) : filteredUsers.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-400">No users found</p>
+                  <p className="text-gray-600">Không tìm thấy người dùng</p>
                 </div>
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-gray-700">
-                      <th className="px-6 py-4 text-left">
-                        <input type="checkbox" className="w-4 h-4" />
+                    <tr className="border-b border-gray-200 bg-gray-100">
+                      <th className="px-6 py-3 text-left">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          checked={paginatedUsers.length > 0 && paginatedUsers.every(u => selectedUsers.has(u._id))}
+                          onChange={(e) => handleSelectAll(e.target.checked)}
+                        />
                       </th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">TÊN NGƯỜI DÙNG</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">EMAIL</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">VAI TRÒ</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">NGÀY THAM GIA</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">KYC</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">HÀNH ĐỘNG</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">User name</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Vai trò</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">KYC</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
+                        <button
+                          onClick={() => handleSort('dateAdded')}
+                          className="flex items-center gap-2 hover:text-gray-700 transition-colors"
+                        >
+                          Ngày tham gia
+                          {sortColumn === 'dateAdded' && (
+                            <ChevronDown className={`w-4 h-4 ${sortDirection === 'asc' ? 'rotate-180' : ''}`} />
+                          )}
+                        </button>
+                      </th>
+                      <th className="px-6 py-3 text-left"></th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {paginatedUsers.map((user) => (
-                      <tr key={user._id} className="border-b border-gray-700 hover:bg-gray-800/50 transition-all">
-                        <td className="px-6 py-4">
-                          <input type="checkbox" className="w-4 h-4" />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            {user.avatar ? (
-                              <img src={user.avatar} alt={user.username} className="w-10 h-10 rounded-full object-cover" />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">
-                                {user.username?.[0]?.toUpperCase() || 'U'}
+                  <tbody className="divide-y divide-gray-200">
+                    {paginatedUsers.map((user) => {
+                      const roleTag = getRoleTag(user);
+                      const kycTag = getKYCTag(user);
+                      const displayName = user.fullname || user.username;
+                      return (
+                        <tr key={user._id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <input 
+                              type="checkbox" 
+                              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              checked={selectedUsers.has(user._id)}
+                              onChange={(e) => handleSelectUser(user._id, e.target.checked)}
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              {user.avatar ? (
+                                <img 
+                                  src={user.avatar} 
+                                  alt={displayName} 
+                                  className="w-10 h-10 rounded-full object-cover" 
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm">
+                                  {(user.username?.[0] || user.email?.[0] || 'U').toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-medium text-gray-900">{displayName}</div>
+                                <div className="text-sm text-gray-500">{user.email}</div>
                               </div>
-                            )}
-                            <div className="text-white font-medium">{user.username}</div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-gray-400">{user.email}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-gray-400 capitalize">{user.role}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-gray-400">
-                            {new Date(user.createdAt).toLocaleDateString('vi-VN')}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">{getKYCStatusBadge(user.kyc_status)}</td>
-                        <td className="px-6 py-4">
-                          <div className="relative" ref={(el) => { menuRefs.current[user._id] = el; }}>
-                            <button
-                              onClick={() => setOpenMenuId(openMenuId === user._id ? null : user._id)}
-                              className="text-gray-400 hover:text-white transition-all"
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-2.5 py-1 text-xs font-medium rounded-full ${roleTag.bgColor} ${roleTag.textColor}`}
                             >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                              </svg>
-                            </button>
-                            {openMenuId === user._id && (
-                              <div 
-                                className="absolute right-0 mt-2 w-48 bg-[#1a1f2e] border border-gray-700 rounded-lg shadow-lg z-50"
-                                onClick={(e) => e.stopPropagation()}
+                              {roleTag.label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-2.5 py-1 text-xs font-medium rounded-full ${kycTag.bgColor} ${kycTag.textColor}`}
+                            >
+                              {kycTag.label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{formatDate(user.createdAt)}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="relative" ref={(el) => { menuRefs.current[user._id] = el; }}>
+                              <button
+                                onClick={() => setOpenMenuId(openMenuId === user._id ? null : user._id)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
                               >
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewDetails(user._id);
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-700 transition-all rounded-lg"
+                                <MoreVertical className="w-5 h-5" />
+                              </button>
+                              {openMenuId === user._id && (
+                                <div 
+                                  className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  Xem chi tiết
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleViewDetails(user._id);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    Xem chi tiết
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-700 flex items-center justify-between">
-              <div className="text-gray-400 text-sm">
-                Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredUsers.length)} / {filteredUsers.length} users
+            {/* Pagination */}
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+              <div className="text-sm text-gray-600">
+                Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredUsers.length)} / {filteredUsers.length} người dùng
                 {searchQuery && ` (lọc từ ${users.length} tổng)`}
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`px-4 py-2 rounded-lg transition-all text-sm ${
                     currentPage === 1
-                      ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
-                      : 'bg-gray-800 text-white hover:bg-gray-700'
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                   }`}
                 >
                   Previous
@@ -355,10 +423,10 @@ export default function AdminUsers() {
                     <button
                       key={page}
                       onClick={() => handlePageChange(page as number)}
-                      className={`px-4 py-2 rounded-lg transition-all ${
+                      className={`px-4 py-2 rounded-lg transition-all text-sm ${
                         currentPage === page
                           ? 'bg-blue-600 text-white'
-                          : 'bg-gray-800 text-white hover:bg-gray-700'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                       }`}
                     >
                       {page}
@@ -369,10 +437,10 @@ export default function AdminUsers() {
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages || totalPages === 0}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`px-4 py-2 rounded-lg transition-all text-sm ${
                     currentPage === totalPages || totalPages === 0
-                      ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
-                      : 'bg-gray-800 text-white hover:bg-gray-700'
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                   }`}
                 >
                   Next
