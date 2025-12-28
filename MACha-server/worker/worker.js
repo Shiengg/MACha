@@ -331,7 +331,7 @@ async function handleCampaignRejected(job) {
         }));
 
         if (creator.email) {
-            await sendCampaignRejectedEmail(creator.email, {
+            await mailerService.sendCampaignRejectedEmail(creator.email, {
                 username: creator.username,
                 campaignTitle: campaign.title,
                 campaignId: campaign._id.toString(),
