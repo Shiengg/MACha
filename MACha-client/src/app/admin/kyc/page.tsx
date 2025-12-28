@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { getPendingKYCs, getKYCDetails, approveKYC, rejectKYC, KYCUser, KYCDetails } from '@/services/admin/kyc.service';
 import Swal from 'sweetalert2';
+import { MoreVertical, ChevronDown, Search, SlidersHorizontal } from 'lucide-react';
 
 export default function AdminKYCApproval() {
   const [kycRequests, setKycRequests] = useState<KYCUser[]>([]);
@@ -16,6 +17,11 @@ export default function AdminKYCApproval() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedKYC, setSelectedKYC] = useState<KYCDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [selectedKYCs, setSelectedKYCs] = useState<Set<string>>(new Set());
+  const [showFilters, setShowFilters] = useState(false);
+  const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const filterRef = useRef<HTMLDivElement | null>(null);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -25,6 +31,29 @@ export default function AdminKYCApproval() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, sortBy]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      Object.entries(menuRefs.current).forEach(([kycId, ref]) => {
+        if (ref && !ref.contains(target) && openMenuId === kycId) {
+          setOpenMenuId(null);
+        }
+      });
+      
+      if (filterRef.current && !filterRef.current.contains(target) && showFilters) {
+        setShowFilters(false);
+      }
+    };
+
+    if (openMenuId || showFilters) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [openMenuId, showFilters]);
 
   const fetchKYCs = async () => {
     try {
@@ -43,6 +72,7 @@ export default function AdminKYCApproval() {
   };
 
   const handleViewDetails = async (userId: string) => {
+    setOpenMenuId(null);
     try {
       setLoadingDetails(true);
       setShowDetailsModal(true);
@@ -60,7 +90,26 @@ export default function AdminKYCApproval() {
     }
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedKYCs(new Set(paginatedRequests.map(r => r._id)));
+    } else {
+      setSelectedKYCs(new Set());
+    }
+  };
+
+  const handleSelectKYC = (kycId: string, checked: boolean) => {
+    const newSelected = new Set(selectedKYCs);
+    if (checked) {
+      newSelected.add(kycId);
+    } else {
+      newSelected.delete(kycId);
+    }
+    setSelectedKYCs(newSelected);
+  };
+
   const handleApprove = async (userId: string) => {
+    setOpenMenuId(null);
     const result = await Swal.fire({
       title: 'Duyệt KYC?',
       text: 'Người dùng sẽ được xác thực và có thể tạo chiến dịch',
@@ -85,6 +134,7 @@ export default function AdminKYCApproval() {
   };
 
   const handleReject = async (userId: string) => {
+    setOpenMenuId(null);
     const { value: reason } = await Swal.fire({
       title: 'Từ chối KYC',
       input: 'textarea',
@@ -177,184 +227,239 @@ export default function AdminKYCApproval() {
     return pages;
   };
 
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <span className="px-3 py-1 bg-yellow-900/30 text-yellow-500 rounded-full text-sm">Chờ duyệt</span>;
+        return { label: 'Chờ duyệt', bgColor: 'bg-amber-50', textColor: 'text-amber-700' };
       case 'verified':
-        return <span className="px-3 py-1 bg-green-900/30 text-green-500 rounded-full text-sm">Đã duyệt</span>;
+        return { label: 'Đã duyệt', bgColor: 'bg-emerald-50', textColor: 'text-emerald-700' };
       case 'rejected':
-        return <span className="px-3 py-1 bg-red-900/30 text-red-500 rounded-full text-sm">Từ chối</span>;
+        return { label: 'Từ chối', bgColor: 'bg-red-50', textColor: 'text-red-700' };
       case 'unverified':
-        return <span className="px-3 py-1 bg-gray-900/30 text-gray-500 rounded-full text-sm">Chưa xác thực</span>;
+        return { label: 'Chưa xác thực', bgColor: 'bg-gray-50', textColor: 'text-gray-700' };
       default:
-        return null;
+        return { label: status, bgColor: 'bg-gray-50', textColor: 'text-gray-700' };
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1419]">
+    <div className="min-h-screen bg-white">
       <AdminSidebar />
       <AdminHeader />
       
       <div className="ml-64 pt-16">
         <div className="p-8">
+          {/* Main Title */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Duyệt KYC Người Dùng</h1>
-            <p className="text-gray-400">Xem xét và phê duyệt yêu cầu xác thực danh tính của người dùng.</p>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2">Duyệt KYC người dùng</h1>
+            <p className="text-gray-600">Xem xét và phê duyệt yêu cầu xác thực danh tính của người dùng.</p>
           </div>
 
-          <div className="bg-[#1a1f2e] rounded-lg border border-gray-700">
-            <div className="p-6 border-b border-gray-700">
-              <div className="flex items-center gap-4">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    placeholder="Tìm kiếm theo tên, email..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg pl-10 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  />
-                  <svg
-                    className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                </div>
-                <div className="relative">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="all">Trạng thái: Tất cả</option>
-                    <option value="pending">Chờ duyệt</option>
-                    <option value="verified">Đã duyệt</option>
-                    <option value="rejected">Từ chối</option>
-                    <option value="unverified">Chưa xác thực</option>
-                  </select>
-                  <svg className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-                <div className="relative">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
-                    className="px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="newest">Mới nhất</option>
-                    <option value="oldest">Cũ nhất</option>
-                  </select>
-                  <svg className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+          {/* Header with title, count, search and filters */}
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Tất cả yêu cầu KYC <span className="text-gray-500 font-normal">({filteredRequests.length})</span>
+              </h2>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              
+              {/* Filters Button */}
+              <div className="relative" ref={filterRef}>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors"
+                >
+                  <SlidersHorizontal className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-bold">Filters</span>
+                </button>
+                
+                {/* Filters Dropdown */}
+                {showFilters && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
+                    <div className="space-y-4">
+                      {/* Status Filter */}
+                      <div className="relative">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Trạng thái
+                        </label>
+                        <select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          className="w-full px-3 py-2 bg-white text-gray-900 rounded-lg border border-gray-200 appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                          <option value="all">Tất cả</option>
+                          <option value="pending">Chờ duyệt</option>
+                          <option value="verified">Đã duyệt</option>
+                          <option value="rejected">Từ chối</option>
+                          <option value="unverified">Chưa xác thực</option>
+                        </select>
+                        <ChevronDown className="w-4 h-4 absolute right-3 bottom-2.5 pointer-events-none text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+          </div>
+
+          {/* Table */}
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
 
             <div className="overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="text-center">
                     <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-400">Đang tải...</p>
+                    <p className="text-gray-600">Đang tải dữ liệu...</p>
                   </div>
                 </div>
               ) : paginatedRequests.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-400">Không có yêu cầu KYC nào</p>
+                  <p className="text-gray-600">Không có yêu cầu KYC nào</p>
                 </div>
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-gray-700">
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">TÊN NGƯỜI DÙNG</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">EMAIL</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">TÊN THẬT</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">CCCD (4 SỐ CUỐI)</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">NGÀY GỬI</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">TRẠNG THÁI</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">HÀNH ĐỘNG</th>
+                    <tr className="border-b border-gray-200 bg-gray-100">
+                      <th className="px-6 py-3 text-left">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded-full border-gray-300 text-blue-600 focus:ring-blue-500"
+                          checked={paginatedRequests.length > 0 && paginatedRequests.every(r => selectedKYCs.has(r._id))}
+                          onChange={(e) => handleSelectAll(e.target.checked)}
+                        />
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Tên người dùng</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Email</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Tên thật</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">CCCD (4 số cuối)</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Ngày gửi</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Trạng thái</th>
+                      <th className="px-6 py-3 text-left"></th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {paginatedRequests.map((request) => (
-                      <tr key={request._id} className="border-b border-gray-700 hover:bg-gray-800/50 transition-all">
-                        <td className="px-6 py-4">
-                          <div className="text-white font-medium">{request.username}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-gray-400">{request.email}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-gray-400">{request.identity_verified_name || '-'}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-gray-400">{request.identity_card_last4 || '-'}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-gray-400">
-                            {request.kyc_submitted_at 
-                              ? new Date(request.kyc_submitted_at).toLocaleDateString('vi-VN')
-                              : '-'
-                            }
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">{getStatusBadge(request.kyc_status)}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleViewDetails(request._id)}
-                              className="p-2 text-blue-500 hover:bg-blue-900/20 rounded-lg transition-all"
-                              title="Xem chi tiết"
+                  <tbody className="divide-y divide-gray-200">
+                    {paginatedRequests.map((request, index) => {
+                      const statusBadge = getStatusBadge(request.kyc_status);
+                      const isLastTwo = index >= paginatedRequests.length - 2;
+                      return (
+                        <tr key={request._id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <input 
+                              type="checkbox" 
+                              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              checked={selectedKYCs.has(request._id)}
+                              onChange={(e) => handleSelectKYC(request._id, e.target.checked)}
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-gray-900">{request.username}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{request.email}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{request.identity_verified_name || '-'}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{request.identity_card_last4 || '-'}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{formatDate(request.kyc_submitted_at || '')}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-2.5 py-1 text-xs font-medium rounded-full ${statusBadge.bgColor} ${statusBadge.textColor}`}
                             >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                            </button>
-                            {request.kyc_status === 'pending' && (
-                              <>
-                                <button
-                                  onClick={() => handleApprove(request._id)}
-                                  className="p-2 text-green-500 hover:bg-green-900/20 rounded-lg transition-all"
-                                  title="Duyệt"
+                              {statusBadge.label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="relative" ref={(el) => { menuRefs.current[request._id] = el; }}>
+                              <button
+                                onClick={() => setOpenMenuId(openMenuId === request._id ? null : request._id)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                              >
+                                <MoreVertical className="w-5 h-5" />
+                              </button>
+                              {openMenuId === request._id && (
+                                <div 
+                                  className={`absolute right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 ${
+                                    isLastTwo ? 'bottom-full mb-2' : 'mt-2'
+                                  }`}
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={() => handleReject(request._id)}
-                                  className="p-2 text-red-500 hover:bg-red-900/20 rounded-lg transition-all"
-                                  title="Từ chối"
-                                >
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleViewDetails(request._id);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    Xem chi tiết
+                                  </button>
+                                  {request.kyc_status === 'pending' && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleApprove(request._id);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
+                                      >
+                                        Duyệt
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleReject(request._id);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
+                                      >
+                                        Từ chối
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-700 flex items-center justify-between">
-              <div className="text-gray-400 text-sm">
+            {/* Pagination */}
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+              <div className="text-sm text-gray-600">
                 Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredRequests.length)} / {filteredRequests.length} yêu cầu
                 {searchQuery && ` (lọc từ ${kycRequests.length} tổng)`}
               </div>
@@ -362,10 +467,10 @@ export default function AdminKYCApproval() {
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`px-4 py-2 rounded-lg transition-all text-sm ${
                     currentPage === 1
-                      ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
-                      : 'bg-gray-800 text-white hover:bg-gray-700'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
                   }`}
                 >
                   Previous
@@ -380,10 +485,10 @@ export default function AdminKYCApproval() {
                     <button
                       key={page}
                       onClick={() => handlePageChange(page as number)}
-                      className={`px-4 py-2 rounded-lg transition-all ${
+                      className={`px-4 py-2 rounded-lg transition-all text-sm ${
                         currentPage === page
                           ? 'bg-blue-600 text-white'
-                          : 'bg-gray-800 text-white hover:bg-gray-700'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
                       }`}
                     >
                       {page}
@@ -394,10 +499,10 @@ export default function AdminKYCApproval() {
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages || totalPages === 0}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`px-4 py-2 rounded-lg transition-all text-sm ${
                     currentPage === totalPages || totalPages === 0
-                      ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
-                      : 'bg-gray-800 text-white hover:bg-gray-700'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
                   }`}
                 >
                   Next
@@ -411,12 +516,12 @@ export default function AdminKYCApproval() {
       {/* KYC Details Modal */}
       {showDetailsModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1f2e] rounded-lg border border-gray-700 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-700 flex items-center justify-between sticky top-0 bg-[#1a1f2e] z-10">
-              <h2 className="text-2xl font-bold text-white">Chi tiết KYC</h2>
+          <div className="bg-white rounded-lg border border-gray-200 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+              <h2 className="text-2xl font-semibold text-gray-900">Chi tiết KYC</h2>
               <button
                 onClick={() => setShowDetailsModal(false)}
-                className="text-gray-400 hover:text-white transition-all"
+                className="text-gray-400 hover:text-gray-600 transition-all"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -428,53 +533,62 @@ export default function AdminKYCApproval() {
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
                   <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                  <p className="text-gray-400">Đang tải chi tiết...</p>
+                  <p className="text-gray-600">Đang tải chi tiết...</p>
                 </div>
               </div>
             ) : selectedKYC ? (
               <div className="p-6 space-y-6">
                 {/* User Info */}
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-4">Thông tin người dùng</h3>
-                  <div className="grid grid-cols-2 gap-4 bg-gray-800/50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin người dùng</h3>
+                  <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <div>
-                      <p className="text-gray-400 text-sm">Username</p>
-                      <p className="text-white font-medium">{selectedKYC.user.username}</p>
+                      <p className="text-gray-600 text-sm mb-1">Username</p>
+                      <p className="text-gray-900 font-medium">{selectedKYC.user.username}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400 text-sm">Email</p>
-                      <p className="text-white font-medium">{selectedKYC.user.email}</p>
+                      <p className="text-gray-600 text-sm mb-1">Email</p>
+                      <p className="text-gray-900 font-medium">{selectedKYC.user.email}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400 text-sm">Họ tên</p>
-                      <p className="text-white font-medium">{selectedKYC.user.fullname || '-'}</p>
+                      <p className="text-gray-600 text-sm mb-1">Họ tên</p>
+                      <p className="text-gray-900 font-medium">{selectedKYC.user.fullname || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400 text-sm">Trạng thái</p>
-                      <div className="mt-1">{getStatusBadge(selectedKYC.user.kyc_status)}</div>
+                      <p className="text-gray-600 text-sm mb-1">Trạng thái</p>
+                      <div className="mt-1">
+                        {(() => {
+                          const badge = getStatusBadge(selectedKYC.user.kyc_status);
+                          return (
+                            <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${badge.bgColor} ${badge.textColor}`}>
+                              {badge.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* KYC Info */}
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-4">Thông tin xác thực</h3>
-                  <div className="grid grid-cols-2 gap-4 bg-gray-800/50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin xác thực</h3>
+                  <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <div>
-                      <p className="text-gray-400 text-sm">Tên trên CCCD</p>
-                      <p className="text-white font-medium">{selectedKYC.kyc_info.identity_verified_name || '-'}</p>
+                      <p className="text-gray-600 text-sm mb-1">Tên trên CCCD</p>
+                      <p className="text-gray-900 font-medium">{selectedKYC.kyc_info.identity_verified_name || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400 text-sm">CCCD (4 số cuối)</p>
-                      <p className="text-white font-medium">{selectedKYC.kyc_info.identity_card_last4 || '-'}</p>
+                      <p className="text-gray-600 text-sm mb-1">CCCD (4 số cuối)</p>
+                      <p className="text-gray-900 font-medium">{selectedKYC.kyc_info.identity_card_last4 || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400 text-sm">Mã số thuế</p>
-                      <p className="text-white font-medium">{selectedKYC.kyc_info.tax_code || '-'}</p>
+                      <p className="text-gray-600 text-sm mb-1">Mã số thuế</p>
+                      <p className="text-gray-900 font-medium">{selectedKYC.kyc_info.tax_code || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400 text-sm">Địa chỉ</p>
-                      <p className="text-white font-medium">
+                      <p className="text-gray-600 text-sm mb-1">Địa chỉ</p>
+                      <p className="text-gray-900 font-medium">
                         {selectedKYC.kyc_info.address?.district && selectedKYC.kyc_info.address?.city
                           ? `${selectedKYC.kyc_info.address.district}, ${selectedKYC.kyc_info.address.city}`
                           : '-'
@@ -487,19 +601,19 @@ export default function AdminKYCApproval() {
                 {/* Bank Info */}
                 {selectedKYC.kyc_info.bank_account && (
                   <div>
-                    <h3 className="text-lg font-semibold text-white mb-4">Thông tin ngân hàng</h3>
-                    <div className="grid grid-cols-2 gap-4 bg-gray-800/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin ngân hàng</h3>
+                    <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                       <div>
-                        <p className="text-gray-400 text-sm">Ngân hàng</p>
-                        <p className="text-white font-medium">{selectedKYC.kyc_info.bank_account.bank_name || '-'}</p>
+                        <p className="text-gray-600 text-sm mb-1">Ngân hàng</p>
+                        <p className="text-gray-900 font-medium">{selectedKYC.kyc_info.bank_account.bank_name || '-'}</p>
                       </div>
                       <div>
-                        <p className="text-gray-400 text-sm">STK (4 số cuối)</p>
-                        <p className="text-white font-medium">{selectedKYC.kyc_info.bank_account.account_number_last4 || '-'}</p>
+                        <p className="text-gray-600 text-sm mb-1">STK (4 số cuối)</p>
+                        <p className="text-gray-900 font-medium">{selectedKYC.kyc_info.bank_account.account_number_last4 || '-'}</p>
                       </div>
                       <div className="col-span-2">
-                        <p className="text-gray-400 text-sm">Chủ tài khoản</p>
-                        <p className="text-white font-medium">{selectedKYC.kyc_info.bank_account.account_holder_name || '-'}</p>
+                        <p className="text-gray-600 text-sm mb-1">Chủ tài khoản</p>
+                        <p className="text-gray-900 font-medium">{selectedKYC.kyc_info.bank_account.account_holder_name || '-'}</p>
                       </div>
                     </div>
                   </div>
@@ -512,12 +626,12 @@ export default function AdminKYCApproval() {
                     <div className="grid grid-cols-2 gap-4">
                       {selectedKYC.kyc_info.kyc_documents.identity_front_url && (
                         <div>
-                          <p className="text-gray-400 text-sm mb-2">CCCD mặt trước</p>
+                          <p className="text-gray-600 text-sm mb-2">CCCD mặt trước</p>
                           <a
                             href={selectedKYC.kyc_info.kyc_documents.identity_front_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-all text-blue-400 hover:text-blue-300"
+                            className="block bg-gray-50 border border-gray-200 p-3 rounded-lg hover:bg-gray-100 transition-all text-blue-600 hover:text-blue-700"
                           >
                             Xem tài liệu →
                           </a>
@@ -525,12 +639,12 @@ export default function AdminKYCApproval() {
                       )}
                       {selectedKYC.kyc_info.kyc_documents.identity_back_url && (
                         <div>
-                          <p className="text-gray-400 text-sm mb-2">CCCD mặt sau</p>
+                          <p className="text-gray-600 text-sm mb-2">CCCD mặt sau</p>
                           <a
                             href={selectedKYC.kyc_info.kyc_documents.identity_back_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-all text-blue-400 hover:text-blue-300"
+                            className="block bg-gray-50 border border-gray-200 p-3 rounded-lg hover:bg-gray-100 transition-all text-blue-600 hover:text-blue-700"
                           >
                             Xem tài liệu →
                           </a>
@@ -538,12 +652,12 @@ export default function AdminKYCApproval() {
                       )}
                       {selectedKYC.kyc_info.kyc_documents.selfie_url && (
                         <div>
-                          <p className="text-gray-400 text-sm mb-2">Ảnh selfie với CCCD</p>
+                          <p className="text-gray-600 text-sm mb-2">Ảnh selfie với CCCD</p>
                           <a
                             href={selectedKYC.kyc_info.kyc_documents.selfie_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-all text-blue-400 hover:text-blue-300"
+                            className="block bg-gray-50 border border-gray-200 p-3 rounded-lg hover:bg-gray-100 transition-all text-blue-600 hover:text-blue-700"
                           >
                             Xem tài liệu →
                           </a>
@@ -551,12 +665,12 @@ export default function AdminKYCApproval() {
                       )}
                       {selectedKYC.kyc_info.kyc_documents.tax_document_url && (
                         <div>
-                          <p className="text-gray-400 text-sm mb-2">Giấy tờ thuế</p>
+                          <p className="text-gray-600 text-sm mb-2">Giấy tờ thuế</p>
                           <a
                             href={selectedKYC.kyc_info.kyc_documents.tax_document_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-all text-blue-400 hover:text-blue-300"
+                            className="block bg-gray-50 border border-gray-200 p-3 rounded-lg hover:bg-gray-100 transition-all text-blue-600 hover:text-blue-700"
                           >
                             Xem tài liệu →
                           </a>
@@ -564,12 +678,12 @@ export default function AdminKYCApproval() {
                       )}
                       {selectedKYC.kyc_info.kyc_documents.bank_statement_url && (
                         <div>
-                          <p className="text-gray-400 text-sm mb-2">Sao kê ngân hàng</p>
+                          <p className="text-gray-600 text-sm mb-2">Sao kê ngân hàng</p>
                           <a
                             href={selectedKYC.kyc_info.kyc_documents.bank_statement_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-all text-blue-400 hover:text-blue-300"
+                            className="block bg-gray-50 border border-gray-200 p-3 rounded-lg hover:bg-gray-100 transition-all text-blue-600 hover:text-blue-700"
                           >
                             Xem tài liệu →
                           </a>
@@ -581,12 +695,12 @@ export default function AdminKYCApproval() {
 
                 {/* Timeline */}
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-4">Lịch sử</h3>
-                  <div className="space-y-3 bg-gray-800/50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Lịch sử</h3>
+                  <div className="space-y-3 bg-gray-50 p-4 rounded-lg border border-gray-200">
                     {selectedKYC.kyc_info.kyc_submitted_at && (
                       <div className="flex items-center gap-3">
                         <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <p className="text-gray-400">
+                        <p className="text-gray-600">
                           Gửi yêu cầu: {new Date(selectedKYC.kyc_info.kyc_submitted_at).toLocaleString('vi-VN')}
                         </p>
                       </div>
@@ -594,7 +708,7 @@ export default function AdminKYCApproval() {
                     {selectedKYC.kyc_info.kyc_verified_at && (
                       <div className="flex items-center gap-3">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <p className="text-gray-400">
+                        <p className="text-gray-600">
                           Đã duyệt: {new Date(selectedKYC.kyc_info.kyc_verified_at).toLocaleString('vi-VN')}
                         </p>
                       </div>
@@ -603,8 +717,8 @@ export default function AdminKYCApproval() {
                       <div className="flex items-start gap-3">
                         <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
                         <div>
-                          <p className="text-gray-400">Lý do từ chối:</p>
-                          <p className="text-red-400 mt-1">{selectedKYC.kyc_info.kyc_rejection_reason}</p>
+                          <p className="text-gray-600">Lý do từ chối:</p>
+                          <p className="text-red-600 mt-1">{selectedKYC.kyc_info.kyc_rejection_reason}</p>
                         </div>
                       </div>
                     )}
@@ -613,7 +727,7 @@ export default function AdminKYCApproval() {
 
                 {/* Actions */}
                 {selectedKYC.user.kyc_status === 'pending' && (
-                  <div className="flex items-center gap-4 pt-4 border-t border-gray-700">
+                  <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
                     <button
                       onClick={() => handleApprove(selectedKYC.user._id)}
                       className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-medium"

@@ -130,7 +130,7 @@ export default function VotingSection({
               Không đủ điều kiện vote
             </h3>
             <p className="text-sm text-yellow-700 dark:text-yellow-400">
-              Bạn cần donate ít nhất 1% mục tiêu của campaign để có quyền vote cho withdrawal request này.
+              Bạn cần đã donate cho campaign này để có quyền vote cho withdrawal request.
             </p>
           </div>
         </div>

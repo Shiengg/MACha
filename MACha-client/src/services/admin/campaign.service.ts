@@ -15,6 +15,7 @@ export interface Campaign {
     username: string;
     email?: string;
     avatar?: string;
+    fullname?: string;
   };
   title: string;
   description?: string;

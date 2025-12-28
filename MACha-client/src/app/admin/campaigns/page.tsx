@@ -1,18 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { getAllCampaigns, approveCampaign, rejectCampaign, Campaign } from '@/services/admin/campaign.service';
 import Swal from 'sweetalert2';
+import { MoreVertical, ChevronDown, Search, SlidersHorizontal } from 'lucide-react';
 
 export default function AdminCampaignApproval() {
+  const router = useRouter();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
+  const [showFilters, setShowFilters] = useState(false);
+  const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const filterRef = useRef<HTMLDivElement | null>(null);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -22,6 +30,29 @@ export default function AdminCampaignApproval() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, sortBy]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      Object.entries(menuRefs.current).forEach(([campaignId, ref]) => {
+        if (ref && !ref.contains(target) && openMenuId === campaignId) {
+          setOpenMenuId(null);
+        }
+      });
+      
+      if (filterRef.current && !filterRef.current.contains(target) && showFilters) {
+        setShowFilters(false);
+      }
+    };
+
+    if (openMenuId || showFilters) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [openMenuId, showFilters]);
 
   const fetchCampaigns = async () => {
     try {
@@ -40,29 +71,104 @@ export default function AdminCampaignApproval() {
   };
 
   const handleApprove = async (id: string) => {
+    setOpenMenuId(null);
     const result = await Swal.fire({
-      title: 'Approve Campaign?',
-      text: 'This campaign will be activated',
+      title: 'Duyệt chiến dịch?',
+      html: `
+        <p style="margin-bottom: 20px;">Chiến dịch sẽ được kích hoạt và hiển thị trên hệ thống.</p>
+        <div style="text-align: left; margin-bottom: 15px;">
+          <label style="display: flex; align-items: center; cursor: pointer; color: #374151;">
+            <input type="checkbox" id="terms-checkbox" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+            <span>Tôi cam kết chịu trách nhiệm với quyết định của mình</span>
+          </label>
+        </div>
+        <div style="text-align: center; margin-top: 10px;">
+          <a href="/terms" target="_blank" style="color: #2563eb; text-decoration: underline; font-size: 14px;">
+            Xem điều khoản cam kết
+          </a>
+        </div>
+      `,
       icon: 'question',
       showCancelButton: true,
       confirmButtonColor: '#10b981',
       cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, approve',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: 'Duyệt',
+      cancelButtonText: 'Hủy',
+      didOpen: () => {
+        const checkbox = document.getElementById('terms-checkbox') as HTMLInputElement;
+        const confirmButton = Swal.getConfirmButton();
+        
+        // Disable button ban đầu
+        if (confirmButton) {
+          confirmButton.disabled = true;
+          confirmButton.style.opacity = '0.5';
+          confirmButton.style.cursor = 'not-allowed';
+        }
+        
+        // Add event listener cho checkbox
+        if (checkbox) {
+          checkbox.addEventListener('change', () => {
+            const confirmButton = Swal.getConfirmButton();
+            if (confirmButton) {
+              if (checkbox.checked) {
+                confirmButton.disabled = false;
+                confirmButton.style.opacity = '1';
+                confirmButton.style.cursor = 'pointer';
+              } else {
+                confirmButton.disabled = true;
+                confirmButton.style.opacity = '0.5';
+                confirmButton.style.cursor = 'not-allowed';
+              }
+            }
+          });
+        }
+      },
+      preConfirm: () => {
+        const checkbox = document.getElementById('terms-checkbox') as HTMLInputElement;
+        if (!checkbox || !checkbox.checked) {
+          return false;
+        }
+        return true;
+      },
+      allowOutsideClick: () => !Swal.isLoading(),
     });
 
     if (result.isConfirmed) {
       try {
         await approveCampaign(id);
-        Swal.fire('Approved!', 'Campaign has been approved', 'success');
+        Swal.fire('Đã duyệt!', 'Chiến dịch đã được duyệt thành công', 'success');
         fetchCampaigns();
       } catch (error: any) {
-        Swal.fire('Error', error?.response?.data?.message || 'Failed to approve campaign', 'error');
+        Swal.fire('Lỗi', error?.response?.data?.message || 'Không thể duyệt chiến dịch', 'error');
       }
     }
   };
 
+  const handleViewDetails = (campaignId: string) => {
+    setOpenMenuId(null);
+    router.push(`/admin/campaigns/${campaignId}`);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedCampaigns(new Set(paginatedCampaigns.map(c => c._id)));
+    } else {
+      setSelectedCampaigns(new Set());
+    }
+  };
+
+  const handleSelectCampaign = (campaignId: string, checked: boolean) => {
+    const newSelected = new Set(selectedCampaigns);
+    if (checked) {
+      newSelected.add(campaignId);
+    } else {
+      newSelected.delete(campaignId);
+    }
+    setSelectedCampaigns(newSelected);
+  };
+
   const handleReject = async (id: string) => {
+    setOpenMenuId(null);
     const { value: reason } = await Swal.fire({
       title: 'Reject Campaign',
       input: 'textarea',
@@ -152,237 +258,257 @@ export default function AdminCampaignApproval() {
     return pages;
   };
 
-  const oldCampaigns = [
-    {
-      id: 1,
-      name: 'New Year 2025 Special',
-      creator: 'Company A',
-      submittedDate: '2024-10-28',
-      startDate: '2024-12-20',
-      endDate: '2025-01-05',
-      status: 'approved',
-    },
-    {
-      id: 2,
-      name: 'Black Friday Sale',
-      creator: 'Company B',
-      submittedDate: '2024-10-27',
-      startDate: '2024-11-25',
-      endDate: '2024-11-30',
-      status: 'rejected',
-    },
-    {
-      id: 3,
-      name: 'Summer Kick-off',
-      creator: 'Company C',
-      submittedDate: '2024-10-26',
-      startDate: '2025-06-01',
-      endDate: '2025-06-15',
-      status: 'approved',
-    },
-    {
-      id: 4,
-      name: 'Back to School Deals',
-      creator: 'Company D',
-      submittedDate: '2024-10-25',
-      startDate: '2025-08-10',
-      endDate: '2025-08-25',
-      status: 'approved',
-    },
-    {
-      id: 5,
-      name: 'Holiday Gift Guide',
-      creator: 'Company E',
-      submittedDate: '2024-10-24',
-      startDate: '2024-11-15',
-      endDate: '2024-12-24',
-      status: 'approved',
-    },
-  ];
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <span className="px-3 py-1 bg-green-900/30 text-green-500 rounded-full text-sm">Đang hoạt động</span>;
+        return { label: 'Đang hoạt động', bgColor: 'bg-green-50', textColor: 'text-green-700' };
       case 'pending':
-        return <span className="px-3 py-1 bg-yellow-900/30 text-yellow-500 rounded-full text-sm">Chờ duyệt</span>;
+        return { label: 'Chờ duyệt', bgColor: 'bg-amber-50', textColor: 'text-amber-700' };
       case 'rejected':
-        return <span className="px-3 py-1 bg-red-900/30 text-red-500 rounded-full text-sm">Từ chối</span>;
+        return { label: 'Từ chối', bgColor: 'bg-red-50', textColor: 'text-red-700' };
       case 'completed':
-        return <span className="px-3 py-1 bg-blue-900/30 text-blue-500 rounded-full text-sm">Hoàn thành</span>;
+        return { label: 'Hoàn thành', bgColor: 'bg-blue-50', textColor: 'text-blue-700' };
       case 'cancelled':
-        return <span className="px-3 py-1 bg-gray-900/30 text-gray-500 rounded-full text-sm">Đã hủy</span>;
+        return { label: 'Đã hủy', bgColor: 'bg-gray-50', textColor: 'text-gray-700' };
       default:
-        return <span className="px-3 py-1 bg-gray-900/30 text-gray-500 rounded-full text-sm">{status}</span>;
+        return { label: status, bgColor: 'bg-gray-50', textColor: 'text-gray-700' };
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1419]">
+    <div className="min-h-screen bg-white">
       <AdminSidebar />
       <AdminHeader />
       
       <div className="ml-64 pt-16">
         <div className="p-8">
+          {/* Main Title */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Duyệt Chiến dịch</h1>
-            <p className="text-gray-400">Chấp nhận hoặc từ chối các chiến dịch đang chờ duyệt.</p>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2">Quản lý chiến dịch</h1>
+            <p className="text-gray-600">Quản lý, tìm kiếm và lọc các chiến dịch trong hệ thống.</p>
           </div>
 
-          <div className="bg-[#1a1f2e] rounded-lg border border-gray-700">
-            <div className="p-6 border-b border-gray-700">
-              <div className="flex items-center gap-4">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    placeholder="Tìm theo tên chiến dịch hoặc người tạo..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg pl-10 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  />
-                  <svg
-                    className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                </div>
-                <div className="relative">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="all">Trạng thái: Tất cả</option>
-                    <option value="pending">Chờ duyệt</option>
-                    <option value="active">Đang hoạt động</option>
-                    <option value="rejected">Từ chối</option>
-                    <option value="completed">Hoàn thành</option>
-                    <option value="cancelled">Đã hủy</option>
-                  </select>
-                  <svg className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-                <div className="relative">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
-                    className="px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="newest">Mới nhất</option>
-                    <option value="oldest">Cũ nhất</option>
-                  </select>
-                  <svg className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+          {/* Header with title, count, search and filters */}
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Tất cả chiến dịch <span className="text-gray-500 font-normal">({filteredCampaigns.length})</span>
+              </h2>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              
+              {/* Filters Button */}
+              <div className="relative" ref={filterRef}>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors"
+                >
+                  <SlidersHorizontal className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-bold">Filters</span>
+                </button>
+                
+                {/* Filters Dropdown */}
+                {showFilters && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
+                    <div className="space-y-4">
+                      {/* Status Filter */}
+                      <div className="relative">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Trạng thái
+                        </label>
+                        <select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          className="w-full px-3 py-2 bg-white text-gray-900 rounded-lg border border-gray-200 appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                          <option value="all">Tất cả</option>
+                          <option value="pending">Chờ duyệt</option>
+                          <option value="active">Đang hoạt động</option>
+                          <option value="rejected">Từ chối</option>
+                          <option value="completed">Hoàn thành</option>
+                          <option value="cancelled">Đã hủy</option>
+                        </select>
+                        <ChevronDown className="w-4 h-4 absolute right-3 bottom-2.5 pointer-events-none text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+          </div>
+
+          {/* Table */}
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
 
             <div className="overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="text-center">
                     <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-400">Loading campaigns...</p>
+                    <p className="text-gray-600">Đang tải dữ liệu...</p>
                   </div>
                 </div>
               ) : filteredCampaigns.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-400">No pending campaigns</p>
+                  <p className="text-gray-600">Không tìm thấy chiến dịch</p>
                 </div>
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-gray-700">
-                      <th className="px-6 py-4 text-left">
-                        <input type="checkbox" className="w-4 h-4" />
+                    <tr className="border-b border-gray-200 bg-gray-100">
+                      <th className="px-6 py-3 text-left">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded-full border-gray-300 text-blue-600 focus:ring-blue-500"
+                          checked={paginatedCampaigns.length > 0 && paginatedCampaigns.every(c => selectedCampaigns.has(c._id))}
+                          onChange={(e) => handleSelectAll(e.target.checked)}
+                        />
                       </th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">Tên chiến dịch</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">Người tạo</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">Mục tiêu</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">Ngày tạo</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">Trạng thái</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">Hành động</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Tên chiến dịch</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Người tạo</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Mục tiêu</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Ngày tạo</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Trạng thái</th>
+                      <th className="px-6 py-3 text-left"></th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {paginatedCampaigns.map((campaign) => (
-                      <tr key={campaign._id} className="border-b border-gray-700 hover:bg-gray-800/50 transition-all">
-                        <td className="px-6 py-4">
-                          <input type="checkbox" className="w-4 h-4" />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-white font-medium">{campaign.title}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-gray-400">{campaign.creator?.username || 'Unknown'}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-gray-400">
-                            {campaign.goal_amount?.toLocaleString('vi-VN')} VND
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-gray-400">
-                            {new Date(campaign.createdAt).toLocaleDateString('vi-VN')}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">{getStatusBadge(campaign.status)}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            {campaign.status === 'pending' ? (
-                              <>
-                                <button
-                                  onClick={() => handleApprove(campaign._id)}
-                                  className="px-3 py-1 bg-green-900/30 text-green-500 rounded-lg text-sm hover:bg-green-900/50 transition-all"
-                                >
-                                  Duyệt
-                                </button>
-                                <button
-                                  onClick={() => handleReject(campaign._id)}
-                                  className="px-3 py-1 bg-red-900/30 text-red-500 rounded-lg text-sm hover:bg-red-900/50 transition-all"
-                                >
-                                  Từ chối
-                                </button>
-                              </>
-                            ) : (
+                  <tbody className="divide-y divide-gray-200">
+                    {paginatedCampaigns.map((campaign, index) => {
+                      const statusBadge = getStatusBadge(campaign.status);
+                      const isLastTwo = index >= paginatedCampaigns.length - 2;
+                      return (
+                        <tr key={campaign._id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <input 
+                              type="checkbox" 
+                              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              checked={selectedCampaigns.has(campaign._id)}
+                              onChange={(e) => handleSelectCampaign(campaign._id, e.target.checked)}
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-gray-900">{campaign.title}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{campaign.creator?.fullname || campaign.creator?.username || 'Unknown'}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{formatCurrency(campaign.goal_amount || 0)}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{formatDate(campaign.createdAt)}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-2.5 py-1 text-xs font-medium rounded-full ${statusBadge.bgColor} ${statusBadge.textColor}`}
+                            >
+                              {statusBadge.label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="relative" ref={(el) => { menuRefs.current[campaign._id] = el; }}>
                               <button
-                                className="px-3 py-1 bg-blue-900/30 text-blue-400 rounded-lg text-sm hover:bg-blue-900/50 transition-all"
+                                onClick={() => setOpenMenuId(openMenuId === campaign._id ? null : campaign._id)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
                               >
-                                Xem chi tiết
+                                <MoreVertical className="w-5 h-5" />
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {openMenuId === campaign._id && (
+                                <div 
+                                  className={`absolute right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 ${
+                                    isLastTwo ? 'bottom-full mb-2' : 'mt-2'
+                                  }`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {campaign.status === 'pending' ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleApprove(campaign._id);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
+                                      >
+                                        Duyệt
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleReject(campaign._id);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
+                                      >
+                                        Từ chối
+                                      </button>
+                                    </>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleViewDetails(campaign._id);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    Xem chi tiết
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-700 flex items-center justify-between">
-              <div className="text-gray-400 text-sm">
-                Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredCampaigns.length)} / {filteredCampaigns.length} campaigns
+            {/* Pagination */}
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+              <div className="text-sm text-gray-600">
+                Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredCampaigns.length)} / {filteredCampaigns.length} chiến dịch
                 {searchQuery && ` (lọc từ ${campaigns.length} tổng)`}
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`px-4 py-2 rounded-lg transition-all text-sm ${
                     currentPage === 1
-                      ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
-                      : 'bg-gray-800 text-white hover:bg-gray-700'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
                   }`}
                 >
                   Previous
@@ -397,10 +523,10 @@ export default function AdminCampaignApproval() {
                     <button
                       key={page}
                       onClick={() => handlePageChange(page as number)}
-                      className={`px-4 py-2 rounded-lg transition-all ${
+                      className={`px-4 py-2 rounded-lg transition-all text-sm ${
                         currentPage === page
                           ? 'bg-blue-600 text-white'
-                          : 'bg-gray-800 text-white hover:bg-gray-700'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
                       }`}
                     >
                       {page}
@@ -411,10 +537,10 @@ export default function AdminCampaignApproval() {
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages || totalPages === 0}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`px-4 py-2 rounded-lg transition-all text-sm ${
                     currentPage === totalPages || totalPages === 0
-                      ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
-                      : 'bg-gray-800 text-white hover:bg-gray-700'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
                   }`}
                 >
                   Next

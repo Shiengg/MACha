@@ -11,7 +11,7 @@ export const getCampaigns = async () => {
     }
 
     // 2. Cache miss - Query database
-    const campaigns = await Campaign.find().populate("creator", "username avatar");
+    const campaigns = await Campaign.find().populate("creator", "username fullname avatar");
 
     // 3. Cache for 1 hour
     await redisClient.setEx(campaignKey, 3600, JSON.stringify(campaigns));
@@ -29,7 +29,7 @@ export const getCampaignById = async (campaignId) => {
     }
 
     // 2. Cache miss - Query database
-    const campaign = await Campaign.findById(campaignId).populate("creator", "username");
+    const campaign = await Campaign.findById(campaignId).populate("creator", "username fullname avatar");
     if (!campaign) {
         return null;
     }
@@ -66,7 +66,7 @@ export const getCampaignsByCategory = async (category) => {
         category,
         status: 'active' // Only return active campaigns
     })
-        .populate("creator", "username avatar")
+        .populate("creator", "username fullname avatar")
         .sort({ createdAt: -1 }); // Newest first
 
     // Save to cache (TTL: 5 minutes)

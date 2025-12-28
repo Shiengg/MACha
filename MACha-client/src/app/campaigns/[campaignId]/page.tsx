@@ -6,6 +6,7 @@ import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import { campaignService, Campaign, CampaignUpdate, CreateCampaignUpdatePayload } from '@/services/campaign.service';
 import { donationService, Donation } from '@/services/donation.service';
 import { escrowService, Escrow, Vote } from '@/services/escrow.service';
+import { formatEscrowError } from '@/utils/escrow.utils';
 import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { cloudinaryService } from '@/services/cloudinary.service';
@@ -340,7 +341,7 @@ function CampaignDetails() {
                     setUserVote(null);
                 }
 
-                // Check eligibility: user must have donated at least 1% of goal_amount
+                // Check eligibility: user chỉ cần đã donate (bất kỳ số tiền nào)
                 if (campaign) {
                     try {
                         const userDonations = donations.filter(
@@ -350,9 +351,8 @@ function CampaignDetails() {
                                     : donation.donor) === (user._id || user.id) &&
                                 donation.payment_status === 'completed'
                         );
-                        const totalDonated = userDonations.reduce((sum, d) => sum + d.amount, 0);
-                        const threshold = campaign.goal_amount * 0.01; // 1%
-                        setIsEligibleToVote(totalDonated >= threshold);
+                        // Chỉ cần có ít nhất 1 donation completed là được vote
+                        setIsEligibleToVote(userDonations.length > 0);
                     } catch (err) {
                         console.error('Error checking eligibility:', err);
                         setIsEligibleToVote(false);
@@ -490,20 +490,20 @@ function CampaignDetails() {
                 prev.map((req) => (req._id === escrowId ? updatedRequest : req))
             );
 
-            // Show success message
+            // Show success toast
             Swal.fire({
                 icon: 'success',
                 title: 'Thành công!',
                 text: `Bạn đã vote ${value === 'approve' ? 'Đồng ý' : 'Từ chối'} cho withdrawal request này`,
-                timer: 2000,
+                timer: 3000,
+                timerProgressBar: true,
                 showConfirmButton: false,
+                toast: true,
+                position: 'top-end',
             });
         } catch (err: any) {
             console.error('Error submitting vote:', err);
-            const errorMessage =
-                err?.response?.data?.message ||
-                err?.message ||
-                'Không thể submit vote. Vui lòng thử lại sau.';
+            const errorMessage = formatEscrowError(err);
             Swal.fire({
                 icon: 'error',
                 title: 'Lỗi',
@@ -1348,13 +1348,102 @@ function CampaignDetails() {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Auto-created Withdrawal Request Banner */}
+                                            {(() => {
+                                                const campaignProgress = (campaign.current_amount / campaign.goal_amount) * 100;
+                                                const milestonePercentages = [50, 75, 100];
+                                                const reachedMilestones = milestonePercentages.filter(
+                                                    (milestone) => campaignProgress >= milestone
+                                                );
+
+                                                // Find auto-created withdrawal requests for reached milestones
+                                                const autoCreatedRequests = withdrawalRequests.filter(
+                                                    (req) =>
+                                                        req.auto_created &&
+                                                        req.milestone_percentage &&
+                                                        reachedMilestones.includes(req.milestone_percentage) &&
+                                                        req.request_status !== 'cancelled' &&
+                                                        req.request_status !== 'admin_rejected'
+                                                );
+
+                                                if (autoCreatedRequests.length > 0) {
+                                                    return (
+                                                        <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-xl p-6 border border-orange-200 dark:border-orange-800">
+                                                            <div className="flex items-start gap-4">
+                                                                <div className="flex-shrink-0">
+                                                                    <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center">
+                                                                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                                                        </svg>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <h3 className="text-lg font-bold text-orange-900 dark:text-orange-300 mb-2">
+                                                                        Campaign đã đạt milestone! 🎉
+                                                                    </h3>
+                                                                    <p className="text-orange-700 dark:text-orange-400 mb-4">
+                                                                        Withdrawal request đã được tạo tự động khi campaign đạt các mốc mục tiêu:
+                                                                    </p>
+                                                                    <div className="space-y-2 mb-4">
+                                                                        {autoCreatedRequests.map((request) => (
+                                                                            <div
+                                                                                key={request._id}
+                                                                                className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-orange-200 dark:border-orange-700"
+                                                                            >
+                                                                                <div className="flex items-center justify-between">
+                                                                                    <div className="flex items-center gap-3">
+                                                                                        <span className="px-3 py-1 bg-orange-500 text-white rounded-full text-sm font-semibold">
+                                                                                            {request.milestone_percentage}%
+                                                                                        </span>
+                                                                                        <div>
+                                                                                            <p className="font-semibold text-gray-900 dark:text-white">
+                                                                                                {formatCurrency(request.withdrawal_request_amount)}
+                                                                                            </p>
+                                                                                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                                                                Trạng thái: {
+                                                                                                    request.request_status === 'voting_in_progress' ? 'Đang vote' :
+                                                                                                    request.request_status === 'voting_completed' ? 'Đã hoàn thành vote' :
+                                                                                                    request.request_status === 'admin_approved' ? 'Admin đã duyệt' :
+                                                                                                    request.request_status === 'released' ? 'Đã giải ngân' :
+                                                                                                    'Chờ xử lý'
+                                                                                                }
+                                                                                            </p>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setActiveTab('withdrawals');
+                                                                                            // Scroll to withdrawals section
+                                                                                            setTimeout(() => {
+                                                                                                const withdrawalsTab = document.querySelector('[data-tab="withdrawals"]');
+                                                                                                if (withdrawalsTab) {
+                                                                                                    withdrawalsTab.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                                                                }
+                                                                                            }, 100);
+                                                                                        }}
+                                                                                        className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-all text-sm"
+                                                                                    >
+                                                                                        Xem chi tiết
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
                                         </div>
                                     )}
 
                                     {activeTab === 'updates' && <UpdatesTab campaignId={campaignId} updates={updates} setUpdates={setUpdates} updatesLoading={updatesLoading} isCreator={!!(user && campaign && user._id === campaign.creator._id)} />}
 
                                     {activeTab === 'withdrawals' && (
-                                        <div className="space-y-6">
+                                        <div className="space-y-6" data-tab="withdrawals">
                                             {/* Header with Create Button */}
                                             <div className="flex items-center justify-between">
                                                 <div>
