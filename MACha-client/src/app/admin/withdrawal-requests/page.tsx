@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import {
@@ -9,13 +9,12 @@ import {
   rejectWithdrawalRequest,
 } from '@/services/admin/escrow.service';
 import { Escrow, WithdrawalRequestStatus, Campaign, User } from '@/services/escrow.service';
-import { formatEscrowError, formatWithdrawalStatus, getStatusColor, formatCurrencyVND, formatDateTime } from '@/utils/escrow.utils';
+import { formatEscrowError, formatWithdrawalStatus, formatCurrencyVND, formatDateTime } from '@/utils/escrow.utils';
 import Swal from 'sweetalert2';
 import {
   DollarSign,
   CheckCircle2,
   XCircle,
-  Eye,
   RefreshCw,
   Calendar,
   Users,
@@ -23,6 +22,10 @@ import {
   TrendingDown,
   FileText,
   AlertCircle,
+  MoreVertical,
+  ChevronDown,
+  Search,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 export default function AdminWithdrawalRequests() {
@@ -32,10 +35,39 @@ export default function AdminWithdrawalRequests() {
   const [statusFilter, setStatusFilter] = useState<WithdrawalRequestStatus>('voting_completed');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [selectedRequests, setSelectedRequests] = useState<Set<string>>(new Set());
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const filterRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     fetchWithdrawalRequests();
   }, [statusFilter]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      Object.entries(menuRefs.current).forEach(([requestId, ref]) => {
+        if (ref && !ref.contains(target) && openMenuId === requestId) {
+          setOpenMenuId(null);
+        }
+      });
+      
+      if (filterRef.current && !filterRef.current.contains(target) && showFilters) {
+        setShowFilters(false);
+      }
+    };
+
+    if (openMenuId || showFilters) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [openMenuId, showFilters]);
 
   const fetchWithdrawalRequests = async () => {
     try {
@@ -54,11 +86,32 @@ export default function AdminWithdrawalRequests() {
   };
 
   const handleViewDetails = (escrow: Escrow) => {
+    setOpenMenuId(null);
     setSelectedRequest(escrow);
     setShowDetailsModal(true);
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const filtered = filteredRequests.map(r => r._id);
+      setSelectedRequests(new Set(filtered));
+    } else {
+      setSelectedRequests(new Set());
+    }
+  };
+
+  const handleSelectRequest = (requestId: string, checked: boolean) => {
+    const newSelected = new Set(selectedRequests);
+    if (checked) {
+      newSelected.add(requestId);
+    } else {
+      newSelected.delete(requestId);
+    }
+    setSelectedRequests(newSelected);
+  };
+
   const handleApprove = async (escrowId: string) => {
+    setOpenMenuId(null);
     const result = await Swal.fire({
       title: 'Duyệt yêu cầu rút tiền?',
       html: `
@@ -156,6 +209,7 @@ export default function AdminWithdrawalRequests() {
   };
 
   const handleReject = async (escrowId: string) => {
+    setOpenMenuId(null);
     const result = await Swal.fire({
       title: 'Từ chối yêu cầu rút tiền',
       html: `
@@ -291,13 +345,19 @@ export default function AdminWithdrawalRequests() {
   };
 
   const getStatusBadge = (status: WithdrawalRequestStatus) => {
-    const colors = getStatusColor(status);
     const label = formatWithdrawalStatus(status);
-    return (
-      <span className={`px-3 py-1 ${colors.bg} ${colors.text} rounded-full text-sm font-medium`}>
-        {label}
-      </span>
-    );
+    switch (status) {
+      case 'voting_completed':
+        return { label, bgColor: 'bg-blue-50', textColor: 'text-blue-700' };
+      case 'admin_approved':
+        return { label, bgColor: 'bg-emerald-50', textColor: 'text-emerald-700' };
+      case 'admin_rejected':
+        return { label, bgColor: 'bg-red-50', textColor: 'text-red-700' };
+      case 'released':
+        return { label, bgColor: 'bg-green-50', textColor: 'text-green-700' };
+      default:
+        return { label, bgColor: 'bg-gray-50', textColor: 'text-gray-700' };
+    }
   };
 
   const getCampaignTitle = (campaign: string | Campaign): string => {
@@ -315,149 +375,244 @@ export default function AdminWithdrawalRequests() {
     return requestedBy.email || 'N/A';
   };
 
+  const filteredRequests = withdrawalRequests.filter((request) => {
+    const query = searchQuery.toLowerCase();
+    const campaignTitle = getCampaignTitle(request.campaign).toLowerCase();
+    const creatorName = getCreatorInfo(request.requested_by).toLowerCase();
+    const creatorEmail = getCreatorEmail(request.requested_by).toLowerCase();
+    
+    return campaignTitle.includes(query) || 
+           creatorName.includes(query) || 
+           creatorEmail.includes(query);
+  });
+
   return (
-    <div className="min-h-screen bg-[#0f1419]">
+    <div className="min-h-screen bg-white">
       <AdminSidebar />
       <AdminHeader />
 
       <div className="ml-64 pt-16">
         <div className="p-8">
+          {/* Main Title */}
           <div className="mb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-white mb-2">Quản lý yêu cầu rút tiền</h1>
-                <p className="text-gray-400">Xem xét và phê duyệt các yêu cầu rút tiền từ campaign creators.</p>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2">Quản lý yêu cầu rút tiền</h1>
+            <p className="text-gray-600">Xem xét và phê duyệt các yêu cầu rút tiền từ campaign creators.</p>
+          </div>
+
+          {/* Header with title, count, search and filters */}
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Tất cả yêu cầu <span className="text-gray-500 font-normal">({filteredRequests.length})</span>
+              </h2>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
               </div>
+              
+              {/* Filters Button */}
+              <div className="relative" ref={filterRef}>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors"
+                >
+                  <SlidersHorizontal className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-bold">Filters</span>
+                </button>
+                
+                {/* Filters Dropdown */}
+                {showFilters && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
+                    <div className="space-y-4">
+                      {/* Status Filter */}
+                      <div className="relative">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Trạng thái
+                        </label>
+                        <select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value as WithdrawalRequestStatus)}
+                          className="w-full px-3 py-2 bg-white text-gray-900 rounded-lg border border-gray-200 appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                          <option value="voting_completed">Đã hoàn thành vote</option>
+                          <option value="admin_approved">Admin đã duyệt</option>
+                          <option value="admin_rejected">Admin từ chối</option>
+                          <option value="released">Đã giải ngân</option>
+                        </select>
+                        <ChevronDown className="w-4 h-4 absolute right-3 bottom-2.5 pointer-events-none text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Refresh Button */}
               <button
                 onClick={handleRefresh}
                 disabled={loading || isProcessing}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                Làm mới
+                <span className="text-sm font-medium">Làm mới</span>
               </button>
             </div>
           </div>
 
-          <div className="bg-[#1a1f2e] rounded-lg border border-gray-700">
-            <div className="p-6 border-b border-gray-700">
-              <div className="flex items-center gap-4">
-                <div className="relative flex-1">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as WithdrawalRequestStatus)}
-                    className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="voting_completed">Đã hoàn thành vote</option>
-                    <option value="admin_approved">Admin đã duyệt</option>
-                    <option value="admin_rejected">Admin từ chối</option>
-                    <option value="released">Đã giải ngân</option>
-                  </select>
-                  <svg
-                    className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
+          {/* Table */}
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
 
             <div className="overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="text-center">
                     <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-400">Đang tải...</p>
+                    <p className="text-gray-600">Đang tải dữ liệu...</p>
                   </div>
                 </div>
-              ) : withdrawalRequests.length === 0 ? (
+              ) : filteredRequests.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-400">Không có yêu cầu rút tiền nào</p>
+                  <p className="text-gray-600">Không có yêu cầu rút tiền nào</p>
                 </div>
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-gray-700">
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">CAMPAIGN</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">NGƯỜI YÊU CẦU</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">SỐ TIỀN</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">KẾT QUẢ VOTE</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">TRẠNG THÁI</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">NGÀY YÊU CẦU</th>
-                      <th className="px-6 py-4 text-left text-gray-400 font-medium text-sm">HÀNH ĐỘNG</th>
+                    <tr className="border-b border-gray-200 bg-gray-100">
+                      <th className="px-6 py-3 text-left">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded-full border-gray-300 text-blue-600 focus:ring-blue-500"
+                          checked={filteredRequests.length > 0 && filteredRequests.every(r => selectedRequests.has(r._id))}
+                          onChange={(e) => handleSelectAll(e.target.checked)}
+                        />
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Campaign</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Người yêu cầu</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Số tiền</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Kết quả vote</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Trạng thái</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Ngày yêu cầu</th>
+                      <th className="px-6 py-3 text-left"></th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {withdrawalRequests.map((request) => (
-                      <tr key={request._id} className="border-b border-gray-700 hover:bg-gray-800/50 transition-all">
-                        <td className="px-6 py-4">
-                          <div className="text-white font-medium">{getCampaignTitle(request.campaign)}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-white font-medium">{getCreatorInfo(request.requested_by)}</div>
-                          <div className="text-gray-400 text-sm">{getCreatorEmail(request.requested_by)}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-white font-semibold">{formatCurrencyVND(request.withdrawal_request_amount)}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          {request.votingResults && request.votingResults.totalVotes > 0 ? (
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2 text-sm">
-                                <TrendingUp className="w-4 h-4 text-green-500" />
-                                <span className="text-green-400 font-medium">{request.votingResults.approvePercentage}%</span>
-                                <span className="text-gray-400">({request.votingResults.approveCount} phiếu)</span>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredRequests.map((request, index) => {
+                      const statusBadge = getStatusBadge(request.request_status);
+                      const isLastTwo = index >= filteredRequests.length - 2;
+                      return (
+                        <tr key={request._id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <input 
+                              type="checkbox" 
+                              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              checked={selectedRequests.has(request._id)}
+                              onChange={(e) => handleSelectRequest(request._id, e.target.checked)}
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-gray-900">{getCampaignTitle(request.campaign)}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-gray-900">{getCreatorInfo(request.requested_by)}</div>
+                            <div className="text-sm text-gray-500">{getCreatorEmail(request.requested_by)}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-semibold text-gray-900">{formatCurrencyVND(request.withdrawal_request_amount)}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            {request.votingResults && request.votingResults.totalVotes > 0 ? (
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 text-sm">
+                                  <TrendingUp className="w-4 h-4 text-green-600" />
+                                  <span className="text-green-700 font-medium">{request.votingResults.approvePercentage}%</span>
+                                  <span className="text-gray-500">({request.votingResults.approveCount} phiếu)</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm">
+                                  <TrendingDown className="w-4 h-4 text-red-600" />
+                                  <span className="text-red-700 font-medium">{request.votingResults.rejectPercentage}%</span>
+                                  <span className="text-gray-500">({request.votingResults.rejectCount} phiếu)</span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2 text-sm">
-                                <TrendingDown className="w-4 h-4 text-red-500" />
-                                <span className="text-red-400 font-medium">{request.votingResults.rejectPercentage}%</span>
-                                <span className="text-gray-400">({request.votingResults.rejectCount} phiếu)</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 text-sm">Chưa có vote</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">{getStatusBadge(request.request_status)}</td>
-                        <td className="px-6 py-4">
-                          <div className="text-gray-400 text-sm">{formatDateTime(request.createdAt)}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleViewDetails(request)}
-                              className="p-2 text-blue-500 hover:bg-blue-900/20 rounded-lg transition-all"
-                              title="Xem chi tiết"
-                            >
-                              <Eye className="w-5 h-5" />
-                            </button>
-                            {request.request_status === 'voting_completed' && (
-                              <>
-                                <button
-                                  onClick={() => handleApprove(request._id)}
-                                  disabled={isProcessing}
-                                  className="p-2 text-green-500 hover:bg-green-900/20 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                  title="Duyệt"
-                                >
-                                  <CheckCircle2 className="w-5 h-5" />
-                                </button>
-                                <button
-                                  onClick={() => handleReject(request._id)}
-                                  disabled={isProcessing}
-                                  className="p-2 text-red-500 hover:bg-red-900/20 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                  title="Từ chối"
-                                >
-                                  <XCircle className="w-5 h-5" />
-                                </button>
-                              </>
+                            ) : (
+                              <span className="text-gray-500 text-sm">Chưa có vote</span>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-2.5 py-1 text-xs font-medium rounded-full ${statusBadge.bgColor} ${statusBadge.textColor}`}
+                            >
+                              {statusBadge.label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{formatDateTime(request.createdAt)}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="relative" ref={(el) => { menuRefs.current[request._id] = el; }}>
+                              <button
+                                onClick={() => setOpenMenuId(openMenuId === request._id ? null : request._id)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                              >
+                                <MoreVertical className="w-5 h-5" />
+                              </button>
+                              {openMenuId === request._id && (
+                                <div 
+                                  className={`absolute right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 ${
+                                    isLastTwo ? 'bottom-full mb-2' : 'mt-2'
+                                  }`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleViewDetails(request);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    Xem chi tiết
+                                  </button>
+                                  {request.request_status === 'voting_completed' && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleApprove(request._id);
+                                        }}
+                                        disabled={isProcessing}
+                                        className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        Duyệt
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleReject(request._id);
+                                        }}
+                                        disabled={isProcessing}
+                                        className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        Từ chối
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
@@ -469,15 +624,15 @@ export default function AdminWithdrawalRequests() {
       {/* Details Modal */}
       {showDetailsModal && selectedRequest && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1f2e] rounded-lg border border-gray-700 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-700 flex items-center justify-between sticky top-0 bg-[#1a1f2e] z-10">
-              <h2 className="text-2xl font-bold text-white">Chi tiết yêu cầu rút tiền</h2>
+          <div className="bg-white rounded-lg border border-gray-200 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+              <h2 className="text-2xl font-semibold text-gray-900">Chi tiết yêu cầu rút tiền</h2>
               <button
                 onClick={() => {
                   setShowDetailsModal(false);
                   setSelectedRequest(null);
                 }}
-                className="text-gray-400 hover:text-white transition-all"
+                className="text-gray-400 hover:text-gray-600 transition-all"
                 disabled={isProcessing}
               >
                 <XCircle className="w-6 h-6" />
@@ -487,14 +642,14 @@ export default function AdminWithdrawalRequests() {
             <div className="p-6 space-y-6">
               {/* Campaign Info */}
               <div>
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5" />
                   Thông tin Campaign
                 </h3>
-                <div className="grid grid-cols-2 gap-4 bg-gray-800/50 p-4 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <div>
-                    <p className="text-gray-400 text-sm">Tên Campaign</p>
-                    <p className="text-white font-medium">
+                    <p className="text-gray-600 text-sm mb-1">Tên Campaign</p>
+                    <p className="text-gray-900 font-medium">
                       {typeof selectedRequest.campaign === 'object'
                         ? selectedRequest.campaign.title
                         : 'N/A'}
@@ -503,12 +658,12 @@ export default function AdminWithdrawalRequests() {
                   {typeof selectedRequest.campaign === 'object' && (
                     <>
                       <div>
-                        <p className="text-gray-400 text-sm">Mục tiêu</p>
-                        <p className="text-white font-medium">{formatCurrencyVND(selectedRequest.campaign.goal_amount)}</p>
+                        <p className="text-gray-600 text-sm mb-1">Mục tiêu</p>
+                        <p className="text-gray-900 font-medium">{formatCurrencyVND(selectedRequest.campaign.goal_amount)}</p>
                       </div>
                       <div>
-                        <p className="text-gray-400 text-sm">Số tiền hiện tại</p>
-                        <p className="text-white font-medium">{formatCurrencyVND(selectedRequest.campaign.current_amount)}</p>
+                        <p className="text-gray-600 text-sm mb-1">Số tiền hiện tại</p>
+                        <p className="text-gray-900 font-medium">{formatCurrencyVND(selectedRequest.campaign.current_amount)}</p>
                       </div>
                     </>
                   )}
@@ -517,57 +672,66 @@ export default function AdminWithdrawalRequests() {
 
               {/* Creator Info */}
               <div>
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Users className="w-5 h-5" />
                   Thông tin người yêu cầu
                 </h3>
-                <div className="grid grid-cols-2 gap-4 bg-gray-800/50 p-4 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <div>
-                    <p className="text-gray-400 text-sm">Họ tên</p>
-                    <p className="text-white font-medium">{getCreatorInfo(selectedRequest.requested_by)}</p>
+                    <p className="text-gray-600 text-sm mb-1">Họ tên</p>
+                    <p className="text-gray-900 font-medium">{getCreatorInfo(selectedRequest.requested_by)}</p>
                   </div>
                   <div>
-                    <p className="text-gray-400 text-sm">Username</p>
-                    <p className="text-white font-medium">
+                    <p className="text-gray-600 text-sm mb-1">Username</p>
+                    <p className="text-gray-900 font-medium">
                       {typeof selectedRequest.requested_by === 'object'
                         ? selectedRequest.requested_by.username
                         : 'N/A'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-400 text-sm">Email</p>
-                    <p className="text-white font-medium">{getCreatorEmail(selectedRequest.requested_by)}</p>
+                    <p className="text-gray-600 text-sm mb-1">Email</p>
+                    <p className="text-gray-900 font-medium">{getCreatorEmail(selectedRequest.requested_by)}</p>
                   </div>
                 </div>
               </div>
 
               {/* Request Info */}
               <div>
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <DollarSign className="w-5 h-5" />
                   Thông tin yêu cầu
                 </h3>
-                <div className="grid grid-cols-2 gap-4 bg-gray-800/50 p-4 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <div>
-                    <p className="text-gray-400 text-sm">Số tiền yêu cầu</p>
-                    <p className="text-white font-semibold text-lg">{formatCurrencyVND(selectedRequest.withdrawal_request_amount)}</p>
+                    <p className="text-gray-600 text-sm mb-1">Số tiền yêu cầu</p>
+                    <p className="text-gray-900 font-semibold text-lg">{formatCurrencyVND(selectedRequest.withdrawal_request_amount)}</p>
                   </div>
                   <div>
-                    <p className="text-gray-400 text-sm">Trạng thái</p>
-                    <div className="mt-1">{getStatusBadge(selectedRequest.request_status)}</div>
+                    <p className="text-gray-600 text-sm mb-1">Trạng thái</p>
+                    <div className="mt-1">
+                      {(() => {
+                        const badge = getStatusBadge(selectedRequest.request_status);
+                        return (
+                          <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${badge.bgColor} ${badge.textColor}`}>
+                            {badge.label}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </div>
                   <div>
-                    <p className="text-gray-400 text-sm">Ngày tạo</p>
-                    <p className="text-white font-medium">{formatDateTime(selectedRequest.createdAt)}</p>
+                    <p className="text-gray-600 text-sm mb-1">Ngày tạo</p>
+                    <p className="text-gray-900 font-medium">{formatDateTime(selectedRequest.createdAt)}</p>
                   </div>
                   <div>
-                    <p className="text-gray-400 text-sm">Ngày cập nhật</p>
-                    <p className="text-white font-medium">{formatDateTime(selectedRequest.updatedAt)}</p>
+                    <p className="text-gray-600 text-sm mb-1">Ngày cập nhật</p>
+                    <p className="text-gray-900 font-medium">{formatDateTime(selectedRequest.updatedAt)}</p>
                   </div>
                   {selectedRequest.request_reason && (
                     <div className="col-span-2">
-                      <p className="text-gray-400 text-sm mb-2">Lý do yêu cầu</p>
-                      <p className="text-white whitespace-pre-wrap bg-gray-900/50 p-3 rounded-lg">
+                      <p className="text-gray-600 text-sm mb-2">Lý do yêu cầu</p>
+                      <p className="text-gray-900 whitespace-pre-wrap bg-white border border-gray-200 p-3 rounded-lg">
                         {selectedRequest.request_reason}
                       </p>
                     </div>
@@ -578,21 +742,21 @@ export default function AdminWithdrawalRequests() {
               {/* Voting Period */}
               {(selectedRequest.voting_start_date || selectedRequest.voting_end_date) && (
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <Calendar className="w-5 h-5" />
                     Thời gian vote
                   </h3>
-                  <div className="bg-gray-800/50 p-4 rounded-lg space-y-2">
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-2 border border-gray-200">
                     {selectedRequest.voting_start_date && (
                       <div>
-                        <p className="text-gray-400 text-sm">Bắt đầu</p>
-                        <p className="text-white font-medium">{formatDateTime(selectedRequest.voting_start_date)}</p>
+                        <p className="text-gray-600 text-sm mb-1">Bắt đầu</p>
+                        <p className="text-gray-900 font-medium">{formatDateTime(selectedRequest.voting_start_date)}</p>
                       </div>
                     )}
                     {selectedRequest.voting_end_date && (
                       <div>
-                        <p className="text-gray-400 text-sm">Kết thúc</p>
-                        <p className="text-white font-medium">{formatDateTime(selectedRequest.voting_end_date)}</p>
+                        <p className="text-gray-600 text-sm mb-1">Kết thúc</p>
+                        <p className="text-gray-900 font-medium">{formatDateTime(selectedRequest.voting_end_date)}</p>
                       </div>
                     )}
                   </div>
@@ -602,22 +766,22 @@ export default function AdminWithdrawalRequests() {
               {/* Voting Results */}
               {selectedRequest.votingResults && selectedRequest.votingResults.totalVotes > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <Users className="w-5 h-5" />
                     Kết quả vote
                   </h3>
-                  <div className="bg-gray-800/50 p-4 rounded-lg space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-4 border border-gray-200">
                     <div className="grid grid-cols-2 gap-4">
                       {/* Approve */}
-                      <div className="bg-green-900/30 rounded-lg p-4 border border-green-700/50">
+                      <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                         <div className="flex items-center gap-2 mb-2">
-                          <TrendingUp className="w-5 h-5 text-green-500" />
-                          <span className="text-green-400 font-semibold">Đồng ý</span>
+                          <TrendingUp className="w-5 h-5 text-green-600" />
+                          <span className="text-green-700 font-semibold">Đồng ý</span>
                         </div>
-                        <div className="text-2xl font-bold text-green-400 mb-1">
+                        <div className="text-2xl font-bold text-green-700 mb-1">
                           {selectedRequest.votingResults.approvePercentage}%
                         </div>
-                        <div className="text-sm text-gray-400">
+                        <div className="text-sm text-gray-600">
                           {selectedRequest.votingResults.approveCount} phiếu
                         </div>
                         <div className="text-xs text-gray-500 mt-2">
@@ -626,15 +790,15 @@ export default function AdminWithdrawalRequests() {
                       </div>
 
                       {/* Reject */}
-                      <div className="bg-red-900/30 rounded-lg p-4 border border-red-700/50">
+                      <div className="bg-red-50 rounded-lg p-4 border border-red-200">
                         <div className="flex items-center gap-2 mb-2">
-                          <TrendingDown className="w-5 h-5 text-red-500" />
-                          <span className="text-red-400 font-semibold">Từ chối</span>
+                          <TrendingDown className="w-5 h-5 text-red-600" />
+                          <span className="text-red-700 font-semibold">Từ chối</span>
                         </div>
-                        <div className="text-2xl font-bold text-red-400 mb-1">
+                        <div className="text-2xl font-bold text-red-700 mb-1">
                           {selectedRequest.votingResults.rejectPercentage}%
                         </div>
-                        <div className="text-sm text-gray-400">
+                        <div className="text-sm text-gray-600">
                           {selectedRequest.votingResults.rejectCount} phiếu
                         </div>
                         <div className="text-xs text-gray-500 mt-2">
@@ -642,7 +806,7 @@ export default function AdminWithdrawalRequests() {
                         </div>
                       </div>
                     </div>
-                    <div className="text-center text-sm text-gray-400 pt-2 border-t border-gray-700">
+                    <div className="text-center text-sm text-gray-600 pt-2 border-t border-gray-200">
                       Tổng: {selectedRequest.votingResults.totalVotes} phiếu bầu
                     </div>
                   </div>
@@ -652,19 +816,19 @@ export default function AdminWithdrawalRequests() {
               {/* Admin Review Info */}
               {selectedRequest.admin_reviewed_at && (
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <AlertCircle className="w-5 h-5" />
                     Thông tin admin review
                   </h3>
-                  <div className="bg-gray-800/50 p-4 rounded-lg space-y-2">
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-2 border border-gray-200">
                     <div>
-                      <p className="text-gray-400 text-sm">Ngày review</p>
-                      <p className="text-white font-medium">{formatDateTime(selectedRequest.admin_reviewed_at)}</p>
+                      <p className="text-gray-600 text-sm mb-1">Ngày review</p>
+                      <p className="text-gray-900 font-medium">{formatDateTime(selectedRequest.admin_reviewed_at)}</p>
                     </div>
                     {selectedRequest.admin_rejection_reason && (
                       <div>
-                        <p className="text-gray-400 text-sm">Lý do từ chối</p>
-                        <p className="text-red-400 mt-1 bg-red-900/20 p-3 rounded-lg">
+                        <p className="text-gray-600 text-sm mb-1">Lý do từ chối</p>
+                        <p className="text-red-600 mt-1 bg-red-50 border border-red-200 p-3 rounded-lg">
                           {selectedRequest.admin_rejection_reason}
                         </p>
                       </div>
@@ -675,7 +839,7 @@ export default function AdminWithdrawalRequests() {
 
               {/* Actions */}
               {selectedRequest.request_status === 'voting_completed' && (
-                <div className="flex items-center gap-4 pt-4 border-t border-gray-700">
+                <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
                   <button
                     onClick={() => handleApprove(selectedRequest._id)}
                     disabled={isProcessing}
