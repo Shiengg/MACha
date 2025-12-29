@@ -170,18 +170,22 @@ export default function AdminKYCApproval() {
   const filteredRequests = kycRequests
     .filter((request) => {
       const query = searchQuery.toLowerCase();
+      const username = request.user?.username || request.username || '';
+      const email = request.user?.email || request.email || '';
+      const identityName = request.extracted_data?.identity_verified_name || request.identity_verified_name || '';
       const matchesSearch =
-        request.username?.toLowerCase().includes(query) ||
-        request.email?.toLowerCase().includes(query) ||
-        request.identity_verified_name?.toLowerCase().includes(query);
+        username.toLowerCase().includes(query) ||
+        email.toLowerCase().includes(query) ||
+        identityName.toLowerCase().includes(query);
       
-      const matchesStatus = statusFilter === 'all' || request.kyc_status === statusFilter;
+      const status = request.status || request.kyc_status || 'unverified';
+      const matchesStatus = statusFilter === 'all' || status === statusFilter;
       
       return matchesSearch && matchesStatus;
     })
     .sort((a, b) => {
-      const dateA = new Date(a.kyc_submitted_at || 0).getTime();
-      const dateB = new Date(b.kyc_submitted_at || 0).getTime();
+      const dateA = new Date(a.submitted_at || a.kyc_submitted_at || 0).getTime();
+      const dateB = new Date(b.submitted_at || b.kyc_submitted_at || 0).getTime();
       return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
     });
 
@@ -362,8 +366,16 @@ export default function AdminKYCApproval() {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {paginatedRequests.map((request, index) => {
-                      const statusBadge = getStatusBadge(request.kyc_status);
+                      const status = request.status || request.kyc_status || 'unverified';
+                      const statusBadge = getStatusBadge(status);
                       const isLastTwo = index >= paginatedRequests.length - 2;
+                      const userId = request.user?._id || request._id; // Use user._id for API calls
+                      const username = request.user?.username || request.username || '';
+                      const email = request.user?.email || request.email || '';
+                      const identityName = request.extracted_data?.identity_verified_name || request.identity_verified_name || '';
+                      const identityCard = request.extracted_data?.identity_card_last4 || request.identity_card_last4 || '';
+                      const submittedAt = request.submitted_at || request.kyc_submitted_at || '';
+                      
                       return (
                         <tr key={request._id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4">
@@ -375,19 +387,19 @@ export default function AdminKYCApproval() {
                             />
                           </td>
                           <td className="px-6 py-4">
-                            <div className="font-medium text-gray-900">{request.username}</div>
+                            <div className="font-medium text-gray-900">{username}</div>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">{request.email}</div>
+                            <div className="text-sm text-gray-900">{email}</div>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">{request.identity_verified_name || '-'}</div>
+                            <div className="text-sm text-gray-900">{identityName || '-'}</div>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">{request.identity_card_last4 || '-'}</div>
+                            <div className="text-sm text-gray-900">{identityCard || '-'}</div>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">{formatDate(request.kyc_submitted_at || '')}</div>
+                            <div className="text-sm text-gray-900">{formatDate(submittedAt)}</div>
                           </td>
                           <td className="px-6 py-4">
                             <span
@@ -415,19 +427,19 @@ export default function AdminKYCApproval() {
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleViewDetails(request._id);
+                                      handleViewDetails(userId);
                                     }}
                                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                   >
                                     Xem chi tiết
                                   </button>
-                                  {request.kyc_status === 'pending' && (
+                                  {status === 'pending' && (
                                     <>
                                       <button
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleApprove(request._id);
+                                          handleApprove(userId);
                                         }}
                                         className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
                                       >
@@ -437,7 +449,7 @@ export default function AdminKYCApproval() {
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleReject(request._id);
+                                          handleReject(userId);
                                         }}
                                         className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
                                       >

@@ -6,13 +6,7 @@ import {
     unfollowUser, 
     getFollowers, 
     getFollowing, 
-    searchUsers,
-    submitKYC,
-    getKYCStatus,
-    getPendingKYCs,
-    getKYCDetails,
-    approveKYC,
-    rejectKYC
+    searchUsers
 } from "../controllers/UserController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { checkRole } from "../middlewares/checkRole.js";
@@ -27,13 +21,6 @@ userRoutes.post('/:id/follow', authMiddleware, followUser);
 userRoutes.post('/:id/unfollow', authMiddleware, unfollowUser);
 userRoutes.get('/:id/follower', authMiddleware, getFollowers);
 userRoutes.get('/:id/following', authMiddleware, getFollowing);
-
-userRoutes.post('/kyc/submit', authMiddleware, RateLimitMiddleware.rateLimitByIP(5, 3600), submitKYC);
-userRoutes.get('/kyc/status', authMiddleware, getKYCStatus);
-userRoutes.get('/kyc/pending', authMiddleware, checkRole('admin'), getPendingKYCs);
-userRoutes.get('/kyc/:id/details', authMiddleware, checkRole('admin'), getKYCDetails);
-userRoutes.post('/kyc/:id/approve', authMiddleware, checkRole('admin'), approveKYC);
-userRoutes.post('/kyc/:id/reject', authMiddleware, checkRole('admin'), rejectKYC);
 
 /**
  * @swagger

@@ -48,6 +48,7 @@ app.use(cookieParser());
 
 app.use("/api/auth", routes.authRoutes);
 app.use("/api/users", routes.userRoutes);
+app.use("/api/kyc", routes.kycRoutes);
 app.use("/api/posts", routes.postRoutes);
 app.use("/api/comments", routes.commentRoutes);
 app.use("/api/likes", routes.likeRoutes);

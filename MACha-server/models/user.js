@@ -45,46 +45,17 @@ const userSchema = mongoose.Schema({
         default: false,
     },
 
+    // KYC Status (derived from latest KYC submission)
     kyc_status: {
         type: String,
         enum: ["unverified", "pending", "verified", "rejected"],
         default: "unverified",
+        index: true
     },
-    kyc_documents: {
-        identity_front_url: String,
-        identity_back_url: String,
-        selfie_url: String,
-        tax_document_url: String,
-        bank_statement_url: String
-    },
-    identity_verified_name: String,
-    identity_card_last4: String,
-    tax_code: String,
-    address: {
-        city: String,
-        district: String
-    },
-    bank_account: {
-        bank_name: String,
-        account_number_last4: String,
-        account_holder_name: String,
-        bank_document_url: String
-    },
-    kyc_submitted_at: {
-        type: Date,
-        default: null
-    },
-    kyc_verified_at: {
-        type: Date,
-        default: null
-    },
-    kyc_verified_by: {
+    // Reference to latest KYC submission
+    current_kyc_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        default: null
-    },
-    kyc_rejection_reason: {
-        type: String,
+        ref: "KYC",
         default: null
     },
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
