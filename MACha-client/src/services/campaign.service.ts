@@ -7,6 +7,7 @@ import {
   DELETE_CAMPAIGN_ROUTE,
   CANCEL_CAMPAIGN_ROUTE,
   GET_CAMPAIGNS_BY_CATEGORY_ROUTE,
+  SEARCH_CAMPAIGNS_BY_HASHTAG_ROUTE,
   GET_ACTIVE_CATEGORIES_ROUTE,
   GET_CAMPAIGNS_BY_CREATOR_ROUTE,
   CREATE_CAMPAIGN_UPDATE_ROUTE,
@@ -54,6 +55,10 @@ export interface Campaign {
   rejected_at?: string;
   cancellation_reason?: string;
   cancelled_at?: string;
+  hashtag?: {
+    _id: string;
+    name: string;
+  };
   createdAt: string;
   updatedAt: string;
   // Escrow-related fields
@@ -95,6 +100,7 @@ export interface CreateCampaignPayload {
   proof_documents_url: string;
   milestones: Milestone[];
   expected_timeline?: TimelineItem[];
+  hashtag?: string; // Single hashtag name
 }
 
 export interface UpdateCampaignPayload {
@@ -159,6 +165,13 @@ export const campaignService = {
   async getActiveCategories(): Promise<CategoryWithCount[]> {
     const response = await apiClient.get(GET_ACTIVE_CATEGORIES_ROUTE);
     return response.data.categories;
+  },
+
+  async searchCampaignsByHashtag(hashtag: string): Promise<Campaign[]> {
+    const response = await apiClient.get(SEARCH_CAMPAIGNS_BY_HASHTAG_ROUTE, {
+      params: { hashtag },
+    });
+    return response.data.campaigns;
   },
 
   async getCampaignsByCreator(creatorId: string): Promise<Campaign[]> {

@@ -1,4 +1,5 @@
 import Campaign from "../models/campaign.js";
+import Hashtag from "../models/Hashtag.js";
 import { redisClient } from "../config/redis.js";
 
 export const getCampaigns = async () => {
@@ -11,7 +12,9 @@ export const getCampaigns = async () => {
     }
 
     // 2. Cache miss - Query database
-    const campaigns = await Campaign.find().populate("creator", "username fullname avatar");
+    const campaigns = await Campaign.find()
+        .populate("creator", "username fullname avatar")
+        .populate("hashtag", "name");
 
     // 3. Cache for 1 hour
     await redisClient.setEx(campaignKey, 3600, JSON.stringify(campaigns));
@@ -29,7 +32,9 @@ export const getCampaignById = async (campaignId) => {
     }
 
     // 2. Cache miss - Query database
-    const campaign = await Campaign.findById(campaignId).populate("creator", "username fullname avatar");
+    const campaign = await Campaign.findById(campaignId)
+        .populate("creator", "username fullname avatar")
+        .populate("hashtag", "name");
     if (!campaign) {
         return null;
     }
@@ -41,13 +46,54 @@ export const getCampaignById = async (campaignId) => {
 
 
 export const createCampaign = async (payload) => {
-    const campaign = new Campaign(payload);
+    // Extract hashtag from payload if provided
+    const { hashtag: hashtagName, ...campaignData } = payload;
+    
+    // Create campaign first (without hashtag)
+    const campaign = new Campaign(campaignData);
     await campaign.save();
+
+    // Process hashtag if provided
+    if (hashtagName && typeof hashtagName === 'string') {
+        const normalizedName = hashtagName.trim().toLowerCase();
+        
+        if (normalizedName.length > 0) {
+            try {
+                // Try to create hashtag (will fail if duplicate due to unique index)
+                const hashtag = await Hashtag.create({
+                    name: normalizedName,
+                    campaign: campaign._id
+                });
+                
+                // Update campaign with hashtag
+                campaign.hashtag = hashtag._id;
+                await campaign.save();
+            } catch (error) {
+                // If duplicate (MongoDB duplicate key error), find existing one
+                if (error.code === 11000) {
+                    const existingHashtag = await Hashtag.findOne({
+                        name: normalizedName,
+                        campaign: campaign._id
+                    });
+                    if (existingHashtag) {
+                        campaign.hashtag = existingHashtag._id;
+                        await campaign.save();
+                    }
+                } else {
+                    // Other errors, log but don't fail campaign creation
+                    console.error(`Error creating hashtag ${normalizedName}:`, error);
+                }
+            }
+        }
+    }
 
     await Promise.all([
         redisClient.del('campaigns:all'),
         redisClient.del('campaigns:pending'),
     ]);
+
+    // Populate hashtag before returning
+    await campaign.populate('hashtag', 'name');
 
     return campaign;
 }
@@ -67,6 +113,7 @@ export const getCampaignsByCategory = async (category) => {
         status: 'active' // Only return active campaigns
     })
         .populate("creator", "username fullname avatar")
+        .populate("hashtag", "name")
         .sort({ createdAt: -1 }); // Newest first
 
     // Save to cache (TTL: 5 minutes)
@@ -121,6 +168,7 @@ export const getCampaignsByCreator = async (creatorId) => {
         creator: creatorId
     })
         .populate("creator", "username avatar fullname")
+        .populate("hashtag", "name")
         .sort({ createdAt: -1 });
 
     await redisClient.setEx(campaignKey, 300, JSON.stringify(campaigns));
@@ -245,6 +293,12 @@ export const deleteCampaign = async (campaignId, userId) => {
 
     const category = campaign.category;
     const status = campaign.status;
+    const hashtagId = campaign.hashtag;
+
+    // Delete associated hashtag
+    if (hashtagId) {
+        await Hashtag.findByIdAndDelete(hashtagId);
+    }
 
     await Campaign.findByIdAndDelete(campaignId);
 
@@ -306,6 +360,7 @@ export const getPendingCampaigns = async () => {
 
     const campaigns = await Campaign.find({ status: 'pending' })
         .populate("creator", "username email avatar")
+        .populate("hashtag", "name")
         .sort({ createdAt: -1 });
 
     await redisClient.setEx(campaignKey, 300, JSON.stringify(campaigns));
@@ -379,6 +434,24 @@ export const rejectCampaign = async (campaignId, adminId, reason) => {
     ]);
 
     return { success: true, campaign };
+}
+
+export const searchCampaignsByHashtag = async (hashtagName) => {
+    const normalizedName = hashtagName.toLowerCase().trim();
+    
+    // Find hashtag
+    const hashtag = await Hashtag.findOne({ name: normalizedName });
+    if (!hashtag) {
+        return [];
+    }
+
+    // Find campaigns with this hashtag
+    const campaigns = await Campaign.find({ hashtag: hashtag._id })
+        .populate("creator", "username fullname avatar")
+        .populate("hashtag", "name")
+        .sort({ createdAt: -1 });
+
+    return campaigns;
 }
 
 export const processExpiredCampaigns = async () => {

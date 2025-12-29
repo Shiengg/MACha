@@ -89,6 +89,27 @@ export const getCampaignsByCreator = async (req, res) => {
     }
 }
 
+export const searchCampaignsByHashtag = async (req, res) => {
+    try {
+        const { hashtag } = req.query;
+
+        if (!hashtag) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Hashtag parameter is required"
+            });
+        }
+
+        const campaigns = await campaignService.searchCampaignsByHashtag(hashtag);
+        res.status(HTTP_STATUS.OK).json({
+            hashtag,
+            count: campaigns.length,
+            campaigns
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
+    }
+}
+
 export const createCampaign = async (req, res) => {
     try {
         if (req.user.kyc_status !== 'verified') {

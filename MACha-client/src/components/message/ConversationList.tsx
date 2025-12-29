@@ -251,7 +251,7 @@ export default function ConversationList({
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between mb-1">
                                                 <h3 className="font-semibold text-gray-800 truncate">
-                                                    {otherParticipant.fullname}
+                                                    {otherParticipant?.fullname || otherParticipant?.username}
                                                 </h3>
                                                 {conversation.lastMessage && (
                                                     <span className="text-xs text-gray-500 flex-shrink-0 ml-2">

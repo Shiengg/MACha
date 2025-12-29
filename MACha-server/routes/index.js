@@ -1,5 +1,6 @@
 import authRoutes from "./AuthRoute.js";
 import userRoutes from "./UserRoute.js";
+import kycRoutes from "./KYCRoute.js";
 import postRoutes from "./PostRoute.js";
 import commentRoutes from "./CommentRoute.js";
 import likeRoutes from "./LikeRoute.js";
@@ -14,6 +15,7 @@ import messageRoutes from "./MessageRoute.js";
 export {
     authRoutes,
     userRoutes,
+    kycRoutes,
     postRoutes,
     commentRoutes,
     likeRoutes,

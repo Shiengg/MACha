@@ -374,53 +374,73 @@ export default function AdminUserDetail() {
                         <div>
                           <h3 className="text-lg font-semibold text-white mb-3">Thông tin xác thực</h3>
                           <div className="bg-gray-800/50 rounded-lg p-4 grid grid-cols-2 gap-4">
-                            {kycDetails.kyc_info.identity_verified_name && (
+                            {/* Use extracted_data if available, fallback to legacy fields */}
+                            {(kycDetails.kyc_info.extracted_data?.identity_verified_name || kycDetails.kyc_info.identity_verified_name) && (
                               <div>
                                 <p className="text-gray-400 text-sm">Tên trên CCCD</p>
-                                <p className="text-white">{kycDetails.kyc_info.identity_verified_name}</p>
+                                <p className="text-white">
+                                  {kycDetails.kyc_info.extracted_data?.identity_verified_name || kycDetails.kyc_info.identity_verified_name}
+                                </p>
                               </div>
                             )}
-                            {kycDetails.kyc_info.identity_card_last4 && (
+                            {(kycDetails.kyc_info.extracted_data?.identity_card_last4 || kycDetails.kyc_info.identity_card_last4) && (
                               <div>
                                 <p className="text-gray-400 text-sm">CCCD (4 số cuối)</p>
-                                <p className="text-white">{kycDetails.kyc_info.identity_card_last4}</p>
+                                <p className="text-white">
+                                  {kycDetails.kyc_info.extracted_data?.identity_card_last4 || kycDetails.kyc_info.identity_card_last4}
+                                </p>
                               </div>
                             )}
-                            {kycDetails.kyc_info.tax_code && (
+                            {(kycDetails.kyc_info.extracted_data?.tax_code || kycDetails.kyc_info.tax_code) && (
                               <div>
                                 <p className="text-gray-400 text-sm">Mã số thuế</p>
-                                <p className="text-white">{kycDetails.kyc_info.tax_code}</p>
+                                <p className="text-white">
+                                  {kycDetails.kyc_info.extracted_data?.tax_code || kycDetails.kyc_info.tax_code}
+                                </p>
                               </div>
                             )}
-                            {kycDetails.kyc_info.address && (
+                            {(kycDetails.kyc_info.extracted_data?.address || kycDetails.kyc_info.address) && (
                               <div>
                                 <p className="text-gray-400 text-sm flex items-center gap-1">
                                   <MapPin className="w-4 h-4" />
                                   Địa chỉ
                                 </p>
                                 <p className="text-white">
-                                  {kycDetails.kyc_info.address.district && kycDetails.kyc_info.address.city
-                                    ? `${kycDetails.kyc_info.address.district}, ${kycDetails.kyc_info.address.city}`
-                                    : '-'}
+                                  {(() => {
+                                    const addr = kycDetails.kyc_info.extracted_data?.address || kycDetails.kyc_info.address;
+                                    if (addr?.district && addr?.city) {
+                                      return `${addr.district}, ${addr.city}`;
+                                    }
+                                    if (addr?.full_address) {
+                                      return addr.full_address;
+                                    }
+                                    return '-';
+                                  })()}
                                 </p>
                               </div>
                             )}
-                            {kycDetails.kyc_info.kyc_submitted_at && (
+                            {(kycDetails.kyc_info.submitted_at || kycDetails.kyc_info.kyc_submitted_at) && (
                               <div>
                                 <p className="text-gray-400 text-sm">Ngày nộp</p>
-                                <p className="text-white">{formatDateTime(kycDetails.kyc_info.kyc_submitted_at)}</p>
+                                <p className="text-white">
+                                  {formatDateTime(kycDetails.kyc_info.submitted_at || kycDetails.kyc_info.kyc_submitted_at || '')}
+                                </p>
                               </div>
                             )}
-                            {kycDetails.kyc_info.kyc_verified_at && (
+                            {(kycDetails.kyc_info.verified_at || kycDetails.kyc_info.kyc_verified_at) && (
                               <div>
                                 <p className="text-gray-400 text-sm">Ngày xác thực</p>
-                                <p className="text-white">{formatDateTime(kycDetails.kyc_info.kyc_verified_at)}</p>
+                                <p className="text-white">
+                                  {formatDateTime(kycDetails.kyc_info.verified_at || kycDetails.kyc_info.kyc_verified_at || '')}
+                                </p>
                               </div>
                             )}
-                            {kycDetails.kyc_info.kyc_rejection_reason && (
+                            {(kycDetails.kyc_info.rejection_reason || kycDetails.kyc_info.kyc_rejection_reason) && (
                               <div className="col-span-2">
                                 <p className="text-gray-400 text-sm">Lý do từ chối</p>
-                                <p className="text-red-400">{kycDetails.kyc_info.kyc_rejection_reason}</p>
+                                <p className="text-red-400">
+                                  {kycDetails.kyc_info.rejection_reason || kycDetails.kyc_info.kyc_rejection_reason}
+                                </p>
                               </div>
                             )}
                           </div>
@@ -428,113 +448,129 @@ export default function AdminUserDetail() {
                       )}
 
                       {/* Bank Info */}
-                      {kycDetails.kyc_info?.bank_account && (
+                      {(kycDetails.kyc_info?.extracted_data?.bank_account || kycDetails.kyc_info?.bank_account) && (
                         <div>
                           <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                             <Building2 className="w-5 h-5" />
                             Thông tin ngân hàng
                           </h3>
                           <div className="bg-gray-800/50 rounded-lg p-4 grid grid-cols-2 gap-4">
-                            {kycDetails.kyc_info.bank_account.bank_name && (
-                              <div>
-                                <p className="text-gray-400 text-sm">Ngân hàng</p>
-                                <p className="text-white">{kycDetails.kyc_info.bank_account.bank_name}</p>
-                              </div>
-                            )}
-                            {kycDetails.kyc_info.bank_account.account_number_last4 && (
-                              <div>
-                                <p className="text-gray-400 text-sm">STK (4 số cuối)</p>
-                                <p className="text-white">{kycDetails.kyc_info.bank_account.account_number_last4}</p>
-                              </div>
-                            )}
-                            {kycDetails.kyc_info.bank_account.account_holder_name && (
-                              <div>
-                                <p className="text-gray-400 text-sm">Tên chủ tài khoản</p>
-                                <p className="text-white">{kycDetails.kyc_info.bank_account.account_holder_name}</p>
-                              </div>
-                            )}
+                            {(() => {
+                              const bankAccount = kycDetails.kyc_info.extracted_data?.bank_account || kycDetails.kyc_info.bank_account;
+                              return (
+                                <>
+                                  {bankAccount?.bank_name && (
+                                    <div>
+                                      <p className="text-gray-400 text-sm">Ngân hàng</p>
+                                      <p className="text-white">{bankAccount.bank_name}</p>
+                                    </div>
+                                  )}
+                                  {(bankAccount?.account_number_last4 || bankAccount?.account_number) && (
+                                    <div>
+                                      <p className="text-gray-400 text-sm">STK (4 số cuối)</p>
+                                      <p className="text-white">
+                                        {bankAccount.account_number_last4 || bankAccount.account_number?.slice(-4)}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {bankAccount?.account_holder_name && (
+                                    <div>
+                                      <p className="text-gray-400 text-sm">Tên chủ tài khoản</p>
+                                      <p className="text-white">{bankAccount.account_holder_name}</p>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       )}
 
                       {/* KYC Documents */}
-                      {kycDetails.kyc_info?.kyc_documents && (
+                      {(kycDetails.kyc_info?.documents || kycDetails.kyc_info?.kyc_documents) && (
                         <div>
                           <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                             <FileText className="w-5 h-5" />
                             Tài liệu KYC
                           </h3>
                           <div className="bg-gray-800/50 rounded-lg p-4 grid grid-cols-2 gap-4">
-                            {kycDetails.kyc_info.kyc_documents.identity_front_url && (
-                              <div>
-                                <p className="text-gray-400 text-sm mb-2">Mặt trước CCCD</p>
-                                <a
-                                  href={kycDetails.kyc_info.kyc_documents.identity_front_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-all"
-                                >
-                                  <ExternalLink className="w-4 h-4" />
-                                  <span>Xem tài liệu</span>
-                                </a>
-                              </div>
-                            )}
-                            {kycDetails.kyc_info.kyc_documents.identity_back_url && (
-                              <div>
-                                <p className="text-gray-400 text-sm mb-2">Mặt sau CCCD</p>
-                                <a
-                                  href={kycDetails.kyc_info.kyc_documents.identity_back_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-all"
-                                >
-                                  <ExternalLink className="w-4 h-4" />
-                                  <span>Xem tài liệu</span>
-                                </a>
-                              </div>
-                            )}
-                            {kycDetails.kyc_info.kyc_documents.selfie_url && (
-                              <div>
-                                <p className="text-gray-400 text-sm mb-2">Ảnh selfie</p>
-                                <a
-                                  href={kycDetails.kyc_info.kyc_documents.selfie_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-all"
-                                >
-                                  <ExternalLink className="w-4 h-4" />
-                                  <span>Xem ảnh</span>
-                                </a>
-                              </div>
-                            )}
-                            {kycDetails.kyc_info.kyc_documents.tax_document_url && (
-                              <div>
-                                <p className="text-gray-400 text-sm mb-2">Giấy tờ thuế</p>
-                                <a
-                                  href={kycDetails.kyc_info.kyc_documents.tax_document_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-all"
-                                >
-                                  <ExternalLink className="w-4 h-4" />
-                                  <span>Xem tài liệu</span>
-                                </a>
-                              </div>
-                            )}
-                            {kycDetails.kyc_info.kyc_documents.bank_statement_url && (
-                              <div>
-                                <p className="text-gray-400 text-sm mb-2">Sao kê ngân hàng</p>
-                                <a
-                                  href={kycDetails.kyc_info.kyc_documents.bank_statement_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-all"
-                                >
-                                  <ExternalLink className="w-4 h-4" />
-                                  <span>Xem tài liệu</span>
-                                </a>
-                              </div>
-                            )}
+                            {(() => {
+                              const documents = kycDetails.kyc_info.documents || kycDetails.kyc_info.kyc_documents;
+                              return (
+                                <>
+                                  {documents?.identity_front_url && (
+                                    <div>
+                                      <p className="text-gray-400 text-sm mb-2">Mặt trước CCCD</p>
+                                      <a
+                                        href={documents.identity_front_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-all"
+                                      >
+                                        <ExternalLink className="w-4 h-4" />
+                                        <span>Xem tài liệu</span>
+                                      </a>
+                                    </div>
+                                  )}
+                                  {documents?.identity_back_url && (
+                                    <div>
+                                      <p className="text-gray-400 text-sm mb-2">Mặt sau CCCD</p>
+                                      <a
+                                        href={documents.identity_back_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-all"
+                                      >
+                                        <ExternalLink className="w-4 h-4" />
+                                        <span>Xem tài liệu</span>
+                                      </a>
+                                    </div>
+                                  )}
+                                  {documents?.selfie_url && (
+                                    <div>
+                                      <p className="text-gray-400 text-sm mb-2">Ảnh selfie</p>
+                                      <a
+                                        href={documents.selfie_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-all"
+                                      >
+                                        <ExternalLink className="w-4 h-4" />
+                                        <span>Xem ảnh</span>
+                                      </a>
+                                    </div>
+                                  )}
+                                  {documents?.tax_document_url && (
+                                    <div>
+                                      <p className="text-gray-400 text-sm mb-2">Giấy tờ thuế</p>
+                                      <a
+                                        href={documents.tax_document_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-all"
+                                      >
+                                        <ExternalLink className="w-4 h-4" />
+                                        <span>Xem tài liệu</span>
+                                      </a>
+                                    </div>
+                                  )}
+                                  {documents?.bank_statement_url && (
+                                    <div>
+                                      <p className="text-gray-400 text-sm mb-2">Sao kê ngân hàng</p>
+                                      <a
+                                        href={documents.bank_statement_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-all"
+                                      >
+                                        <ExternalLink className="w-4 h-4" />
+                                        <span>Xem tài liệu</span>
+                                      </a>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       )}

@@ -10,7 +10,10 @@
     "dev": "nodemon server.js",
     "worker": "nodemon worker/worker.js",
     "worker:dev": "nodemon worker/worker.js",
-    "subscriber": "node subscribers/initSubscriber.js"
+    "subscriber": "node subscribers/initSubscriber.js",
+    "migrate:kyc": "node scripts/migrate-kyc-data.js",
+    "migrate:kyc:dry-run": "node scripts/migrate-kyc-data.js --dry-run",
+    "migrate:kyc:cleanup": "node scripts/migrate-kyc-data.js --cleanup"
   },
   "keywords": [],
   "author": "",
