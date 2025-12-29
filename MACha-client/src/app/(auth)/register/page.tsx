@@ -11,6 +11,7 @@ import Link from 'next/link';
 import Swal from 'sweetalert2';
 import { registerSchema, type RegisterFormData } from '@/schemas/auth.schema';
 import PublicRoute from '@/components/guards/PublicRoute';
+import { Suspense } from 'react';
 
 function SignupPageContent() {
     const { login } = useAuth();
@@ -245,7 +246,13 @@ function SignupPageContent() {
 export default function SignupPage() {
     return (
         <PublicRoute>
-            <SignupPageContent />
+            <Suspense fallback={
+                <div className="min-h-screen flex items-center justify-center bg-gray-100">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+            }>
+                <SignupPageContent />
+            </Suspense>
         </PublicRoute>
     );
 }

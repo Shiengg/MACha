@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -8,11 +8,7 @@ interface PublicRouteProps {
     children: React.ReactNode;
 }
 
-/**
- * PublicRoute component - Dành cho các trang như login/register
- * Nếu user đã authenticate, redirect về trang chủ hoặc returnUrl
- */
-export default function PublicRoute({ children }: PublicRouteProps) {
+function PublicRouteContent({ children }: PublicRouteProps) {
     const { user, isAuthenticated, loading } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -47,5 +43,24 @@ export default function PublicRoute({ children }: PublicRouteProps) {
 
     // If not authenticated, render children (login/register page)
     return <>{children}</>;
+}
+
+/**
+ * PublicRoute component - Dành cho các trang như login/register
+ * Nếu user đã authenticate, redirect về trang chủ hoặc returnUrl
+ */
+export default function PublicRoute({ children }: PublicRouteProps) {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-gray-600">Loading...</p>
+                </div>
+            </div>
+        }>
+            <PublicRouteContent>{children}</PublicRouteContent>
+        </Suspense>
+    );
 }
 

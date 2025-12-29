@@ -63,6 +63,8 @@ export interface Campaign {
   updatedAt: string;
   // Escrow-related fields
   available_amount?: number; // Số tiền có thể rút (current_amount - total released amount)
+  // Donation-related fields
+  completed_donations_count?: number; // Số lượng donation đã hoàn thành
 }
 
 export interface Milestone {
