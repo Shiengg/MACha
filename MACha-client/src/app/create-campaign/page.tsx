@@ -38,6 +38,7 @@ interface FormData {
   end_date: string;
   description: string;
   story: string;
+  hashtag: string; // Single hashtag
   // Step 3: Commitment & Documents
   milestones: Milestone[];
   expected_timeline: TimelineItem[];
@@ -92,6 +93,7 @@ function CreateCampaignContent() {
     end_date: '',
     description: '',
     story: '',
+    hashtag: '',
     // Step 3: Commitment & Documents
     milestones: [
       // Mốc 100% cố định - không thể xóa
@@ -642,6 +644,7 @@ function CreateCampaignContent() {
         proof_documents_url: proofDocUrl,
         milestones: formData.milestones,
         expected_timeline: formData.expected_timeline.length > 0 ? formData.expected_timeline : undefined,
+        hashtag: formData.hashtag.trim() ? formData.hashtag.trim() : undefined,
       };
 
       await campaignService.createCampaign(payload);
@@ -996,6 +999,42 @@ function CreateCampaignContent() {
                     maxLength={5000}
                   />
                   <p className="text-xs text-gray-500 mt-1">{formData.story.length}/5000 ký tự (tối thiểu 100)</p>
+                </div>
+
+                {/* Hashtag */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Hashtag (tùy chọn)
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Nhập 1 hashtag để giúp người dùng dễ dàng tìm kiếm campaign của bạn.
+                  </p>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.hashtag}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/^#/, '').toLowerCase();
+                        handleInputChange('hashtag', value);
+                      }}
+                      placeholder="VD: gopquy, trogiup, thiennguyen"
+                      className="w-full px-4 py-3 pl-8 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      maxLength={50}
+                    />
+                    <span className="absolute left-3 top-3.5 text-gray-400 dark:text-gray-500">#</span>
+                    {formData.hashtag && (
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('hashtag', '')}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {formData.hashtag ? `#${formData.hashtag}` : 'Chưa có hashtag'}
+                  </p>
                 </div>
 
                 {/* Expected Timeline */}

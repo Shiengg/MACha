@@ -162,6 +162,10 @@ const campaignSchema = new mongoose.Schema({
         type: Number,
         default: 0,
         min: 0
+    },
+    hashtag: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Hashtag"
     }
 },
     {
@@ -173,6 +177,7 @@ const campaignSchema = new mongoose.Schema({
 campaignSchema.index({ status: 1, createdAt: -1 });
 campaignSchema.index({ category: 1, status: 1 });
 campaignSchema.index({ creator: 1, status: 1 });
+campaignSchema.index({ hashtag: 1 }); // Index for hashtag search
 
 const Campaign = mongoose.model("Campaign", campaignSchema);
 export default Campaign;

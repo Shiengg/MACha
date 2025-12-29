@@ -12,7 +12,8 @@ import {
     getPendingCampaigns,
     approveCampaign,
     rejectCampaign,
-    createWithdrawalRequest
+    createWithdrawalRequest,
+    searchCampaignsByHashtag
 } from "../controllers/CampaignController.js";
 import { getWithdrawalRequestsByCampaign } from "../controllers/EscrowController.js";
 import {
@@ -27,6 +28,7 @@ import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 const campaignRoutes = Router();
 
 campaignRoutes.get('/', RateLimitMiddleware.rateLimitByIP(100, 60), getAllCampaigns);
+campaignRoutes.get('/search/hashtag', RateLimitMiddleware.rateLimitByIP(100, 60), searchCampaignsByHashtag);
 campaignRoutes.get('/categories/active', RateLimitMiddleware.rateLimitByIP(100, 60), getActiveCategories);
 campaignRoutes.get('/category', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignsByCategory);
 campaignRoutes.get('/pending', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), getPendingCampaigns);
