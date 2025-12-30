@@ -60,7 +60,20 @@ export default function Header() {
                     <div className="flex items-center gap-6 flex-1">
                         {/* Logo */}
                         <button
-                            onClick={() => router.push('/')}
+                            onClick={() => {
+                                if (pathname === '/') {
+                                    // Refresh when newfeeds page
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    window.dispatchEvent(new CustomEvent('refreshPosts'));
+                                } else {
+                                    // Navigate to home if on other pages
+                                    router.push('/');
+                                    // Scroll to top after navigation
+                                    setTimeout(() => {
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }, 100);
+                                }
+                            }}
                             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                         >
                             <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-lg flex items-center justify-center">

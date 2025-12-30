@@ -8,7 +8,7 @@ import TrendingHashtags from "@/components/shared/TrendingHashtags";
 import { getPosts, Post, createPost, CreatePostData } from "@/services/post.service";
 import { useAuth } from "@/contexts/AuthContext";
 import Image from "next/image";
-import { FaImages, FaMapMarkerAlt, FaBullhorn, FaTimes } from "react-icons/fa";
+import { FaImages, FaMapMarkerAlt, FaBullhorn, FaTimes, FaSync } from "react-icons/fa";
 import { cloudinaryService } from "@/services/cloudinary.service";
 
 function HomeContent() {
@@ -16,6 +16,8 @@ function HomeContent() {
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showRefreshButton, setShowRefreshButton] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   
@@ -32,23 +34,62 @@ function HomeContent() {
     }
   }, [user, router]);
 
-  useEffect(() => {
-    const fetchPosts = async () => {
-      try {
+  const fetchPosts = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
         setLoading(true);
-        setError(null);
-        const data = await getPosts();
-        setPosts(data);
-      } catch (err) {
-        console.error("Error loading posts:", err);
-        setError("Không thể tải bài viết. Vui lòng thử lại sau.");
-      } finally {
+      }
+      setError(null);
+      const data = await getPosts();
+      setPosts(data);
+    } catch (err) {
+      console.error("Error loading posts:", err);
+      setError("Không thể tải bài viết. Vui lòng thử lại sau.");
+    } finally {
+      if (isRefresh) {
+        setIsRefreshing(false);
+      } else {
         setLoading(false);
       }
-    };
+    }
+  };
 
+  const handleRefresh = async () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setShowRefreshButton(true);
+    await fetchPosts(true);
+  };
+
+  useEffect(() => {
     fetchPosts();
   }, []);
+
+  useEffect(() => {
+    const handleRefreshEvent = () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setShowRefreshButton(true);
+      fetchPosts(true);
+    };
+
+    window.addEventListener('refreshPosts', handleRefreshEvent);
+    return () => {
+      window.removeEventListener('refreshPosts', handleRefreshEvent);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Only show refresh button when actively refreshing
+    // Hide it when refresh completes
+    if (!isRefreshing) {
+      const timer = setTimeout(() => {
+        setShowRefreshButton(false);
+      }, 500); // Hide after 500ms when refresh completes
+      return () => clearTimeout(timer);
+    }
+  }, [isRefreshing]);
 
 
   const handleDonate = (postId: string, campaignId?: string) => {
@@ -270,6 +311,20 @@ function HomeContent() {
                 </button>
               </div>
             </div>
+
+            {/* Refresh Button - Floating circular button - Only show when refreshing */}
+            {isRefreshing && (
+              <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${showRefreshButton || isRefreshing ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'}`}>
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing || loading}
+                  className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  aria-label="Refresh posts"
+                >
+                  <FaSync className={`w-5 h-5 text-orange-500 dark:text-emerald-400 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            )}
 
             {/* Posts Feed */}
             {loading ? (
