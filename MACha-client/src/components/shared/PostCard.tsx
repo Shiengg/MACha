@@ -202,10 +202,6 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
     onShare?.(post._id);
   };
 
-  const handleDonate = () => {
-    onDonate?.(post._id, post.campaign_id?._id);
-  };
-
   const handleHashtagClick = (hashtagName: string) => {
     console.log('Clicked hashtag:', hashtagName);
     // TODO: Navigate to hashtag page or filter posts by hashtag
@@ -248,6 +244,120 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
   const contentPreview = post.content_text.length > 200
     ? post.content_text.slice(0, 200) + '...'
     : post.content_text;
+
+  const renderImageItem = (url: string, index: number, className = "", showOverlay = false, overlayText = "") => (
+    <div key={index} className={`relative group ${className}`}>
+      <div className="w-full h-full rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900">
+        <Image
+          src={url}
+          alt={`Post media ${index + 1}`}
+          width={800}
+          height={800}
+          className="w-full h-full object-cover"
+        />
+      </div>
+      {showOverlay && (
+        <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-lg">
+          <span className="text-white text-3xl font-semibold">
+            {overlayText}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderImageLayout = () => {
+    if (!post.media_url || post.media_url.length === 0) return null;
+
+    const images = post.media_url;
+    const count = images.length;
+    const remainingCount = count > 5 ? count - 5 : 0;
+
+    // 1 ảnh: full width, tỷ lệ 4:3
+    if (count === 1) {
+      return (
+        <div className="relative w-full">
+          <div className="aspect-[4/3] w-full">
+            {renderImageItem(images[0], 0, "h-full")}
+          </div>
+        </div>
+      );
+    }
+
+    // 2 ảnh: chia đôi màn hình
+    if (count === 2) {
+      return (
+        <div className="relative w-full">
+          <div className="grid grid-cols-2 gap-2">
+            {images.map((url, index) =>
+              renderImageItem(url, index, "aspect-[4/5]")
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // 3 ảnh: 1 ảnh lớn trên, 2 ảnh nhỏ dưới
+    if (count === 3) {
+      return (
+        <div className="relative w-full">
+          <div className="grid gap-2">
+            <div className="aspect-[4/3] w-full">
+              {renderImageItem(images[0], 0, "h-full")}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {images.slice(1).map((url, i) =>
+                renderImageItem(url, i + 1, "aspect-[4/5]")
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 4 ảnh: lưới 2x2
+    if (count === 4) {
+      return (
+        <div className="relative w-full">
+          <div className="grid grid-cols-2 gap-2">
+            {images.map((url, index) =>
+              renderImageItem(url, index, "aspect-square")
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // 5+ ảnh: 2 ảnh lớn trên, 3 ảnh nhỏ dưới
+    if (count >= 5) {
+      const firstRow = images.slice(0, 2);
+      const secondRow = images.slice(2, 5);
+
+      return (
+        <div className="relative w-full">
+          <div className="grid gap-2">
+            {/* Hàng trên: 2 ảnh lớn */}
+            <div className="grid grid-cols-2 gap-2">
+              {firstRow.map((url, i) =>
+                renderImageItem(url, i, "aspect-[4/3]")
+              )}
+            </div>
+            {/* Hàng dưới: 3 ảnh nhỏ */}
+            <div className="grid grid-cols-3 gap-2">
+              {secondRow.map((url, i) => {
+                const isLastImage = i === secondRow.length - 1;
+                const showOverlay = isLastImage && remainingCount > 0;
+                const overlayText = `+${remainingCount}`;
+                return renderImageItem(url, i + 2, "aspect-[4/5]", showOverlay, overlayText);
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
@@ -311,41 +421,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
       </div>
 
       {/* Media */}
-      {post.media_url && post.media_url.length > 0 && (
-        <div className="relative w-full">
-          {post.media_url.length === 1 ? (
-            <div className="relative w-full max-h-[600px] bg-gray-100 dark:bg-gray-900">
-              <img
-                src={post.media_url[0]}
-                alt="Post media"
-                className="w-full h-auto max-h-[600px] object-contain"
-              />
-            </div>
-          ) : (
-            <div className={`grid gap-1 ${post.media_url.length === 2 ? 'grid-cols-2' :
-              post.media_url.length === 3 ? 'grid-cols-3' :
-                'grid-cols-2'
-              }`}>
-              {post.media_url.slice(0, 4).map((url, index) => (
-                <div key={index} className="relative w-full aspect-square bg-gray-100 dark:bg-gray-900">
-                  <img
-                    src={url}
-                    alt={`Post media ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                  {index === 3 && (post.media_url?.length ?? 0) > 4 && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                      <span className="text-white text-3xl font-semibold">
-                        +{(post.media_url?.length ?? 0) - 4}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {renderImageLayout()}
 
       {/* Stats */}
       <div className="px-4 py-2 flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
@@ -401,15 +477,6 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
         >
           <Share2 className="w-5 h-5" />
           <span className="font-medium">Chia sẻ</span>
-        </button>
-
-        {/* Donate Button - Highlighted */}
-        <button
-          onClick={handleDonate}
-          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all text-white font-semibold shadow-md hover:shadow-lg"
-        >
-          <DollarSign className="w-5 h-5 fill-white" />
-          <span>Quyên góp</span>
         </button>
       </div>
 
