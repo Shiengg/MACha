@@ -144,8 +144,15 @@ export const createPost = async (userId, postData) => {
         isLiked: false,
     };
 
-    // Invalidate posts list cache
-    await redisClient.del('posts:all');
+    // Invalidate posts list cache (similar to message.service.js)
+    const keySet = 'posts:all:keys';
+    const keys = await redisClient.sMembers(keySet);
+
+    if (keys.length > 0) {
+        await redisClient.del(...keys);
+    }
+
+    await redisClient.del(keySet);
 
     return postWithCounts;
 };
@@ -153,15 +160,12 @@ export const createPost = async (userId, postData) => {
 /**
  * Get all posts with Cache-Aside Pattern
  */
-export const getPosts = async (userId = null) => {
-    const postsKey = 'posts:all';
-
-    // 1. Check cache first
+export const getPosts = async (userId = null, page = 0, limit = 20) => {
+    const postsKey = `posts:all:page:${page}:limit:${limit}`;
     const cached = await redisClient.get(postsKey);
     if (cached) {
         const posts = JSON.parse(cached);
 
-        // Enrich with user-specific isLiked status
         if (userId) {
             const enrichedPosts = await Promise.all(
                 posts.map(async (post) => ({
@@ -175,11 +179,12 @@ export const getPosts = async (userId = null) => {
         return posts;
     }
 
-    // 2. Cache miss - Query database
     const posts = await Post.find()
         .populate("user", "username avatar fullname")
         .populate("hashtags", "name")
         .populate("campaign_id", "title")
+        .skip(page * limit)
+        .limit(limit)
         .sort({ createdAt: -1 });
 
     // 3. Enrich posts with metadata
@@ -194,6 +199,9 @@ export const getPosts = async (userId = null) => {
     }));
 
     await redisClient.setEx(postsKey, 120, JSON.stringify(postsToCache));
+
+    // Add key to set for cache invalidation
+    await redisClient.sAdd('posts:all:keys', postsKey);
 
     return postsWithCounts;
 };
@@ -269,7 +277,16 @@ export const deletePost = async (postId, userId) => {
 
     // Invalidate caches
     await invalidatePostCaches(postId);
-    await redisClient.del('posts:all');
+    
+    // Invalidate posts list cache (similar to message.service.js)
+    const keySet = 'posts:all:keys';
+    const keys = await redisClient.sMembers(keySet);
+
+    if (keys.length > 0) {
+        await redisClient.del(...keys);
+    }
+
+    await redisClient.del(keySet);
 
     return { success: true };
 };
