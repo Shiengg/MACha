@@ -454,6 +454,101 @@ export const searchCampaignsByHashtag = async (hashtagName) => {
     return campaigns;
 }
 
+const calculateRelevanceScore = (title, searchTerm, searchWords, isActive) => {
+    const titleLower = title.toLowerCase();
+    let score = 0;
+
+    if (titleLower.startsWith(searchTerm)) {
+        score += 1000;
+    }
+
+    if (titleLower.includes(searchTerm) && !titleLower.startsWith(searchTerm)) {
+        score += 500;
+    }
+
+    const titleWords = titleLower.split(/\s+/);
+    const matchedWords = new Set();
+    searchWords.forEach(word => {
+        if (titleWords.includes(word)) {
+            matchedWords.add(word);
+        }
+    });
+    score += matchedWords.size * 100;
+
+    searchWords.forEach(word => {
+        if (!matchedWords.has(word)) {
+            titleWords.forEach(titleWord => {
+                if (titleWord.includes(word) || word.includes(titleWord)) {
+                    score += 10;
+                }
+            });
+        }
+    });
+
+    if (isActive) {
+        score += 50;
+    }
+
+    return score;
+};
+
+export const searchCampaignsByTitle = async (searchTerm, limit = 50) => {
+    if (!searchTerm || searchTerm.trim() === "") {
+        return [];
+    }
+
+    const normalizedSearch = searchTerm.toLowerCase().trim();
+    const searchWords = normalizedSearch.split(/\s+/).filter(word => word.length > 0);
+    
+    const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = new RegExp(escapedSearch, 'i');
+
+    // Find all campaigns that match the search term
+    const allCampaigns = await Campaign.find({
+        title: searchRegex
+    })
+        .populate("creator", "username fullname avatar")
+        .populate("hashtag", "name")
+        .lean();
+
+    // Calculate relevance score for each campaign
+    const campaignsWithScore = allCampaigns.map(campaign => ({
+        ...campaign,
+        relevanceScore: calculateRelevanceScore(
+            campaign.title,
+            normalizedSearch,
+            searchWords,
+            campaign.status === 'active'
+        )
+    }));
+
+    // Sort by relevance score (descending), then by creation date (descending)
+    campaignsWithScore.sort((a, b) => {
+        if (b.relevanceScore !== a.relevanceScore) {
+            return b.relevanceScore - a.relevanceScore;
+        }
+        return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    // Limit results and remove score field
+    const results = campaignsWithScore
+        .slice(0, limit)
+        .map(({ relevanceScore, ...campaign }) => campaign);
+
+    // Convert back to Mongoose documents
+    const campaignIds = results.map(c => c._id);
+    const populatedCampaigns = await Campaign.find({ _id: { $in: campaignIds } })
+        .populate("creator", "username fullname avatar")
+        .populate("hashtag", "name");
+
+    // Maintain the relevance order
+    const orderedCampaigns = campaignIds.map(id => 
+        populatedCampaigns.find(c => c._id.toString() === id.toString())
+    ).filter(Boolean);
+
+    return orderedCampaigns;
+}
+
 export const processExpiredCampaigns = async () => {
     const now = new Date();
     

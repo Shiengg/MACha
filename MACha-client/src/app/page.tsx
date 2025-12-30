@@ -321,7 +321,7 @@ function HomeContent() {
                   className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   aria-label="Refresh posts"
                 >
-                  <FaSync className={`w-5 h-5 text-orange-500 dark:text-emerald-400 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <FaSync className={`w-5 h-5 text-orange-500 dark:text-orange-400 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
                 </button>
               </div>
             )}

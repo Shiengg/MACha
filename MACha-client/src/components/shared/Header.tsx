@@ -45,15 +45,23 @@ export default function Header() {
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        if (searchQuery.trim()) {
-            // Navigate to search page or handle search
-            console.log("Search for:", searchQuery);
-            // router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+        const trimmedQuery = searchQuery.trim();
+        if (trimmedQuery) {
+            if (trimmedQuery.startsWith('#')) {
+                const hashtagName = trimmedQuery.substring(1).trim().toLowerCase();
+                if (hashtagName) {
+                    router.push(`/hashtag/${encodeURIComponent(hashtagName)}`);
+                }
+            } else {
+                const normalizedQuery = trimmedQuery.toLowerCase();
+                router.push(`/search?q=${encodeURIComponent(normalizedQuery)}`);
+            }
+            setSearchQuery("");
         }
     };
 
     return (
-        <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-500">
             <div className="max-w-7xl mx-auto px-6 py-3">
                 <div className="flex items-center justify-between gap-8">
                     {/* Left side: Logo and Search */}
@@ -62,13 +70,10 @@ export default function Header() {
                         <button
                             onClick={() => {
                                 if (pathname === '/') {
-                                    // Refresh when newfeeds page
                                     window.scrollTo({ top: 0, behavior: 'smooth' });
                                     window.dispatchEvent(new CustomEvent('refreshPosts'));
                                 } else {
-                                    // Navigate to home if on other pages
                                     router.push('/');
-                                    // Scroll to top after navigation
                                     setTimeout(() => {
                                         window.scrollTo({ top: 0, behavior: 'smooth' });
                                     }, 100);

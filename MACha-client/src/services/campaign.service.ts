@@ -8,6 +8,7 @@ import {
   CANCEL_CAMPAIGN_ROUTE,
   GET_CAMPAIGNS_BY_CATEGORY_ROUTE,
   SEARCH_CAMPAIGNS_BY_HASHTAG_ROUTE,
+  SEARCH_CAMPAIGNS_BY_TITLE_ROUTE,
   GET_ACTIVE_CATEGORIES_ROUTE,
   GET_CAMPAIGNS_BY_CREATOR_ROUTE,
   CREATE_CAMPAIGN_UPDATE_ROUTE,
@@ -172,6 +173,13 @@ export const campaignService = {
   async searchCampaignsByHashtag(hashtag: string): Promise<Campaign[]> {
     const response = await apiClient.get(SEARCH_CAMPAIGNS_BY_HASHTAG_ROUTE, {
       params: { hashtag },
+    });
+    return response.data.campaigns;
+  },
+
+  async searchCampaignsByTitle(query: string, limit?: number): Promise<Campaign[]> {
+    const response = await apiClient.get(SEARCH_CAMPAIGNS_BY_TITLE_ROUTE, {
+      params: { q: query, ...(limit && { limit }) },
     });
     return response.data.campaigns;
   },

@@ -110,6 +110,32 @@ export const searchCampaignsByHashtag = async (req, res) => {
     }
 }
 
+export const searchCampaignsByTitle = async (req, res) => {
+    try {
+        const { q, query, title, limit } = req.query;
+        
+        // Support multiple parameter names: q, query, title
+        const searchTerm = q || query || title;
+
+        if (!searchTerm || searchTerm.trim() === "") {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Search term is required"
+            });
+        }
+
+        const limitNum = limit ? parseInt(limit) : 50;
+        const campaigns = await campaignService.searchCampaignsByTitle(searchTerm, limitNum);
+        
+        res.status(HTTP_STATUS.OK).json({
+            query: searchTerm,
+            count: campaigns.length,
+            campaigns
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
+    }
+}
+
 export const createCampaign = async (req, res) => {
     try {
         if (req.user.kyc_status !== 'verified') {

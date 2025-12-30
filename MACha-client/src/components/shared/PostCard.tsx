@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, MessageCircle, Share2, DollarSign, MoreHorizontal } from 'lucide-react';
+import { FaEdit, FaTrash, FaFlag } from 'react-icons/fa';
 import Image from 'next/image';
 import { toggleLikePost } from '@/services/post.service';
 import CommentModal from './CommentModal';
@@ -49,11 +50,31 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
   const [isCommenting, setIsCommenting] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const justLikedRef = useRef(false);
   const justCommentedRef = useRef(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
+  const currentUserId = (user as any)?._id || user?.id;
+  const isOwner = currentUserId === post.user._id;
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -63,19 +84,16 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
 
       const currentUserId = (user as any)?._id || user?.id;
 
-      // Nếu là chính mình vừa like (optimistic update đã xử lý rồi)
       if (event.userId === currentUserId) {
         justLikedRef.current = false; // Reset flag
         return;
       }
 
-      // Chỉ log nếu là chủ bài viết
       if (post.user._id === currentUserId) {
         console.log('🎉 Có người like bài viết của bạn:', event.postId);
         console.log('👤 User ID:', event.userId);
       }
 
-      // Cập nhật count cho tất cả mọi người
       setLikesCount((prev) => prev + 1);
     };
 
@@ -84,29 +102,24 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
 
       const currentUserId = (user as any)?._id || user?.id;
 
-      // Nếu là chính mình vừa unlike (optimistic update đã xử lý rồi)
       if (event.userId === currentUserId) {
         justLikedRef.current = false;
         return;
       }
 
-      // Chỉ log nếu là chủ bài viết
       if (post.user._id === currentUserId) {
         console.log('💔 Có người unlike bài viết của bạn:', event.postId);
         console.log('👤 User ID:', event.userId);
       }
 
-      // Cập nhật count cho tất cả mọi người
       setLikesCount((prev) => prev - 1);
     }
 
     const handleCommentAddedEvent = (event: any) => {
-      // Chỉ xử lý nếu là bài viết hiện tại
       if (event.postId !== post._id) return;
 
       const currentUserId = (user as any)?._id || user?.id;
 
-      // Nếu là chính mình vừa comment (optimistic update đã xử lý rồi)
       if (event.userId === currentUserId) {
         console.log('👤 Đó là bạn vừa comment (đã optimistic update)');
         justCommentedRef.current = false;
@@ -116,17 +129,14 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
       console.log('💬 Có người comment bài viết này:', event.postId);
       console.log('📦 Comment:', event.content_text);
 
-      // Cập nhật comment count
       setCommentsCount((prev) => prev + 1);
     }
 
     const handleCommentDeletedEvent = (event: any) => {
-      // Chỉ xử lý nếu là bài viết hiện tại
       if (event.postId !== post._id) return;
 
       const currentUserId = (user as any)?._id || user?.id;
 
-      // Nếu là chính mình vừa xóa (optimistic update đã giảm count rồi)
       if (event.userId === currentUserId) {
         console.log('👤 Đó là bạn vừa xóa comment (đã optimistic update)');
         justCommentedRef.current = false;
@@ -135,7 +145,6 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
 
       console.log('🗑️ Có người xóa comment:', event.commentId);
 
-      // Giảm count cho người khác
       setCommentsCount((prev) => Math.max(0, prev - 1));
     }
 
@@ -172,7 +181,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
       // Revert on error
       setIsLiked(previousState);
       setLikesCount(previousCount);
-      justLikedRef.current = false; // Reset flag khi có lỗi
+      justLikedRef.current = false;
 
       // Show error message to user
       const errorMessage = error?.message || 'Có lỗi xảy ra khi thực hiện hành động này';
@@ -387,9 +396,58 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
             </p>
           </div>
         </div>
-        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
-          <MoreHorizontal className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-        </button>
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+          >
+            <MoreHorizontal className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          </button>
+
+          {/* Dropdown Menu */}
+          {isDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+              {isOwner ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      // TODO: Handle edit post
+                      console.log('Edit post:', post._id);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white"
+                  >
+                    <FaEdit className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                    <span className="text-sm font-medium">Chỉnh sửa bài viết</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      // TODO: Handle delete post
+                      console.log('Delete post:', post._id);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-red-600 dark:text-red-400"
+                  >
+                    <FaTrash className="w-4 h-4" />
+                    <span className="text-sm font-medium">Xóa bài viết</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    // TODO: Handle report post
+                    console.log('Report post:', post._id);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white"
+                >
+                  <FaFlag className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                  <span className="text-sm font-medium">Báo cáo bài viết</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Content */}
