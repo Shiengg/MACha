@@ -11,6 +11,7 @@ import notificationRoute from "./NotificationRoute.js";
 import hashtagRoutes from "./HashtagRoute.js";
 import conversationRoutes from "./ConversationRoute.js";
 import messageRoutes from "./MessageRoute.js";
+import reportRoutes from "./ReportRoute.js";
 
 export {
     authRoutes,
@@ -26,5 +27,6 @@ export {
     notificationRoute,
     hashtagRoutes,
     conversationRoutes,
-    messageRoutes
+    messageRoutes,
+    reportRoutes
 }
