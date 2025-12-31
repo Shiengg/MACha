@@ -43,6 +43,31 @@ export const getPostById = async (req, res) => {
     }
 }
 
+export const updatePost = async (req, res) => {
+    try {
+        const { content_text, media_url } = req.body;
+        
+        if (!content_text) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: "Content is required" });
+        }
+
+        const result = await postService.updatePost(req.params.id, req.user._id, { content_text, media_url });
+
+        if (!result.success) {
+            if (result.error === 'NOT_FOUND') {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({ message: HTTP_STATUS_TEXT.NOT_FOUND });
+            }
+            if (result.error === 'FORBIDDEN') {
+                return res.status(HTTP_STATUS.FORBIDDEN).json({ message: HTTP_STATUS_TEXT.FORBIDDEN });
+            }
+        }
+
+        return res.status(HTTP_STATUS.OK).json({ populatedPost: result.post });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+}
+
 export const deletePost = async (req, res) => {
     try {
         const result = await postService.deletePost(req.params.id, req.user._id);

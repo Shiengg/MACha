@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createPost, getPosts, getPostById, deletePost, getPostsByHashtag, searchPostsByHashtag } from "../controllers/PostController.js";
+import { createPost, getPosts, getPostById, updatePost, deletePost, getPostsByHashtag, searchPostsByHashtag } from "../controllers/PostController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 
 const postRoutes = Router();
@@ -9,6 +9,7 @@ postRoutes.get('/', authMiddleware, getPosts);
 postRoutes.get('/search', searchPostsByHashtag);
 postRoutes.get('/hashtag/:name', getPostsByHashtag);
 postRoutes.get('/:id', authMiddleware, getPostById);
+postRoutes.put('/:id', authMiddleware, updatePost);
 postRoutes.delete('/:id', authMiddleware, deletePost);
 
 /**

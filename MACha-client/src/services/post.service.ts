@@ -3,6 +3,7 @@ import {
   GET_POSTS_ROUTE,
   GET_POST_BY_ID_ROUTE,
   CREATE_POST_ROUTE,
+  UPDATE_POST_ROUTE,
   DELETE_POST_ROUTE,
   SEARCH_POSTS_BY_HASHTAG_ROUTE,
   GET_POSTS_BY_HASHTAG_ROUTE,
@@ -90,6 +91,16 @@ export const createPost = async (data: CreatePostData): Promise<Post> => {
     return response.data.populatedPost;
   } catch (error) {
     console.error("Error creating post:", error);
+    throw error;
+  }
+};
+
+export const updatePost = async (id: string, data: CreatePostData): Promise<Post> => {
+  try {
+    const response = await apiClient.put(UPDATE_POST_ROUTE(id), data);
+    return response.data.populatedPost;
+  } catch (error) {
+    console.error(`Error updating post ${id}:`, error);
     throw error;
   }
 };

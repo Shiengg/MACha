@@ -108,6 +108,19 @@ function HomeContent() {
     }
   };
 
+  const handleUpdatePost = async (postId: string, updatedPost: Post) => {
+    try {
+      // Update post in local state
+      setPosts((prevPosts) =>
+        prevPosts.map((post) => (post._id === postId ? updatedPost : post))
+      );
+    } catch (error) {
+      console.error('Error updating post in list:', error);
+      // If error, refresh the entire list
+      await fetchPosts();
+    }
+  };
+
   const handleHashtagClick = (hashtagName: string) => {
     console.log('View hashtag:', hashtagName);
     // TODO: Filter posts by hashtag or navigate to hashtag page
@@ -374,6 +387,7 @@ function HomeContent() {
                     post={post}
                     onDonate={handleDonate}
                     onDelete={handleDeletePost}
+                    onUpdate={handleUpdatePost}
                   />
                 ))}
               </div>
