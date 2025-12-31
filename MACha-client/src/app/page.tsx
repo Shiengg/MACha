@@ -97,6 +97,17 @@ function HomeContent() {
     // TODO: Open donation modal or navigate to campaign page
   };
 
+  const handleDeletePost = async (postId: string) => {
+    try {
+      // Remove post from local state
+      setPosts((prevPosts) => prevPosts.filter((post) => post._id !== postId));
+    } catch (error) {
+      console.error('Error removing post from list:', error);
+      // If error, refresh the entire list
+      await fetchPosts();
+    }
+  };
+
   const handleHashtagClick = (hashtagName: string) => {
     console.log('View hashtag:', hashtagName);
     // TODO: Filter posts by hashtag or navigate to hashtag page
@@ -362,6 +373,7 @@ function HomeContent() {
                     key={post._id}
                     post={post}
                     onDonate={handleDonate}
+                    onDelete={handleDeletePost}
                   />
                 ))}
               </div>

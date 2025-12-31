@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Heart, MessageCircle, Share2, DollarSign, MoreHorizontal } from 'lucide-react';
 import { FaEdit, FaTrash, FaFlag } from 'react-icons/fa';
 import Image from 'next/image';
-import { toggleLikePost } from '@/services/post.service';
+import { toggleLikePost, deletePost } from '@/services/post.service';
 import CommentModal from './CommentModal';
 import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,9 +38,10 @@ interface PostCardProps {
   onComment?: (postId: string) => void;
   onShare?: (postId: string) => void;
   onDonate?: (postId: string, campaignId?: string) => void;
+  onDelete?: (postId: string) => void;
 }
 
-export default function PostCard({ post, onLike, onComment, onShare, onDonate }: PostCardProps) {
+export default function PostCard({ post, onLike, onComment, onShare, onDonate, onDelete }: PostCardProps) {
   const { socket, isConnected } = useSocket();
   const { user } = useAuth();
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
@@ -51,6 +52,8 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
   const [isLiking, setIsLiking] = useState(false);
   const [isCommenting, setIsCommenting] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const justLikedRef = useRef(false);
   const justCommentedRef = useRef(false);
@@ -423,10 +426,10 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
-                      // TODO: Handle delete post
-                      console.log('Delete post:', post._id);
+                      setShowDeleteConfirm(true);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-red-600 dark:text-red-400"
+                    disabled={isDeleting}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-red-600 dark:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <FaTrash className="w-4 h-4" />
                     <span className="text-sm font-medium">Xóa bài viết</span>
@@ -537,6 +540,63 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
           <span className="font-medium">Chia sẻ</span>
         </button>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => !isDeleting && setShowDeleteConfirm(false)}
+        >
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Xóa bài viết
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Bạn có chắc chắn muốn xóa bài viết này? Hành động này không thể hoàn tác.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    setIsDeleting(true);
+                    await deletePost(post._id);
+                    setShowDeleteConfirm(false);
+                    if (onDelete) {
+                      onDelete(post._id);
+                    }
+                  } catch (error: any) {
+                    console.error('Error deleting post:', error);
+                    alert(error.response?.data?.message || 'Không thể xóa bài viết. Vui lòng thử lại.');
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Đang xóa...
+                  </>
+                ) : (
+                  'Xóa'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Comment Modal */}
       <CommentModal

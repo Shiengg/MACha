@@ -2,6 +2,7 @@ import Post from "../models/post.js";
 import Like from "../models/like.js";
 import Comment from "../models/comment.js";
 import Hashtag from "../models/Hashtag.js";
+import Notification from "../models/notification.js";
 import { redisClient } from "../config/redis.js";
 
 // ==================== HELPER FUNCTIONS ====================
@@ -268,12 +269,24 @@ export const deletePost = async (postId, userId) => {
         return { success: false, error: 'FORBIDDEN' };
     }
 
-    // Delete post and related data
+    // Get all users who have notifications related to this post (before deleting)
+    // This is needed to invalidate their notification caches
+    const relatedNotifications = await Notification.find({ post: postId }).select('receiver');
+    const affectedUserIds = [...new Set(relatedNotifications.map(n => n.receiver.toString()))];
+
+    // Delete post and related data (cascade delete)
     await Promise.all([
         post.deleteOne(),
         Like.deleteMany({ post: postId }),
         Comment.deleteMany({ post: postId }),
+        Notification.deleteMany({ post: postId }), // Delete all notifications related to this post
     ]);
+
+    // Invalidate notification caches for all affected users
+    if (affectedUserIds.length > 0) {
+        const notificationCacheKeys = affectedUserIds.map(userId => `notifications:${userId}`);
+        await redisClient.del(...notificationCacheKeys);
+    }
 
     // Invalidate caches
     await invalidatePostCaches(postId);
