@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, MessageCircle, Share2, DollarSign, MoreHorizontal } from 'lucide-react';
+import { FaEdit, FaTrash, FaFlag } from 'react-icons/fa';
 import Image from 'next/image';
-import { toggleLikePost } from '@/services/post.service';
+import { toggleLikePost, deletePost } from '@/services/post.service';
 import CommentModal from './CommentModal';
 import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,9 +38,10 @@ interface PostCardProps {
   onComment?: (postId: string) => void;
   onShare?: (postId: string) => void;
   onDonate?: (postId: string, campaignId?: string) => void;
+  onDelete?: (postId: string) => void;
 }
 
-export default function PostCard({ post, onLike, onComment, onShare, onDonate }: PostCardProps) {
+export default function PostCard({ post, onLike, onComment, onShare, onDonate, onDelete }: PostCardProps) {
   const { socket, isConnected } = useSocket();
   const { user } = useAuth();
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
@@ -49,11 +51,33 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
   const [isCommenting, setIsCommenting] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const justLikedRef = useRef(false);
   const justCommentedRef = useRef(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
+  const currentUserId = (user as any)?._id || user?.id;
+  const isOwner = currentUserId === post.user._id;
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -63,19 +87,16 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
 
       const currentUserId = (user as any)?._id || user?.id;
 
-      // Nếu là chính mình vừa like (optimistic update đã xử lý rồi)
       if (event.userId === currentUserId) {
         justLikedRef.current = false; // Reset flag
         return;
       }
 
-      // Chỉ log nếu là chủ bài viết
       if (post.user._id === currentUserId) {
         console.log('🎉 Có người like bài viết của bạn:', event.postId);
         console.log('👤 User ID:', event.userId);
       }
 
-      // Cập nhật count cho tất cả mọi người
       setLikesCount((prev) => prev + 1);
     };
 
@@ -84,29 +105,24 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
 
       const currentUserId = (user as any)?._id || user?.id;
 
-      // Nếu là chính mình vừa unlike (optimistic update đã xử lý rồi)
       if (event.userId === currentUserId) {
         justLikedRef.current = false;
         return;
       }
 
-      // Chỉ log nếu là chủ bài viết
       if (post.user._id === currentUserId) {
         console.log('💔 Có người unlike bài viết của bạn:', event.postId);
         console.log('👤 User ID:', event.userId);
       }
 
-      // Cập nhật count cho tất cả mọi người
       setLikesCount((prev) => prev - 1);
     }
 
     const handleCommentAddedEvent = (event: any) => {
-      // Chỉ xử lý nếu là bài viết hiện tại
       if (event.postId !== post._id) return;
 
       const currentUserId = (user as any)?._id || user?.id;
 
-      // Nếu là chính mình vừa comment (optimistic update đã xử lý rồi)
       if (event.userId === currentUserId) {
         console.log('👤 Đó là bạn vừa comment (đã optimistic update)');
         justCommentedRef.current = false;
@@ -116,17 +132,14 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
       console.log('💬 Có người comment bài viết này:', event.postId);
       console.log('📦 Comment:', event.content_text);
 
-      // Cập nhật comment count
       setCommentsCount((prev) => prev + 1);
     }
 
     const handleCommentDeletedEvent = (event: any) => {
-      // Chỉ xử lý nếu là bài viết hiện tại
       if (event.postId !== post._id) return;
 
       const currentUserId = (user as any)?._id || user?.id;
 
-      // Nếu là chính mình vừa xóa (optimistic update đã giảm count rồi)
       if (event.userId === currentUserId) {
         console.log('👤 Đó là bạn vừa xóa comment (đã optimistic update)');
         justCommentedRef.current = false;
@@ -135,7 +148,6 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
 
       console.log('🗑️ Có người xóa comment:', event.commentId);
 
-      // Giảm count cho người khác
       setCommentsCount((prev) => Math.max(0, prev - 1));
     }
 
@@ -172,7 +184,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
       // Revert on error
       setIsLiked(previousState);
       setLikesCount(previousCount);
-      justLikedRef.current = false; // Reset flag khi có lỗi
+      justLikedRef.current = false;
 
       // Show error message to user
       const errorMessage = error?.message || 'Có lỗi xảy ra khi thực hiện hành động này';
@@ -200,10 +212,6 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
 
   const handleShare = () => {
     onShare?.(post._id);
-  };
-
-  const handleDonate = () => {
-    onDonate?.(post._id, post.campaign_id?._id);
   };
 
   const handleHashtagClick = (hashtagName: string) => {
@@ -249,6 +257,120 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
     ? post.content_text.slice(0, 200) + '...'
     : post.content_text;
 
+  const renderImageItem = (url: string, index: number, className = "", showOverlay = false, overlayText = "") => (
+    <div key={index} className={`relative group ${className}`}>
+      <div className="w-full h-full rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900">
+        <Image
+          src={url}
+          alt={`Post media ${index + 1}`}
+          width={800}
+          height={800}
+          className="w-full h-full object-cover"
+        />
+      </div>
+      {showOverlay && (
+        <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-lg">
+          <span className="text-white text-3xl font-semibold">
+            {overlayText}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderImageLayout = () => {
+    if (!post.media_url || post.media_url.length === 0) return null;
+
+    const images = post.media_url;
+    const count = images.length;
+    const remainingCount = count > 5 ? count - 5 : 0;
+
+    // 1 ảnh: full width, tỷ lệ 4:3
+    if (count === 1) {
+      return (
+        <div className="relative w-full">
+          <div className="aspect-[4/3] w-full">
+            {renderImageItem(images[0], 0, "h-full")}
+          </div>
+        </div>
+      );
+    }
+
+    // 2 ảnh: chia đôi màn hình
+    if (count === 2) {
+      return (
+        <div className="relative w-full">
+          <div className="grid grid-cols-2 gap-2">
+            {images.map((url, index) =>
+              renderImageItem(url, index, "aspect-[4/5]")
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // 3 ảnh: 1 ảnh lớn trên, 2 ảnh nhỏ dưới
+    if (count === 3) {
+      return (
+        <div className="relative w-full">
+          <div className="grid gap-2">
+            <div className="aspect-[4/3] w-full">
+              {renderImageItem(images[0], 0, "h-full")}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {images.slice(1).map((url, i) =>
+                renderImageItem(url, i + 1, "aspect-[4/5]")
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 4 ảnh: lưới 2x2
+    if (count === 4) {
+      return (
+        <div className="relative w-full">
+          <div className="grid grid-cols-2 gap-2">
+            {images.map((url, index) =>
+              renderImageItem(url, index, "aspect-square")
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // 5+ ảnh: 2 ảnh lớn trên, 3 ảnh nhỏ dưới
+    if (count >= 5) {
+      const firstRow = images.slice(0, 2);
+      const secondRow = images.slice(2, 5);
+
+      return (
+        <div className="relative w-full">
+          <div className="grid gap-2">
+            {/* Hàng trên: 2 ảnh lớn */}
+            <div className="grid grid-cols-2 gap-2">
+              {firstRow.map((url, i) =>
+                renderImageItem(url, i, "aspect-[4/3]")
+              )}
+            </div>
+            {/* Hàng dưới: 3 ảnh nhỏ */}
+            <div className="grid grid-cols-3 gap-2">
+              {secondRow.map((url, i) => {
+                const isLastImage = i === secondRow.length - 1;
+                const showOverlay = isLastImage && remainingCount > 0;
+                const overlayText = `+${remainingCount}`;
+                return renderImageItem(url, i + 2, "aspect-[4/5]", showOverlay, overlayText);
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
       {/* Header */}
@@ -277,9 +399,58 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
             </p>
           </div>
         </div>
-        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
-          <MoreHorizontal className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-        </button>
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+          >
+            <MoreHorizontal className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          </button>
+
+          {/* Dropdown Menu */}
+          {isDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+              {isOwner ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      // TODO: Handle edit post
+                      console.log('Edit post:', post._id);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white"
+                  >
+                    <FaEdit className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                    <span className="text-sm font-medium">Chỉnh sửa bài viết</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      setShowDeleteConfirm(true);
+                    }}
+                    disabled={isDeleting}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-red-600 dark:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FaTrash className="w-4 h-4" />
+                    <span className="text-sm font-medium">Xóa bài viết</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    // TODO: Handle report post
+                    console.log('Report post:', post._id);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white"
+                >
+                  <FaFlag className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                  <span className="text-sm font-medium">Báo cáo bài viết</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Content */}
@@ -311,41 +482,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
       </div>
 
       {/* Media */}
-      {post.media_url && post.media_url.length > 0 && (
-        <div className="relative w-full">
-          {post.media_url.length === 1 ? (
-            <div className="relative w-full max-h-[600px] bg-gray-100 dark:bg-gray-900">
-              <img
-                src={post.media_url[0]}
-                alt="Post media"
-                className="w-full h-auto max-h-[600px] object-contain"
-              />
-            </div>
-          ) : (
-            <div className={`grid gap-1 ${post.media_url.length === 2 ? 'grid-cols-2' :
-              post.media_url.length === 3 ? 'grid-cols-3' :
-                'grid-cols-2'
-              }`}>
-              {post.media_url.slice(0, 4).map((url, index) => (
-                <div key={index} className="relative w-full aspect-square bg-gray-100 dark:bg-gray-900">
-                  <img
-                    src={url}
-                    alt={`Post media ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                  {index === 3 && (post.media_url?.length ?? 0) > 4 && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                      <span className="text-white text-3xl font-semibold">
-                        +{(post.media_url?.length ?? 0) - 4}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {renderImageLayout()}
 
       {/* Stats */}
       <div className="px-4 py-2 flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
@@ -402,16 +539,64 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate }:
           <Share2 className="w-5 h-5" />
           <span className="font-medium">Chia sẻ</span>
         </button>
-
-        {/* Donate Button - Highlighted */}
-        <button
-          onClick={handleDonate}
-          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all text-white font-semibold shadow-md hover:shadow-lg"
-        >
-          <DollarSign className="w-5 h-5 fill-white" />
-          <span>Quyên góp</span>
-        </button>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => !isDeleting && setShowDeleteConfirm(false)}
+        >
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Xóa bài viết
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Bạn có chắc chắn muốn xóa bài viết này? Hành động này không thể hoàn tác.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    setIsDeleting(true);
+                    await deletePost(post._id);
+                    setShowDeleteConfirm(false);
+                    if (onDelete) {
+                      onDelete(post._id);
+                    }
+                  } catch (error: any) {
+                    console.error('Error deleting post:', error);
+                    alert(error.response?.data?.message || 'Không thể xóa bài viết. Vui lòng thử lại.');
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Đang xóa...
+                  </>
+                ) : (
+                  'Xóa'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Comment Modal */}
       <CommentModal

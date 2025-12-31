@@ -42,7 +42,7 @@ export interface Post {
 
 export interface CreatePostData {
   content_text: string;
-  media_url?: string;
+  media_url?: string[];
 }
 
 export interface GetPostsResponse {
