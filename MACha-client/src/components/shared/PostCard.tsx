@@ -5,7 +5,9 @@ import { Heart, MessageCircle, Share2, DollarSign, MoreHorizontal } from 'lucide
 import { FaEdit, FaTrash, FaFlag, FaImages, FaTimes } from 'react-icons/fa';
 import Image from 'next/image';
 import { toggleLikePost, deletePost, updatePost } from '@/services/post.service';
+import { getReportsByItem } from '@/services/report.service';
 import CommentModal from './CommentModal';
+import ReportModal from './ReportModal';
 import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -60,6 +62,9 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
   const [editContent, setEditContent] = useState(post.content_text);
   const [editMediaUrls, setEditMediaUrls] = useState<string[]>(post.media_url || []);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [hasReported, setHasReported] = useState(false);
+  const [isCheckingReport, setIsCheckingReport] = useState(false);
 
   const justLikedRef = useRef(false);
   const justCommentedRef = useRef(false);
@@ -84,6 +89,28 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isDropdownOpen]);
+
+  useEffect(() => {
+    const checkUserReported = async () => {
+      if (!currentUserId || isOwner) {
+        setHasReported(false);
+        return;
+      }
+
+      try {
+        const { reports } = await getReportsByItem('post', post._id);
+        const userReport = reports.find(
+          (report) => report.reporter._id === currentUserId
+        );
+        setHasReported(!!userReport);
+      } catch (error) {
+        console.error('Error checking report status:', error);
+        setHasReported(false);
+      }
+    };
+
+    checkUserReported();
+  }, [post._id, currentUserId, isOwner]);
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -444,15 +471,41 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
                 </>
               ) : (
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setIsDropdownOpen(false);
-                    // TODO: Handle report post
-                    console.log('Report post:', post._id);
+                    
+                    if (hasReported) {
+                      alert('Bạn đã báo cáo bài viết này rồi. Vui lòng chờ admin xử lý.');
+                      return;
+                    }
+
+                    setIsCheckingReport(true);
+                    try {
+                      const { reports } = await getReportsByItem('post', post._id);
+                      const userReport = reports.find(
+                        (report) => report.reporter._id === currentUserId
+                      );
+                      
+                      if (userReport) {
+                        setHasReported(true);
+                        alert('Bạn đã báo cáo bài viết này rồi. Vui lòng chờ admin xử lý.');
+                      } else {
+                        setShowReportModal(true);
+                      }
+                    } catch (error) {
+                      console.error('Error checking report:', error);
+                      setShowReportModal(true);
+                    } finally {
+                      setIsCheckingReport(false);
+                    }
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white"
+                  disabled={isCheckingReport || hasReported}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FaFlag className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                  <span className="text-sm font-medium">Báo cáo bài viết</span>
+                  <span className="text-sm font-medium">
+                    {hasReported ? 'Đã báo cáo' : 'Báo cáo bài viết'}
+                  </span>
                 </button>
               )}
             </div>
@@ -740,6 +793,17 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
         onClose={() => setShowCommentModal(false)}
         onCommentAdded={handleCommentAdded}
         onCommentDeleted={handleCommentDeleted}
+      />
+
+      {/* Report Modal */}
+      <ReportModal
+        reportedType="post"
+        reportedId={post._id}
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        onSuccess={() => {
+          setHasReported(true);
+        }}
       />
     </div>
   );
