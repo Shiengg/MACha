@@ -108,3 +108,10 @@ export const GET_REPORTS_ROUTE = `${REPORT_ROUTE}`;
 export const GET_REPORT_BY_ID_ROUTE = (id: string) => `${REPORT_ROUTE}/${id}`;
 export const UPDATE_REPORT_STATUS_ROUTE = (id: string) => `${REPORT_ROUTE}/${id}/status`;
 export const GET_REPORTS_BY_ITEM_ROUTE = (reportedType: string, reportedId: string) => `${REPORT_ROUTE}/item/${reportedType}/${reportedId}`;
+
+export const SEARCH_ROUTE = "api/search";
+export const SAVE_SEARCH_HISTORY_ROUTE = `${SEARCH_ROUTE}/history`;
+export const GET_SEARCH_HISTORY_ROUTE = `${SEARCH_ROUTE}/history`;
+export const GET_ALL_SEARCH_HISTORY_ROUTE = `${SEARCH_ROUTE}/history/all`;
+export const DELETE_SEARCH_HISTORY_ROUTE = `${SEARCH_ROUTE}/history`;
+export const DELETE_ALL_SEARCH_HISTORY_ROUTE = `${SEARCH_ROUTE}/history/all`;

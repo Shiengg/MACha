@@ -15,6 +15,7 @@ import Swal from 'sweetalert2';
 import WithdrawalRequestCard from '@/components/escrow/WithdrawalRequestCard';
 import WithdrawalRequestModal from '@/components/escrow/WithdrawalRequestModal';
 import VotingSection from '@/components/escrow/VotingSection';
+import CreatePostModal from '@/components/shared/CreatePostModal';
 
 function CampaignDetails() {
     const params = useParams();
@@ -47,6 +48,7 @@ function CampaignDetails() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [withdrawalRequestsLoading, setWithdrawalRequestsLoading] = useState(false);
     const [isVoting, setIsVoting] = useState(false);
+    const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
 
     const handleDonate = () => {
         router.push(`/campaigns/${campaignId}/donate`);
@@ -1825,7 +1827,7 @@ function CampaignDetails() {
                                                 Ủng hộ ngay
                                             </button>
                                             <button 
-                                                onClick={() => alert('Chức năng đang phát triển')}
+                                                onClick={() => setIsCreatePostOpen(true)}
                                                 className="w-full py-4 bg-white border-2 border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-400 transition flex items-center justify-center gap-2"
                                             >
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1951,6 +1953,22 @@ function CampaignDetails() {
                         )}
                     />
                 )}
+
+                {/* Create Post Modal */}
+                <CreatePostModal
+                    isOpen={isCreatePostOpen}
+                    onClose={() => setIsCreatePostOpen(false)}
+                    initialCampaign={campaign}
+                    onPostCreated={() => {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Thành công!',
+                            text: 'Bài viết đã được tạo thành công',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    }}
+                />
             </div>
         </ProtectedRoute>
     );

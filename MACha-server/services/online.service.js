@@ -1,6 +1,7 @@
 import { redisClient } from '../config/redis.js';
 
-const ONLINE_TTL = 60;
+
+const ONLINE_TTL = 86400; // 24 giờ
 
 
 export const setUserOnline = async (userId, socketId) => {
@@ -58,5 +59,27 @@ export const getUserSocketId = async (userId) => {
     } catch (error) {
         console.error('Error getting user socket ID:', error);
         return null;
+    }
+};
+
+export const getAllOnlineUserIds = async () => {
+    try {
+        const userIds = [];
+        const pattern = 'user:online:*';
+
+        for await (const key of redisClient.scanIterator({
+            MATCH: pattern,
+            COUNT: 100
+        })) {
+            const userId = key.replace('user:online:', '');
+            if (userId) {
+                userIds.push(userId);
+            }
+        }
+        
+        return userIds;
+    } catch (error) {
+        console.error('Error getting all online user IDs:', error);
+        return [];
     }
 };

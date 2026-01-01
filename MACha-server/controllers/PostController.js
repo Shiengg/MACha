@@ -3,15 +3,24 @@ import * as postService from "../services/post.service.js";
 
 export const createPost = async (req, res) => {
     try {
-        const { content_text, media_url } = req.body;
+        const { content_text, media_url, campaign_id } = req.body;
         
         if (!content_text) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: "Content is required" });
         }
 
-        const post = await postService.createPost(req.user._id, { content_text, media_url });
+        const result = await postService.createPost(req.user._id, { content_text, media_url, campaign_id });
 
-        return res.status(HTTP_STATUS.CREATED).json({ populatedPost: post });
+        if (result.success === false) {
+            if (result.error === 'CAMPAIGN_NOT_FOUND') {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({ message: "Campaign not found" });
+            }
+            if (result.error === 'CAMPAIGN_NOT_ACTIVE') {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: "Campaign is not active" });
+            }
+        }
+
+        return res.status(HTTP_STATUS.CREATED).json({ populatedPost: result });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
     }
@@ -45,13 +54,13 @@ export const getPostById = async (req, res) => {
 
 export const updatePost = async (req, res) => {
     try {
-        const { content_text, media_url } = req.body;
+        const { content_text, media_url, campaign_id } = req.body;
         
         if (!content_text) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: "Content is required" });
         }
 
-        const result = await postService.updatePost(req.params.id, req.user._id, { content_text, media_url });
+        const result = await postService.updatePost(req.params.id, req.user._id, { content_text, media_url, campaign_id });
 
         if (!result.success) {
             if (result.error === 'NOT_FOUND') {
@@ -59,6 +68,12 @@ export const updatePost = async (req, res) => {
             }
             if (result.error === 'FORBIDDEN') {
                 return res.status(HTTP_STATUS.FORBIDDEN).json({ message: HTTP_STATUS_TEXT.FORBIDDEN });
+            }
+            if (result.error === 'CAMPAIGN_NOT_FOUND') {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({ message: "Campaign not found" });
+            }
+            if (result.error === 'CAMPAIGN_NOT_ACTIVE') {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: "Campaign is not active" });
             }
         }
 

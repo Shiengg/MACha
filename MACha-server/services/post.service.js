@@ -3,6 +3,7 @@ import Like from "../models/like.js";
 import Comment from "../models/comment.js";
 import Hashtag from "../models/Hashtag.js";
 import Notification from "../models/notification.js";
+import Campaign from "../models/campaign.js";
 import { redisClient } from "../config/redis.js";
 
 // ==================== HELPER FUNCTIONS ====================
@@ -116,18 +117,27 @@ const invalidatePostCaches = async (postId) => {
  * Create a new post
  */
 export const createPost = async (userId, postData) => {
-    const { content_text, media_url } = postData;
+    const { content_text, media_url, campaign_id } = postData;
 
-    // Extract and create hashtags
+    if (campaign_id) {
+        const campaign = await Campaign.findById(campaign_id);
+        if (!campaign) {
+            return { success: false, error: 'CAMPAIGN_NOT_FOUND' };
+        }
+        if (!['active', 'approved', 'voting'].includes(campaign.status)) {
+            return { success: false, error: 'CAMPAIGN_NOT_ACTIVE' };
+        }
+    }
+
     const hashtagNames = extractHashtags(content_text);
     const hashtags = await findOrCreateHashtags(hashtagNames);
 
-    // Create post
     const post = await Post.create({
         user: userId,
         content_text,
         media_url,
         hashtags: hashtags.map((h) => h._id),
+        campaign_id: campaign_id || null,
     });
 
     // Populate post
@@ -145,7 +155,6 @@ export const createPost = async (userId, postData) => {
         isLiked: false,
     };
 
-    // Invalidate posts list cache (similar to message.service.js)
     const keySet = 'posts:all:keys';
     const keys = await redisClient.sMembers(keySet);
 
@@ -254,7 +263,7 @@ export const getPostById = async (postId, userId = null) => {
 };
 
 export const updatePost = async (postId, userId, postData) => {
-    const { content_text, media_url } = postData;
+    const { content_text, media_url, campaign_id } = postData;
 
     const post = await Post.findById(postId);
 
@@ -264,6 +273,21 @@ export const updatePost = async (postId, userId, postData) => {
 
     if (post.user.toString() !== userId.toString()) {
         return { success: false, error: 'FORBIDDEN' };
+    }
+
+    if (campaign_id !== undefined) {
+        if (campaign_id) {
+            const campaign = await Campaign.findById(campaign_id);
+            if (!campaign) {
+                return { success: false, error: 'CAMPAIGN_NOT_FOUND' };
+            }
+            if (!['active', 'approved', 'voting'].includes(campaign.status)) {
+                return { success: false, error: 'CAMPAIGN_NOT_ACTIVE' };
+            }
+            post.campaign_id = campaign_id;
+        } else {
+            post.campaign_id = null;
+        }
     }
 
     const hashtagNames = extractHashtags(content_text);

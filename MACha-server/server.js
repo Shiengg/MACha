@@ -61,12 +61,17 @@ app.use("/api/hashtags", routes.hashtagRoutes);
 app.use("/api/conversations", routes.conversationRoutes);
 app.use("/api/messages", routes.messageRoutes);
 app.use("/api/reports", routes.reportRoutes);
+app.use("/api/search", routes.searchRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
         origin: allowedOrigin,
-    }
+        credentials: true,
+    },
+    pingTimeout: 60000, // 60 giây - thời gian chờ pong response
+    pingInterval: 25000, // 25 giây - thời gian giữa các ping
+    transports: ['websocket', 'polling'],
 });
 
 io.use(async (socket, next) => {
@@ -126,16 +131,10 @@ io.on('connection', async (socket) => {
 
         await onlineService.setUserOnline(userId, socket.id);
         
+        const onlineUserIds = await onlineService.getAllOnlineUserIds();
+        socket.emit('users:online:list', { userIds: onlineUserIds });
+        
         io.emit('user:online', { userId });
-
-        const heartbeatInterval = setInterval(async () => {
-            const refreshed = await onlineService.refreshUserOnline(userId);
-            if (!refreshed) {
-                clearInterval(heartbeatInterval);
-            }
-        }, 30000); // 30 giây
-
-        socket.heartbeatInterval = heartbeatInterval;
     }
 
     // Handle join-room event
@@ -154,12 +153,10 @@ io.on('connection', async (socket) => {
         console.log(`❌ Socket disconnected: ${socket.id} (User: ${username})`);
 
         if (userId) {
-            if (socket.heartbeatInterval) {
-                clearInterval(socket.heartbeatInterval);
-            }
-
+            // Set user offline khi socket disconnect
             await onlineService.setUserOffline(userId);
 
+            // Broadcast user offline status
             io.emit('user:offline', { userId });
         }
     });

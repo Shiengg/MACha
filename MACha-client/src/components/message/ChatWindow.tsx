@@ -23,6 +23,9 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
     const [loading, setLoading] = useState(false);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+    const [showTooltip, setShowTooltip] = useState(false);
+    const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // Lưu các messageId vừa gửi để tránh add 2 lần (REST + Socket)
     const sentMessageIdsRef = useRef<Set<string>>(new Set());
@@ -49,6 +52,33 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
+
+    // Handle tooltip delay when hoveredMessageId changes
+    useEffect(() => {
+        if (hoveredMessageId) {
+            setShowTooltip(false);
+            // Clear existing timeout
+            if (hoverTimeoutRef.current) {
+                clearTimeout(hoverTimeoutRef.current);
+            }
+            // Set timeout to show tooltip after 1 second
+            hoverTimeoutRef.current = setTimeout(() => {
+                setShowTooltip(true);
+            }, 1000);
+        } else {
+            setShowTooltip(false);
+            if (hoverTimeoutRef.current) {
+                clearTimeout(hoverTimeoutRef.current);
+                hoverTimeoutRef.current = null;
+            }
+        }
+
+        return () => {
+            if (hoverTimeoutRef.current) {
+                clearTimeout(hoverTimeoutRef.current);
+            }
+        };
+    }, [hoveredMessageId]);
 
     // Load messages khi conversationId thay đổi
     useEffect(() => {
@@ -156,6 +186,77 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
         return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
     };
 
+    const formatMessageTimeWithDate = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        
+        // Check if same day
+        const isSameDay = 
+            date.getDate() === now.getDate() &&
+            date.getMonth() === now.getMonth() &&
+            date.getFullYear() === now.getFullYear();
+        
+        const timeStr = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        
+        if (isSameDay) {
+            return timeStr;
+        } else {
+            const dateStr = date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+            return `${timeStr} ${dateStr}`;
+        }
+    };
+
+    const renderMessageContent = (content: string) => {
+        // Regex to match URLs (http, https, or www)
+        const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+        const parts: Array<{ text: string; isUrl: boolean }> = [];
+        let lastIndex = 0;
+        let match;
+        let hasUrl = false;
+        
+        urlRegex.lastIndex = 0;
+        
+        while ((match = urlRegex.exec(content)) !== null) {
+            hasUrl = true;
+            if (match.index > lastIndex) {
+                parts.push({ text: content.substring(lastIndex, match.index), isUrl: false });
+            }
+            parts.push({ text: match[0], isUrl: true });
+            lastIndex = urlRegex.lastIndex;
+        }
+        
+        if (!hasUrl) {
+            return <>{content}</>;
+        }
+        
+        if (lastIndex < content.length) {
+            parts.push({ text: content.substring(lastIndex), isUrl: false });
+        }
+        
+        return (
+            <>
+                {parts.map((part, index) => {
+                    if (part.isUrl) {
+                        const href = part.text.startsWith('www.') ? `http://${part.text}` : part.text;
+                        return (
+                            <a
+                                key={index}
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:opacity-80 break-all"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {part.text}
+                            </a>
+                        );
+                    }
+                    return <span key={index}>{part.text}</span>;
+                })}
+            </>
+        );
+    };
+
     if (!conversationId || !conversation) {
         return (
             <div className="flex-1 flex items-center justify-center bg-gray-50">
@@ -243,7 +344,7 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-2">
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-2 relative">
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
                         <div className="flex flex-col items-center gap-2">
@@ -311,35 +412,71 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                                 <div
                                     key={msg._id}
                                     className="flex justify-end"
+                                    onMouseEnter={() => setHoveredMessageId(msg._id)}
+                                    onMouseLeave={() => setHoveredMessageId(null)}
                                 >
-                                    <div className="max-w-[70%] flex flex-row-reverse gap-2">
-                                        <div className="flex flex-col">
+                                    <div className="max-w-[70%] flex flex-row-reverse gap-2 relative">
+                                        <div className="flex flex-col relative">
                                             <div
                                                 className={`px-4 py-2 ${bubbleBaseClasses} ${bubbleShapeClasses}`}
                                             >
                                                 <p className="text-base whitespace-pre-wrap break-words">
-                                                    {msg.content}
+                                                    {renderMessageContent(msg.content)}
                                                 </p>
                                             </div>
                                         </div>
+                                        {hoveredMessageId === msg._id && showTooltip && (
+                                            <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-black/80 text-white text-xs rounded whitespace-nowrap z-50 pointer-events-none transition-opacity duration-200 ease-in-out opacity-100">
+                                                {formatMessageTimeWithDate(msg.createdAt)}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );
                         }
 
                         return (
-                            <div key={msg._id} className="flex justify-start">
+                            <div 
+                                key={msg._id} 
+                                className="flex justify-start"
+                                onMouseEnter={() => {
+                                    const messageId = msg._id;
+                                    setHoveredMessageId(messageId);
+                                    setShowTooltip(false);
+                                    // Clear existing timeout
+                                    if (hoverTimeoutRef.current) {
+                                        clearTimeout(hoverTimeoutRef.current);
+                                    }
+                                    // Set timeout to show tooltip after 1 second
+                                    hoverTimeoutRef.current = setTimeout(() => {
+                                        setShowTooltip(true);
+                                    }, 1000);
+                                }}
+                                onMouseLeave={() => {
+                                    setHoveredMessageId(null);
+                                    setShowTooltip(false);
+                                    if (hoverTimeoutRef.current) {
+                                        clearTimeout(hoverTimeoutRef.current);
+                                        hoverTimeoutRef.current = null;
+                                    }
+                                }}
+                            >
                                 <div className="relative max-w-[70%]">
                                     {/* Cột bubble, luôn thẳng hàng, chừa chỗ avatar bên trái */}
-                                    <div className="ml-10 flex flex-col">
+                                    <div className="ml-10 flex flex-col relative group">
                                         <div
                                             className={`px-4 py-2 ${bubbleBaseClasses} ${bubbleShapeClasses}`}
                                         >
                                             <p className="text-base whitespace-pre-wrap break-words">
-                                                {msg.content}
+                                                {renderMessageContent(msg.content)}
                                             </p>
                                         </div>
                                     </div>
+                                    {hoveredMessageId === msg._id && showTooltip && (
+                                        <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-black/80 text-white text-xs rounded whitespace-nowrap z-50 pointer-events-none transition-opacity duration-200 ease-in-out opacity-100">
+                                            {formatMessageTimeWithDate(msg.createdAt)}
+                                        </div>
+                                    )}
 
                                     {/* Avatar chỉ hiện cho tin cuối nhóm, đặt absolute để không làm lệch bubble */}
                                     {isLastOfGroup && (

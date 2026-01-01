@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Hash } from 'lucide-react';
 import { getTrendingHashtags } from '@/services/hashtag.service';
+import { saveSearchHistory } from '@/services/search.service';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface HashtagData {
   _id: string;
@@ -15,6 +18,8 @@ interface TrendingHashtagsProps {
 }
 
 export default function TrendingHashtags({ onHashtagClick }: TrendingHashtagsProps) {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
   const [hashtags, setHashtags] = useState<HashtagData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +42,19 @@ export default function TrendingHashtags({ onHashtagClick }: TrendingHashtagsPro
     fetchTrendingHashtags();
   }, []);
 
-  const handleClick = (hashtagName: string) => {
+  const handleClick = async (hashtagName: string) => {
+    const query = `#${hashtagName}`;
+    
+    if (isAuthenticated) {
+      try {
+        await saveSearchHistory(query);
+      } catch (error) {
+        console.error('Failed to save search history:', error);
+      }
+    }
+
+    router.push(`/hashtag/${encodeURIComponent(hashtagName.toLowerCase())}`);
+    
     onHashtagClick?.(hashtagName);
   };
 

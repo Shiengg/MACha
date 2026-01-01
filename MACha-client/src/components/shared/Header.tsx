@@ -6,12 +6,15 @@ import { Search, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
 import NotificationDropdown from "./NotificationDropdown";
+import SearchHistoryDropdown from "./SearchHistoryDropdown";
+import { saveSearchHistory } from "@/services/search.service";
 
 export default function Header() {
     const { user, isAuthenticated, loading, logout } = useAuth();
     const pathname = usePathname();
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
+    const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
 
     // Hide header on auth pages
     const authPages = ['/login', '/register', '/forgot-password'];
@@ -43,21 +46,36 @@ export default function Header() {
         );
     }
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        const trimmedQuery = searchQuery.trim();
-        if (trimmedQuery) {
-            if (trimmedQuery.startsWith('#')) {
-                const hashtagName = trimmedQuery.substring(1).trim().toLowerCase();
+    const handleSearch = async (query?: string) => {
+        const queryToSearch = query || searchQuery.trim();
+        if (queryToSearch) {
+            if (isAuthenticated) {
+                try {
+                    await saveSearchHistory(queryToSearch);
+                } catch (error) {
+                    console.error('Failed to save search history:', error);
+                }
+            }
+
+            if (queryToSearch.startsWith('#')) {
+                const hashtagName = queryToSearch.substring(1).trim().toLowerCase();
                 if (hashtagName) {
                     router.push(`/hashtag/${encodeURIComponent(hashtagName)}`);
                 }
             } else {
-                const normalizedQuery = trimmedQuery.toLowerCase();
+                const normalizedQuery = queryToSearch.toLowerCase();
                 router.push(`/search?q=${encodeURIComponent(normalizedQuery)}`);
             }
             setSearchQuery("");
+            setIsSearchDropdownOpen(false);
         }
+    };
+
+    const handleSearchSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsSearchDropdownOpen(false);
+        handleSearch();
     };
 
     return (
@@ -90,26 +108,40 @@ export default function Header() {
                         </button>
 
                         {/* Search Bar */}
-                        <form
-                            onSubmit={handleSearch}
-                            className="flex-1 max-w-lg"
-                        >
-                            <div className="relative">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                                <input
-                                    type="text"
-                                    placeholder="Tìm kiếm chiến dịch, quỹ..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all"
+                        <div className="flex-1 max-w-lg relative">
+                            <form onSubmit={handleSearchSubmit}>
+                                <div className="relative">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                                    <input
+                                        type="text"
+                                        placeholder="Tìm kiếm chiến dịch, quỹ..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        onFocus={() => isAuthenticated && setIsSearchDropdownOpen(true)}
+                                        className="w-full pl-12 pr-4 py-2.5 bg-gray-50 border border-gray-400 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all"
+                                    />
+                                </div>
+                            </form>
+                            {isAuthenticated && (
+                                <SearchHistoryDropdown
+                                    isOpen={isSearchDropdownOpen}
+                                    onClose={() => setIsSearchDropdownOpen(false)}
+                                    onSearch={handleSearch}
                                 />
-                            </div>
-                        </form>
+                            )}
+                        </div>
                     </div>
 
                     {/* Right side: Navigation buttons and user menu */}
                     <div className="flex items-center gap-3">
                         {/* Navigation Links */}
+                        <button
+                            onClick={() => router.push('/events')}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all hidden md:block font-inter"
+                        >
+                            Sự kiện
+                        </button>
+
                         <button
                             onClick={() => router.push('/discover')}
                             className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all hidden md:block font-inter"
@@ -117,12 +149,6 @@ export default function Header() {
                             Khám phá
                         </button>
 
-                        <button
-                            onClick={() => router.push('/events')}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all hidden md:block font-inter"
-                        >
-                            Sự kiện
-                        </button>
 
                         {/* Create Campaign Button - Highlighted */}
                         <button

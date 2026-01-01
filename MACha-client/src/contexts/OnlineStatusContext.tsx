@@ -33,6 +33,10 @@ export const OnlineStatusProvider: React.FC<OnlineStatusProviderProps> = ({ chil
   useEffect(() => {
     if (!socket) return;
 
+    const handleUsersOnlineList = (data: { userIds: string[] }) => {
+      setOnlineUsers(new Set(data.userIds));
+    };
+
     const handleUserOnline = (data: { userId: string }) => {
       setOnlineUsers((prev) => {
         const newSet = new Set(prev);
@@ -49,10 +53,12 @@ export const OnlineStatusProvider: React.FC<OnlineStatusProviderProps> = ({ chil
       });
     };
 
+    socket.on('users:online:list', handleUsersOnlineList);
     socket.on('user:online', handleUserOnline);
     socket.on('user:offline', handleUserOffline);
 
     return () => {
+      socket.off('users:online:list', handleUsersOnlineList);
       socket.off('user:online', handleUserOnline);
       socket.off('user:offline', handleUserOffline);
     };

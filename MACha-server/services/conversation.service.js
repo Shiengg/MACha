@@ -7,6 +7,9 @@ export const createConversationPrivate = async (payload) => {
         members: { $all: [userId1, userId2], $size: 2 }
     });
     if (conversation) {
+        // Clear cache for both users even if conversation already exists
+        // This ensures both users see the conversation in their list
+        await redisClient.del(`conversations:${userId1}`, `conversations:${userId2}`);
         return conversation;
     }
 
@@ -14,7 +17,8 @@ export const createConversationPrivate = async (payload) => {
         members: [userId1, userId2],
         createdBy: userId1,
     });
-    await redisClient.del(`conversations:${userId1}`);
+    // Clear cache for both users when creating new conversation
+    await redisClient.del(`conversations:${userId1}`, `conversations:${userId2}`);
     return newConversation;
 }
 

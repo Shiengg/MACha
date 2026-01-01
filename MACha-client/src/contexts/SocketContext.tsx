@@ -46,6 +46,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     const socketInstance = io(socketUrl, {
       transports: ['websocket', 'polling'],
       withCredentials: true, // Tự động gửi cookie httpOnly
+      reconnection: true, // Tự động reconnect khi bị disconnect
+      reconnectionDelay: 1000, // Đợi 1s trước khi reconnect
+      reconnectionDelayMax: 5000, // Tối đa 5s giữa các lần reconnect
+      reconnectionAttempts: Infinity, // Reconnect vô hạn
+      timeout: 60000, // Timeout cho connection attempt (60s)
     });
 
     socketInstance.on('connect', () => {
@@ -57,14 +62,32 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       console.log('🏠 Joined room:', data.room);
     });
 
-    socketInstance.on('disconnect', () => {
-      console.log('❌ Socket.IO disconnected');
+    socketInstance.on('disconnect', (reason) => {
+      console.log('❌ Socket.IO disconnected:', reason);
       setIsConnected(false);
+      // Nếu disconnect không phải do client tự ngắt, sẽ tự động reconnect
+      if (reason === 'io server disconnect') {
+        // Server đã force disconnect, cần reconnect thủ công
+        socketInstance.connect();
+      }
     });
 
     socketInstance.on('connect_error', (error) => {
       console.error('❌ Socket.IO connection error:', error.message);
       setIsConnected(false);
+    });
+
+    socketInstance.on('reconnect', (attemptNumber) => {
+      console.log('🔄 Socket.IO reconnected after', attemptNumber, 'attempts');
+      setIsConnected(true);
+    });
+
+    socketInstance.on('reconnect_attempt', (attemptNumber) => {
+      console.log('🔄 Socket.IO reconnect attempt:', attemptNumber);
+    });
+
+    socketInstance.on('reconnect_failed', () => {
+      console.error('❌ Socket.IO reconnect failed');
     });
 
     setSocket(socketInstance);
