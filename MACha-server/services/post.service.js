@@ -336,50 +336,43 @@ export const deletePost = async (postId, userId) => {
     return { success: true };
 };
 
-export const getPostsByHashtag = async (hashtagName, userId = null) => {
+export const getPostsByHashtag = async (hashtagName, userId = null, page = 1, limit = 50) => {
     const normalizedName = hashtagName.toLowerCase();
-    const hashtagKey = `posts:hashtag:${normalizedName}`;
-
-    const cached = await redisClient.get(hashtagKey);
-    if (cached) {
-        const posts = JSON.parse(cached);
-
-        if (userId) {
-            const enrichedPosts = await Promise.all(
-                posts.map(async (post) => ({
-                    ...post,
-                    isLiked: await checkUserLiked(post._id, userId)
-                }))
-            );
-            return { success: true, posts: enrichedPosts };
-        }
-
-        return { success: true, posts };
-    }
+    const skip = (page - 1) * limit;
 
     const hashtag = await Hashtag.findOne({ name: normalizedName });
     if (!hashtag) {
         return { success: false, error: 'HASHTAG_NOT_FOUND' };
     }
 
+    // Get total count for pagination
+    const totalCount = await Post.countDocuments({ hashtags: hashtag._id });
+
+    // Get paginated posts
     const posts = await Post.find({ hashtags: hashtag._id })
         .populate("user", "username avatar fullname")
         .populate("hashtags", "name")
         .populate("campaign_id", "title")
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
 
     const postsWithCounts = await Promise.all(
         posts.map(async (post) => await enrichPostWithMetadata(post, userId))
     );
 
-    const postsToCache = postsWithCounts.map(post => ({
-        ...post,
-        isLiked: false
-    }));
-
-    await redisClient.setEx(hashtagKey, 180, JSON.stringify(postsToCache));
-
-    return { success: true, posts: postsWithCounts };
+    return { 
+        success: true, 
+        posts: postsWithCounts,
+        pagination: {
+            page,
+            limit,
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit),
+            hasNext: page * limit < totalCount,
+            hasPrev: page > 1
+        }
+    };
 };
 
 export const searchPostsByHashtag = async (searchTerm, userId = null) => {
@@ -436,6 +429,136 @@ export const searchPostsByHashtag = async (searchTerm, userId = null) => {
     }));
 
     await redisClient.setEx(searchKey, 120, JSON.stringify(postsToCache));
+
+    return { success: true, posts: postsWithCounts };
+};
+
+/**
+ * Calculate time-based penalty score
+ * Posts get penalized based on age to promote newer content
+ */
+const calculateTimePenalty = (createdAt) => {
+    const now = new Date();
+    const postDate = new Date(createdAt);
+    const diffMs = now - postDate;
+    const diffDays = diffMs / (1000 * 60 * 60 * 24); // Convert to days
+    
+    // Post mới (< 1 ngày): không trừ điểm, thậm chí cộng thêm 50 điểm
+    if (diffDays < 1) {
+        return 50;
+    }
+    
+    // Post 1-3 ngày: trừ nhẹ (5 điểm/ngày)
+    if (diffDays < 3) {
+        return -(diffDays - 1) * 5;
+    }
+    
+    // Post 3-7 ngày: trừ vừa (10 điểm/ngày)
+    if (diffDays < 7) {
+        return -10 - (diffDays - 3) * 10;
+    }
+    
+    // Post 7-30 ngày: trừ nhiều (15 điểm/ngày)
+    if (diffDays < 30) {
+        return -50 - (diffDays - 7) * 15;
+    }
+    
+    // Post > 30 ngày: trừ rất nhiều (20 điểm/ngày)
+    return -395 - (diffDays - 30) * 20;
+};
+
+const calculatePostRelevanceScore = (content, searchTerm, searchWords, createdAt) => {
+    const contentLower = content.toLowerCase();
+    let score = 0;
+
+    if (contentLower.startsWith(searchTerm)) {
+        score += 1000;
+    }
+
+    if (contentLower.includes(searchTerm) && !contentLower.startsWith(searchTerm)) {
+        score += 500;
+    }
+
+    const contentWords = contentLower.split(/\s+/);
+    const matchedWords = new Set();
+    searchWords.forEach(word => {
+        if (contentWords.includes(word)) {
+            matchedWords.add(word);
+        }
+    });
+    score += matchedWords.size * 100;
+
+    searchWords.forEach(word => {
+        if (!matchedWords.has(word)) {
+            contentWords.forEach(contentWord => {
+                if (contentWord.includes(word) || word.includes(contentWord)) {
+                    score += 10;
+                }
+            });
+        }
+    });
+
+    // Add time-based adjustment (newer posts get bonus, older posts get penalty)
+    const timeAdjustment = calculateTimePenalty(createdAt);
+    score += timeAdjustment;
+
+    return score;
+};
+
+export const searchPostsByTitle = async (searchTerm, userId = null, limit = 50) => {
+    if (!searchTerm || searchTerm.trim() === "") {
+        return { success: true, posts: [] };
+    }
+
+    const normalizedSearch = searchTerm.toLowerCase().trim();
+    const searchWords = normalizedSearch.split(/\s+/).filter(word => word.length > 0);
+    
+    const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = new RegExp(escapedSearch, 'i');
+
+    const allPosts = await Post.find({
+        content_text: searchRegex
+    })
+        .populate("user", "username avatar fullname")
+        .populate("hashtags", "name")
+        .populate("campaign_id", "title")
+        .lean();
+
+    const postsWithScore = allPosts.map(post => ({
+        ...post,
+        relevanceScore: calculatePostRelevanceScore(
+            post.content_text,
+            normalizedSearch,
+            searchWords,
+            post.createdAt
+        )
+    }));
+
+    postsWithScore.sort((a, b) => {
+        if (b.relevanceScore !== a.relevanceScore) {
+            return b.relevanceScore - a.relevanceScore;
+        }
+        return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    const results = postsWithScore
+        .slice(0, limit)
+        .map(({ relevanceScore, ...post }) => post);
+
+    const postIds = results.map(p => p._id);
+    
+    const posts = await Post.find({ _id: { $in: postIds } })
+        .populate("user", "username avatar fullname")
+        .populate("hashtags", "name")
+        .populate("campaign_id", "title");
+
+    const orderedPosts = postIds.map(id => 
+        posts.find(p => p._id.toString() === id.toString())
+    ).filter(Boolean);
+
+    const postsWithCounts = await Promise.all(
+        orderedPosts.map(async (post) => await enrichPostWithMetadata(post, userId))
+    );
 
     return { success: true, posts: postsWithCounts };
 };

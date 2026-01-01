@@ -90,9 +90,13 @@ export const deletePost = async (req, res) => {
 export const getPostsByHashtag = async (req, res) => {
     try {
         const { name } = req.params;
+        const { page = 1, limit = 50 } = req.query;
         const userId = req.user ? req.user._id : null;
         
-        const result = await postService.getPostsByHashtag(name, userId);
+        const pageNum = parseInt(page, 10);
+        const limitNum = parseInt(limit, 10);
+        
+        const result = await postService.getPostsByHashtag(name, userId, pageNum, limitNum);
 
         if (!result.success) {
             if (result.error === 'HASHTAG_NOT_FOUND') {
@@ -102,7 +106,8 @@ export const getPostsByHashtag = async (req, res) => {
 
         return res.status(HTTP_STATUS.OK).json({ 
             count: result.posts.length, 
-            posts: result.posts 
+            posts: result.posts,
+            pagination: result.pagination
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
@@ -130,6 +135,38 @@ export const searchPostsByHashtag = async (req, res) => {
         return res.status(HTTP_STATUS.OK).json({ 
             count: result.posts.length, 
             posts: result.posts 
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+}
+
+export const searchPostsByTitle = async (req, res) => {
+    try {
+        const { q, query, title, limit } = req.query;
+        
+        const searchTerm = q || query || title;
+        const userId = req.user ? req.user._id : null;
+
+        if (!searchTerm || searchTerm.trim() === "") {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Search term is required"
+            });
+        }
+
+        const limitNum = limit ? parseInt(limit) : 50;
+        const result = await postService.searchPostsByTitle(searchTerm, userId, limitNum);
+
+        if (!result.success) {
+            return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
+                message: "Error searching posts" 
+            });
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            query: searchTerm,
+            count: result.posts.length,
+            posts: result.posts
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });

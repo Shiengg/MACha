@@ -17,6 +17,7 @@ export const CREATE_POST_ROUTE = `${POST_ROUTE}`;
 export const UPDATE_POST_ROUTE = (id: string) => `${POST_ROUTE}/${id}`;
 export const DELETE_POST_ROUTE = (id: string) => `${POST_ROUTE}/${id}`;
 export const SEARCH_POSTS_BY_HASHTAG_ROUTE = `${POST_ROUTE}/search`;
+export const SEARCH_POSTS_BY_TITLE_ROUTE = `${POST_ROUTE}/search/title`;
 export const GET_POSTS_BY_HASHTAG_ROUTE = (name: string) => `${POST_ROUTE}/hashtag/${name}`;
 
 export const HASHTAG_ROUTE = "api/hashtags";

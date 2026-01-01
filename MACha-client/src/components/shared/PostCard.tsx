@@ -248,8 +248,10 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
   };
 
   const handleHashtagClick = (hashtagName: string) => {
-    console.log('Clicked hashtag:', hashtagName);
-    // TODO: Navigate to hashtag page or filter posts by hashtag
+    const normalizedHashtag = hashtagName.trim().toLowerCase();
+    if (normalizedHashtag) {
+      router.push(`/hashtag/${encodeURIComponent(normalizedHashtag)}`);
+    }
   };
 
   const formatTimeAgo = (dateString: string) => {
