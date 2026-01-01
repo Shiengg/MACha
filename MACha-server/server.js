@@ -130,6 +130,9 @@ io.on('connection', async (socket) => {
 
         await onlineService.setUserOnline(userId, socket.id);
         
+        const onlineUserIds = await onlineService.getAllOnlineUserIds();
+        socket.emit('users:online:list', { userIds: onlineUserIds });
+        
         io.emit('user:online', { userId });
     }
 

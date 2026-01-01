@@ -61,3 +61,25 @@ export const getUserSocketId = async (userId) => {
         return null;
     }
 };
+
+export const getAllOnlineUserIds = async () => {
+    try {
+        const userIds = [];
+        const pattern = 'user:online:*';
+
+        for await (const key of redisClient.scanIterator({
+            MATCH: pattern,
+            COUNT: 100
+        })) {
+            const userId = key.replace('user:online:', '');
+            if (userId) {
+                userIds.push(userId);
+            }
+        }
+        
+        return userIds;
+    } catch (error) {
+        console.error('Error getting all online user IDs:', error);
+        return [];
+    }
+};

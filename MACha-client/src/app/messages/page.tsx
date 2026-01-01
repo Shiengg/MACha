@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import ConversationList from '@/components/message/ConversationList';
 import ChatWindow from '@/components/message/ChatWindow';
@@ -11,6 +11,7 @@ import { getConversations } from '@/services/conversation.service';
 
 function MessagesPageContent() {
     const searchParams = useSearchParams();
+    const router = useRouter();
     const conversationIdFromUrl = searchParams.get('conversation');
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -35,7 +36,13 @@ function MessagesPageContent() {
                     const found = sorted.find(c => c._id === conversationIdFromUrl);
                     if (found) {
                         setSelectedConversation(found);
+                    } else {
+                        // Nếu không tìm thấy conversation trong URL, clear selection
+                        setSelectedConversation(null);
                     }
+                } else {
+                    // Nếu không có conversationId trong URL, clear selection
+                    setSelectedConversation(null);
                 }
             } catch (error) {
                 console.error('Error fetching conversations:', error);
@@ -47,6 +54,11 @@ function MessagesPageContent() {
         fetchAndSelectConversation();
     }, [conversationIdFromUrl]);
 
+    const handleSelectConversation = (conversation: Conversation) => {
+        setSelectedConversation(conversation);
+        router.push(`/messages?conversation=${conversation._id}`);
+    };
+
     return (
         <div className="bg-gray-300">
             <div className="flex h-[calc(100vh-73px)]">
@@ -54,7 +66,7 @@ function MessagesPageContent() {
                 <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
                     <ConversationList 
                         selectedConversationId={selectedConversation?._id ?? null}
-                        onSelectConversation={setSelectedConversation}
+                        onSelectConversation={handleSelectConversation}
                         initialConversations={conversations}
                         loading={loading}
                     />
