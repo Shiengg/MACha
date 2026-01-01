@@ -29,9 +29,11 @@ interface Campaign {
 interface CampaignCardProps {
   campaign: Campaign;
   showCreator?: boolean;
+  onClick?: (campaign: Campaign) => void;
+  disableNavigation?: boolean;
 }
 
-export default function CampaignCard({ campaign, showCreator = false }: CampaignCardProps) {
+export default function CampaignCard({ campaign, showCreator = false, onClick, disableNavigation = false }: CampaignCardProps) {
   const router = useRouter();
   const [donations, setDonations] = useState<Donation[]>([]);
 
@@ -133,10 +135,18 @@ export default function CampaignCard({ campaign, showCreator = false }: Campaign
     }
   };
 
+  const handleCardClick = () => {
+    if (onClick) {
+      onClick(campaign);
+    } else if (!disableNavigation) {
+      router.push(`/campaigns/${campaign._id}`);
+    }
+  };
+
   return (
     <div
       className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-all cursor-pointer group"
-      onClick={() => router.push(`/campaigns/${campaign._id}`)}
+      onClick={handleCardClick}
     >
       {/* Campaign Banner Image */}
       <div className="relative h-48 bg-gradient-to-br from-orange-100 to-orange-50 overflow-hidden">
@@ -216,7 +226,9 @@ export default function CampaignCard({ campaign, showCreator = false }: Campaign
             className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-2 px-4 rounded-lg transition-all text-sm"
             onClick={(e) => {
               e.stopPropagation();
-              router.push(`/campaigns/${campaign._id}`);
+              if (!disableNavigation) {
+                router.push(`/campaigns/${campaign._id}`);
+              }
             }}
           >
             Ủng hộ ngay

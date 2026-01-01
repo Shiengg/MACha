@@ -45,6 +45,7 @@ export interface Post {
 export interface CreatePostData {
   content_text: string;
   media_url?: string[];
+  campaign_id?: string;
 }
 
 export interface GetPostsResponse {

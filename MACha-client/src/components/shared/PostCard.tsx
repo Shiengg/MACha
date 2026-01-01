@@ -6,6 +6,8 @@ import { FaEdit, FaTrash, FaFlag, FaImages, FaTimes } from 'react-icons/fa';
 import Image from 'next/image';
 import { toggleLikePost, deletePost, updatePost } from '@/services/post.service';
 import { getReportsByItem } from '@/services/report.service';
+import { campaignService, Campaign } from '@/services/campaign.service';
+import CampaignCard from '@/components/campaign/CampaignCard';
 import CommentModal from './CommentModal';
 import ReportModal from './ReportModal';
 import ShareModal from './ShareModal';
@@ -67,6 +69,8 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
   const [hasReported, setHasReported] = useState(false);
   const [isCheckingReport, setIsCheckingReport] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [fullCampaign, setFullCampaign] = useState<Campaign | null>(null);
+  const [isLoadingCampaign, setIsLoadingCampaign] = useState(false);
 
   const justLikedRef = useRef(false);
   const justCommentedRef = useRef(false);
@@ -113,6 +117,28 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
 
     checkUserReported();
   }, [post._id, currentUserId, isOwner]);
+
+  useEffect(() => {
+    const fetchCampaign = async () => {
+      if (!post.campaign_id?._id) {
+        setFullCampaign(null);
+        return;
+      }
+
+      try {
+        setIsLoadingCampaign(true);
+        const campaign = await campaignService.getCampaignById(post.campaign_id._id);
+        setFullCampaign(campaign);
+      } catch (error) {
+        console.error('Error fetching campaign:', error);
+        setFullCampaign(null);
+      } finally {
+        setIsLoadingCampaign(false);
+      }
+    };
+
+    fetchCampaign();
+  }, [post.campaign_id?._id]);
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -291,8 +317,8 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
     });
   };
 
-  const contentPreview = post.content_text.length > 200
-    ? post.content_text.slice(0, 200) + '...'
+  const contentPreview = post.content_text.length > 100
+    ? post.content_text.slice(0, 100) + '...'
     : post.content_text;
 
   const renderImageItem = (url: string, index: number, className = "", showOverlay = false, overlayText = "") => (
@@ -528,26 +554,39 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
           {post.content_text.length > 200 && (
             <button
               onClick={() => setShowFullText(!showFullText)}
-              className="ml-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 font-medium text-[15px]"
+              className="ml-1 text-black dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 font-bold text-[15px]"
             >
-              {showFullText ? 'Rút gọn' : '... Xem thêm'}
+              {showFullText ? 'Rút gọn' : 'Xem thêm'}
             </button>
           )}
         </div>
 
-        {/* Campaign Badge */}
-        {post.campaign_id && (
-          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full">
-            <DollarSign className="w-4 h-4 text-green-600 dark:text-green-400" />
-            <span className="text-sm font-medium text-green-700 dark:text-green-300">
-              Chiến dịch: {post.campaign_id.title}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Media */}
       {renderImageLayout()}
+
+      {/* Campaign Card */}
+      {post.campaign_id && (
+        <div className="px-4 pb-3">
+          {isLoadingCampaign ? (
+            <div className="flex items-center justify-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="w-8 h-8 border-4 border-gray-200 dark:border-gray-700 border-t-emerald-500 rounded-full animate-spin"></div>
+            </div>
+          ) : fullCampaign ? (
+            <div onClick={(e) => e.stopPropagation()}>
+              <CampaignCard campaign={fullCampaign} />
+            </div>
+          ) : (
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full">
+              <DollarSign className="w-4 h-4 text-green-600 dark:text-green-400" />
+              <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                Chiến dịch: {post.campaign_id.title}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="px-4 py-2 flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
