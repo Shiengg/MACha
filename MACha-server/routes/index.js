@@ -12,6 +12,7 @@ import hashtagRoutes from "./HashtagRoute.js";
 import conversationRoutes from "./ConversationRoute.js";
 import messageRoutes from "./MessageRoute.js";
 import reportRoutes from "./ReportRoute.js";
+import searchRoutes from "./SearchRoute.js";
 
 export {
     authRoutes,
@@ -28,5 +29,6 @@ export {
     hashtagRoutes,
     conversationRoutes,
     messageRoutes,
-    reportRoutes
+    reportRoutes,
+    searchRoutes
 }

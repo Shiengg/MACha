@@ -301,11 +301,9 @@ function HomeContent() {
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <div className="flex max-w-[1920px] mx-auto">
         {/* Left Sidebar - Pink placeholder */}
-        <aside className="hidden lg:block lg:w-[280px] xl:w-[360px] fixed left-0 top-0 h-screen bg-pink-100 dark:bg-pink-900/20 border-r border-gray-200 dark:border-gray-700">
-          <div className="p-6 pt-20">
-            <div className="text-gray-600 dark:text-gray-400 font-medium">
-              Left Sidebar
-            </div>
+        <aside className="hidden lg:block lg:w-[280px] xl:w-[360px] fixed left-0 top-0 h-screen overflow-y-auto bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
+          <div className="p-4 pt-20 space-y-4">
+          <TrendingHashtags onHashtagClick={handleHashtagClick} />
             <div className="text-sm text-gray-500 dark:text-gray-500 mt-2">
               (Làm sau)
             </div>
@@ -398,7 +396,7 @@ function HomeContent() {
         {/* Right Sidebar - Trending & Suggestions */}
         <aside className="hidden lg:block lg:w-[280px] xl:w-[360px] fixed right-0 top-0 h-screen overflow-y-auto bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700">
           <div className="p-4 pt-20 space-y-4">
-            <TrendingHashtags onHashtagClick={handleHashtagClick} />
+            
             
             {/* Placeholder cho các widget khác */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
