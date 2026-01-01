@@ -71,7 +71,8 @@ export const getAllOnlineUserIds = async () => {
             MATCH: pattern,
             COUNT: 100
         })) {
-            const userId = key.replace('user:online:', '');
+            const keyStr = String(key);
+            const userId = keyStr.replace('user:online:', '');
             if (userId) {
                 userIds.push(userId);
             }
