@@ -4,25 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Share2 } from 'lucide-react';
 import { donationService, Donation } from '@/services/donation.service';
-
-interface Campaign {
-  _id: string;
-  title: string;
-  description?: string;
-  goal_amount: number;
-  current_amount: number;
-  status: string;
-  category: string;
-  banner_image?: string;
-  gallery_images?: string[];
-  createdAt: string;
-  end_date?: string;
-  creator?: {
-    _id: string;
-    username: string;
-    avatar?: string;
-  };
-}
+import { Campaign } from '@/services/campaign.service';
 
 
 
