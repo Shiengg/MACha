@@ -8,6 +8,7 @@ import { toggleLikePost, deletePost, updatePost } from '@/services/post.service'
 import { getReportsByItem } from '@/services/report.service';
 import CommentModal from './CommentModal';
 import ReportModal from './ReportModal';
+import ShareModal from './ShareModal';
 import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -65,6 +66,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
   const [showReportModal, setShowReportModal] = useState(false);
   const [hasReported, setHasReported] = useState(false);
   const [isCheckingReport, setIsCheckingReport] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const justLikedRef = useRef(false);
   const justCommentedRef = useRef(false);
@@ -244,6 +246,7 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
   };
 
   const handleShare = () => {
+    setShowShareModal(true);
     onShare?.(post._id);
   };
 
@@ -806,6 +809,13 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
         onSuccess={() => {
           setHasReported(true);
         }}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        postId={post._id}
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
       />
     </div>
   );

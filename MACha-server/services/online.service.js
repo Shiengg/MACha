@@ -1,6 +1,7 @@
 import { redisClient } from '../config/redis.js';
 
-const ONLINE_TTL = 60;
+
+const ONLINE_TTL = 86400; // 24 giờ
 
 
 export const setUserOnline = async (userId, socketId) => {
