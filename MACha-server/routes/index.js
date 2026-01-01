@@ -13,6 +13,7 @@ import conversationRoutes from "./ConversationRoute.js";
 import messageRoutes from "./MessageRoute.js";
 import reportRoutes from "./ReportRoute.js";
 import searchRoutes from "./SearchRoute.js";
+import eventRoutes from "./EventRoute.js";
 
 export {
     authRoutes,
@@ -30,5 +31,6 @@ export {
     conversationRoutes,
     messageRoutes,
     reportRoutes,
-    searchRoutes
+    searchRoutes,
+    eventRoutes
 }
