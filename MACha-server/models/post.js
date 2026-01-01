@@ -22,12 +22,21 @@ const postSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Campaign",
         default: null,
+        index: true
+    },
+    event_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Event",
+        default: null,
+        index: true
     },
 },
     {
         timestamps: true
     }
 );
+
+postSchema.index({ event_id: 1, createdAt: -1 });
 
 const Post = mongoose.model("Post", postSchema)
 export default Post;
