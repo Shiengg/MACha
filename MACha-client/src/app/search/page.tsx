@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { campaignService, Campaign } from '@/services/campaign.service';
 import { searchPostsByTitle, Post } from '@/services/post.service';
 import CampaignCard from '@/components/campaign/CampaignCard';
@@ -27,7 +27,7 @@ const formatNumber = (num: number): string => {
     return num.toString();
 };
 
-export default function SearchPage() {
+function SearchContent() {
     const searchParams = useSearchParams();
     const query = searchParams.get('q') || '';
     const [decodedQuery, setDecodedQuery] = useState('');
@@ -180,6 +180,21 @@ export default function SearchPage() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function SearchPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    <p className="mt-4 text-gray-500">Đang tải...</p>
+                </div>
+            </div>
+        }>
+            <SearchContent />
+        </Suspense>
     );
 }
 
