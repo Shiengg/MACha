@@ -433,17 +433,12 @@ export const searchPostsByHashtag = async (searchTerm, userId = null) => {
     return { success: true, posts: postsWithCounts };
 };
 
-/**
- * Calculate time-based penalty score
- * Posts get penalized based on age to promote newer content
- */
 const calculateTimePenalty = (createdAt) => {
     const now = new Date();
     const postDate = new Date(createdAt);
     const diffMs = now - postDate;
     const diffDays = diffMs / (1000 * 60 * 60 * 24); // Convert to days
     
-    // Post mới (< 1 ngày): không trừ điểm, thậm chí cộng thêm 50 điểm
     if (diffDays < 1) {
         return 50;
     }
