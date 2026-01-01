@@ -3,8 +3,10 @@ import {
   GET_POSTS_ROUTE,
   GET_POST_BY_ID_ROUTE,
   CREATE_POST_ROUTE,
+  UPDATE_POST_ROUTE,
   DELETE_POST_ROUTE,
   SEARCH_POSTS_BY_HASHTAG_ROUTE,
+  SEARCH_POSTS_BY_TITLE_ROUTE,
   GET_POSTS_BY_HASHTAG_ROUTE,
   LIKE_POST_ROUTE,
   UNLIKE_POST_ROUTE,
@@ -53,9 +55,19 @@ export interface CreatePostResponse {
   populatedPost: Post;
 }
 
+export interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
 export interface GetPostsByHashtagResponse {
   count: number;
   posts: Post[];
+  pagination?: PaginationInfo;
 }
 
 export interface SearchPostsResponse {
@@ -94,6 +106,16 @@ export const createPost = async (data: CreatePostData): Promise<Post> => {
   }
 };
 
+export const updatePost = async (id: string, data: CreatePostData): Promise<Post> => {
+  try {
+    const response = await apiClient.put(UPDATE_POST_ROUTE(id), data);
+    return response.data.populatedPost;
+  } catch (error) {
+    console.error(`Error updating post ${id}:`, error);
+    throw error;
+  }
+};
+
 export const deletePost = async (id: string): Promise<void> => {
   try {
     await apiClient.delete(DELETE_POST_ROUTE(id));
@@ -118,13 +140,32 @@ export const searchPostsByHashtag = async (
 };
 
 export const getPostsByHashtag = async (
-  name: string
+  name: string,
+  page: number = 1,
+  limit: number = 50
 ): Promise<GetPostsByHashtagResponse> => {
   try {
-    const response = await apiClient.get(GET_POSTS_BY_HASHTAG_ROUTE(name));
+    const response = await apiClient.get(GET_POSTS_BY_HASHTAG_ROUTE(name), {
+      params: { page, limit },
+    });
     return response.data;
   } catch (error) {
     console.error(`Error fetching posts by hashtag "${name}":`, error);
+    throw error;
+  }
+};
+
+export const searchPostsByTitle = async (
+  keyword: string,
+  limit: number = 50
+): Promise<SearchPostsResponse> => {
+  try {
+    const response = await apiClient.get(SEARCH_POSTS_BY_TITLE_ROUTE, {
+      params: { q: keyword, limit },
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error searching posts by title "${keyword}":`, error);
     throw error;
   }
 };

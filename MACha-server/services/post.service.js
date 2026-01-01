@@ -253,45 +253,77 @@ export const getPostById = async (postId, userId = null) => {
     return postWithMetadata;
 };
 
-/**
- * Delete post with cascade delete
- */
-export const deletePost = async (postId, userId) => {
-    // Find post
+export const updatePost = async (postId, userId, postData) => {
+    const { content_text, media_url } = postData;
+
     const post = await Post.findById(postId);
 
     if (!post) {
         return { success: false, error: 'NOT_FOUND' };
     }
 
-    // Check ownership
     if (post.user.toString() !== userId.toString()) {
         return { success: false, error: 'FORBIDDEN' };
     }
 
-    // Get all users who have notifications related to this post (before deleting)
-    // This is needed to invalidate their notification caches
+    const hashtagNames = extractHashtags(content_text);
+    const hashtags = await findOrCreateHashtags(hashtagNames);
+
+    post.content_text = content_text;
+    post.media_url = media_url || [];
+    post.hashtags = hashtags.map((h) => h._id);
+    await post.save();
+
+    const populatedPost = await post.populate([
+        { path: "user", select: "username avatar fullname" },
+        { path: "hashtags", select: "name" },
+        { path: "campaign_id", select: "title" },
+    ]);
+
+    const postWithMetadata = await enrichPostWithMetadata(populatedPost, userId);
+
+    await invalidatePostCaches(postId);
+    
+    const keySet = 'posts:all:keys';
+    const keys = await redisClient.sMembers(keySet);
+
+    if (keys.length > 0) {
+        await redisClient.del(...keys);
+    }
+
+    await redisClient.del(keySet);
+
+    return { success: true, post: postWithMetadata };
+};
+
+export const deletePost = async (postId, userId) => {
+    const post = await Post.findById(postId);
+
+    if (!post) {
+        return { success: false, error: 'NOT_FOUND' };
+    }
+
+    if (post.user.toString() !== userId.toString()) {
+        return { success: false, error: 'FORBIDDEN' };
+    }
+
     const relatedNotifications = await Notification.find({ post: postId }).select('receiver');
     const affectedUserIds = [...new Set(relatedNotifications.map(n => n.receiver.toString()))];
 
-    // Delete post and related data (cascade delete)
     await Promise.all([
         post.deleteOne(),
         Like.deleteMany({ post: postId }),
         Comment.deleteMany({ post: postId }),
-        Notification.deleteMany({ post: postId }), // Delete all notifications related to this post
+        Notification.deleteMany({ post: postId }),
     ]);
 
-    // Invalidate notification caches for all affected users
     if (affectedUserIds.length > 0) {
         const notificationCacheKeys = affectedUserIds.map(userId => `notifications:${userId}`);
         await redisClient.del(...notificationCacheKeys);
     }
 
-    // Invalidate caches
     await invalidatePostCaches(postId);
     
-    // Invalidate posts list cache (similar to message.service.js)
     const keySet = 'posts:all:keys';
     const keys = await redisClient.sMembers(keySet);
 
@@ -304,64 +336,45 @@ export const deletePost = async (postId, userId) => {
     return { success: true };
 };
 
-/**
- * Get posts by hashtag with Cache-Aside Pattern
- */
-export const getPostsByHashtag = async (hashtagName, userId = null) => {
+export const getPostsByHashtag = async (hashtagName, userId = null, page = 1, limit = 50) => {
     const normalizedName = hashtagName.toLowerCase();
-    const hashtagKey = `posts:hashtag:${normalizedName}`;
+    const skip = (page - 1) * limit;
 
-    // 1. Check cache first
-    const cached = await redisClient.get(hashtagKey);
-    if (cached) {
-        const posts = JSON.parse(cached);
-
-        // Enrich with user-specific isLiked status
-        if (userId) {
-            const enrichedPosts = await Promise.all(
-                posts.map(async (post) => ({
-                    ...post,
-                    isLiked: await checkUserLiked(post._id, userId)
-                }))
-            );
-            return { success: true, posts: enrichedPosts };
-        }
-
-        return { success: true, posts };
-    }
-
-    // 2. Find hashtag
     const hashtag = await Hashtag.findOne({ name: normalizedName });
     if (!hashtag) {
         return { success: false, error: 'HASHTAG_NOT_FOUND' };
     }
 
-    // 3. Query posts
+    // Get total count for pagination
+    const totalCount = await Post.countDocuments({ hashtags: hashtag._id });
+
+    // Get paginated posts
     const posts = await Post.find({ hashtags: hashtag._id })
         .populate("user", "username avatar fullname")
         .populate("hashtags", "name")
         .populate("campaign_id", "title")
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
 
-    // 4. Enrich with metadata
     const postsWithCounts = await Promise.all(
         posts.map(async (post) => await enrichPostWithMetadata(post, userId))
     );
 
-    // 5. Cache the posts (without user-specific isLiked)
-    const postsToCache = postsWithCounts.map(post => ({
-        ...post,
-        isLiked: false
-    }));
-
-    await redisClient.setEx(hashtagKey, 180, JSON.stringify(postsToCache));
-
-    return { success: true, posts: postsWithCounts };
+    return { 
+        success: true, 
+        posts: postsWithCounts,
+        pagination: {
+            page,
+            limit,
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit),
+            hasNext: page * limit < totalCount,
+            hasPrev: page > 1
+        }
+    };
 };
 
-/**
- * Search posts by hashtag with Cache-Aside Pattern
- */
 export const searchPostsByHashtag = async (searchTerm, userId = null) => {
     if (!searchTerm || searchTerm.trim() === "") {
         return { success: false, error: 'EMPTY_SEARCH_TERM' };
@@ -369,7 +382,6 @@ export const searchPostsByHashtag = async (searchTerm, userId = null) => {
 
     const searchKey = `posts:search:${searchTerm.toLowerCase()}`;
 
-    // 1. Check cache first
     const cached = await redisClient.get(searchKey);
     if (cached) {
         const posts = JSON.parse(cached);
@@ -417,6 +429,131 @@ export const searchPostsByHashtag = async (searchTerm, userId = null) => {
     }));
 
     await redisClient.setEx(searchKey, 120, JSON.stringify(postsToCache));
+
+    return { success: true, posts: postsWithCounts };
+};
+
+const calculateTimePenalty = (createdAt) => {
+    const now = new Date();
+    const postDate = new Date(createdAt);
+    const diffMs = now - postDate;
+    const diffDays = diffMs / (1000 * 60 * 60 * 24); // Convert to days
+    
+    if (diffDays < 1) {
+        return 50;
+    }
+    
+    // Post 1-3 ngày: trừ nhẹ (5 điểm/ngày)
+    if (diffDays < 3) {
+        return -(diffDays - 1) * 5;
+    }
+    
+    // Post 3-7 ngày: trừ vừa (10 điểm/ngày)
+    if (diffDays < 7) {
+        return -10 - (diffDays - 3) * 10;
+    }
+    
+    // Post 7-30 ngày: trừ nhiều (15 điểm/ngày)
+    if (diffDays < 30) {
+        return -50 - (diffDays - 7) * 15;
+    }
+    
+    // Post > 30 ngày: trừ rất nhiều (20 điểm/ngày)
+    return -395 - (diffDays - 30) * 20;
+};
+
+const calculatePostRelevanceScore = (content, searchTerm, searchWords, createdAt) => {
+    const contentLower = content.toLowerCase();
+    let score = 0;
+
+    if (contentLower.startsWith(searchTerm)) {
+        score += 1000;
+    }
+
+    if (contentLower.includes(searchTerm) && !contentLower.startsWith(searchTerm)) {
+        score += 500;
+    }
+
+    const contentWords = contentLower.split(/\s+/);
+    const matchedWords = new Set();
+    searchWords.forEach(word => {
+        if (contentWords.includes(word)) {
+            matchedWords.add(word);
+        }
+    });
+    score += matchedWords.size * 100;
+
+    searchWords.forEach(word => {
+        if (!matchedWords.has(word)) {
+            contentWords.forEach(contentWord => {
+                if (contentWord.includes(word) || word.includes(contentWord)) {
+                    score += 10;
+                }
+            });
+        }
+    });
+
+    // Add time-based adjustment (newer posts get bonus, older posts get penalty)
+    const timeAdjustment = calculateTimePenalty(createdAt);
+    score += timeAdjustment;
+
+    return score;
+};
+
+export const searchPostsByTitle = async (searchTerm, userId = null, limit = 50) => {
+    if (!searchTerm || searchTerm.trim() === "") {
+        return { success: true, posts: [] };
+    }
+
+    const normalizedSearch = searchTerm.toLowerCase().trim();
+    const searchWords = normalizedSearch.split(/\s+/).filter(word => word.length > 0);
+    
+    const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = new RegExp(escapedSearch, 'i');
+
+    const allPosts = await Post.find({
+        content_text: searchRegex
+    })
+        .populate("user", "username avatar fullname")
+        .populate("hashtags", "name")
+        .populate("campaign_id", "title")
+        .lean();
+
+    const postsWithScore = allPosts.map(post => ({
+        ...post,
+        relevanceScore: calculatePostRelevanceScore(
+            post.content_text,
+            normalizedSearch,
+            searchWords,
+            post.createdAt
+        )
+    }));
+
+    postsWithScore.sort((a, b) => {
+        if (b.relevanceScore !== a.relevanceScore) {
+            return b.relevanceScore - a.relevanceScore;
+        }
+        return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    const results = postsWithScore
+        .slice(0, limit)
+        .map(({ relevanceScore, ...post }) => post);
+
+    const postIds = results.map(p => p._id);
+    
+    const posts = await Post.find({ _id: { $in: postIds } })
+        .populate("user", "username avatar fullname")
+        .populate("hashtags", "name")
+        .populate("campaign_id", "title");
+
+    const orderedPosts = postIds.map(id => 
+        posts.find(p => p._id.toString() === id.toString())
+    ).filter(Boolean);
+
+    const postsWithCounts = await Promise.all(
+        orderedPosts.map(async (post) => await enrichPostWithMetadata(post, userId))
+    );
 
     return { success: true, posts: postsWithCounts };
 };

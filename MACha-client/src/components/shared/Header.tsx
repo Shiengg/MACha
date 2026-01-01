@@ -117,6 +117,13 @@ export default function Header() {
                             Khám phá
                         </button>
 
+                        <button
+                            onClick={() => router.push('/events')}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all hidden md:block font-inter"
+                        >
+                            Sự kiện
+                        </button>
+
                         {/* Create Campaign Button - Highlighted */}
                         <button
                             onClick={() => router.push('/create-campaign')}

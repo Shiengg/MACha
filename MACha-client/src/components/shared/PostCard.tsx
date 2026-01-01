@@ -2,13 +2,16 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, MessageCircle, Share2, DollarSign, MoreHorizontal } from 'lucide-react';
-import { FaEdit, FaTrash, FaFlag } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaFlag, FaImages, FaTimes } from 'react-icons/fa';
 import Image from 'next/image';
-import { toggleLikePost, deletePost } from '@/services/post.service';
+import { toggleLikePost, deletePost, updatePost } from '@/services/post.service';
+import { getReportsByItem } from '@/services/report.service';
 import CommentModal from './CommentModal';
+import ReportModal from './ReportModal';
 import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import { cloudinaryService } from '@/services/cloudinary.service';
 
 interface PostCardProps {
   post: {
@@ -39,9 +42,10 @@ interface PostCardProps {
   onShare?: (postId: string) => void;
   onDonate?: (postId: string, campaignId?: string) => void;
   onDelete?: (postId: string) => void;
+  onUpdate?: (postId: string, updatedPost: any) => void;
 }
 
-export default function PostCard({ post, onLike, onComment, onShare, onDonate, onDelete }: PostCardProps) {
+export default function PostCard({ post, onLike, onComment, onShare, onDonate, onDelete, onUpdate }: PostCardProps) {
   const { socket, isConnected } = useSocket();
   const { user } = useAuth();
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
@@ -54,6 +58,13 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editContent, setEditContent] = useState(post.content_text);
+  const [editMediaUrls, setEditMediaUrls] = useState<string[]>(post.media_url || []);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [hasReported, setHasReported] = useState(false);
+  const [isCheckingReport, setIsCheckingReport] = useState(false);
 
   const justLikedRef = useRef(false);
   const justCommentedRef = useRef(false);
@@ -78,6 +89,28 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isDropdownOpen]);
+
+  useEffect(() => {
+    const checkUserReported = async () => {
+      if (!currentUserId || isOwner) {
+        setHasReported(false);
+        return;
+      }
+
+      try {
+        const { reports } = await getReportsByItem('post', post._id);
+        const userReport = reports.find(
+          (report) => report.reporter._id === currentUserId
+        );
+        setHasReported(!!userReport);
+      } catch (error) {
+        console.error('Error checking report status:', error);
+        setHasReported(false);
+      }
+    };
+
+    checkUserReported();
+  }, [post._id, currentUserId, isOwner]);
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -215,8 +248,10 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
   };
 
   const handleHashtagClick = (hashtagName: string) => {
-    console.log('Clicked hashtag:', hashtagName);
-    // TODO: Navigate to hashtag page or filter posts by hashtag
+    const normalizedHashtag = hashtagName.trim().toLowerCase();
+    if (normalizedHashtag) {
+      router.push(`/hashtag/${encodeURIComponent(normalizedHashtag)}`);
+    }
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -415,8 +450,9 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
-                      // TODO: Handle edit post
-                      console.log('Edit post:', post._id);
+                      setEditContent(post.content_text);
+                      setEditMediaUrls(post.media_url || []);
+                      setShowEditModal(true);
                     }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white"
                   >
@@ -437,15 +473,41 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
                 </>
               ) : (
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setIsDropdownOpen(false);
-                    // TODO: Handle report post
-                    console.log('Report post:', post._id);
+                    
+                    if (hasReported) {
+                      alert('Bạn đã báo cáo bài viết này rồi. Vui lòng chờ admin xử lý.');
+                      return;
+                    }
+
+                    setIsCheckingReport(true);
+                    try {
+                      const { reports } = await getReportsByItem('post', post._id);
+                      const userReport = reports.find(
+                        (report) => report.reporter._id === currentUserId
+                      );
+                      
+                      if (userReport) {
+                        setHasReported(true);
+                        alert('Bạn đã báo cáo bài viết này rồi. Vui lòng chờ admin xử lý.');
+                      } else {
+                        setShowReportModal(true);
+                      }
+                    } catch (error) {
+                      console.error('Error checking report:', error);
+                      setShowReportModal(true);
+                    } finally {
+                      setIsCheckingReport(false);
+                    }
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white"
+                  disabled={isCheckingReport || hasReported}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FaFlag className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                  <span className="text-sm font-medium">Báo cáo bài viết</span>
+                  <span className="text-sm font-medium">
+                    {hasReported ? 'Đã báo cáo' : 'Báo cáo bài viết'}
+                  </span>
                 </button>
               )}
             </div>
@@ -598,6 +660,134 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
         </div>
       )}
 
+      {/* Edit Post Modal */}
+      {showEditModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => !isUpdating && setShowEditModal(false)}
+        >
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="relative flex items-center px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <h3 className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-gray-900 dark:text-white">
+                Chỉnh sửa bài viết
+              </h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                disabled={isUpdating}
+                className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 disabled:opacity-50"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="overflow-y-auto flex-1 p-4">
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="w-full min-h-[200px] bg-transparent resize-none outline-none border-0 text-lg text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                placeholder="Bạn đang nghĩ gì?"
+                disabled={isUpdating}
+              />
+
+              {/* Media Preview */}
+              {editMediaUrls.length > 0 && (
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {editMediaUrls.map((url, index) => (
+                    <div key={index} className="relative group">
+                      <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
+                        <Image
+                          src={url}
+                          alt={`Media ${index + 1}`}
+                          width={300}
+                          height={300}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          setEditMediaUrls(editMediaUrls.filter((_, i) => i !== index));
+                        }}
+                        disabled={isUpdating}
+                        className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                      >
+                        <FaTimes className="text-xs" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="mt-3 flex items-center justify-between">
+                <label className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length === 0) return;
+                      try {
+                        const uploadResults = await cloudinaryService.uploadMultipleImages(files, 'posts');
+                        const newUrls = uploadResults.map((res) => res.secure_url);
+                        setEditMediaUrls([...editMediaUrls, ...newUrls]);
+                      } catch (error) {
+                        console.error('Error uploading images:', error);
+                        alert('Không thể tải ảnh. Vui lòng thử lại.');
+                      }
+                    }}
+                    className="hidden"
+                    disabled={isUpdating}
+                  />
+                  <FaImages className="text-green-500 text-xl" />
+                </label>
+                <button
+                  onClick={async () => {
+                    if (!editContent.trim() && editMediaUrls.length === 0) {
+                      return;
+                    }
+                    try {
+                      setIsUpdating(true);
+                      const updatedPost = await updatePost(post._id, {
+                        content_text: editContent.trim() || (editMediaUrls.length ? "Đã chia sẻ ảnh" : ""),
+                        media_url: editMediaUrls,
+                      });
+                      setShowEditModal(false);
+                      if (onUpdate) {
+                        onUpdate(post._id, updatedPost);
+                      }
+                    } catch (error: any) {
+                      console.error('Error updating post:', error);
+                      alert(error.response?.data?.message || 'Không thể cập nhật bài viết. Vui lòng thử lại.');
+                    } finally {
+                      setIsUpdating(false);
+                    }
+                  }}
+                  disabled={isUpdating || (!editContent.trim() && editMediaUrls.length === 0)}
+                  className="px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/70 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center gap-2"
+                >
+                  {isUpdating ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Đang cập nhật...
+                    </>
+                  ) : (
+                    'Lưu thay đổi'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Comment Modal */}
       <CommentModal
         postId={post._id}
@@ -605,6 +795,17 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
         onClose={() => setShowCommentModal(false)}
         onCommentAdded={handleCommentAdded}
         onCommentDeleted={handleCommentDeleted}
+      />
+
+      {/* Report Modal */}
+      <ReportModal
+        reportedType="post"
+        reportedId={post._id}
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        onSuccess={() => {
+          setHasReported(true);
+        }}
       />
     </div>
   );

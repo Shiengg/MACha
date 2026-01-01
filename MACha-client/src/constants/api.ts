@@ -14,8 +14,10 @@ export const POST_ROUTE = "api/posts";
 export const GET_POSTS_ROUTE = `${POST_ROUTE}`;
 export const GET_POST_BY_ID_ROUTE = (id: string) => `${POST_ROUTE}/${id}`;
 export const CREATE_POST_ROUTE = `${POST_ROUTE}`;
+export const UPDATE_POST_ROUTE = (id: string) => `${POST_ROUTE}/${id}`;
 export const DELETE_POST_ROUTE = (id: string) => `${POST_ROUTE}/${id}`;
 export const SEARCH_POSTS_BY_HASHTAG_ROUTE = `${POST_ROUTE}/search`;
+export const SEARCH_POSTS_BY_TITLE_ROUTE = `${POST_ROUTE}/search/title`;
 export const GET_POSTS_BY_HASHTAG_ROUTE = (name: string) => `${POST_ROUTE}/hashtag/${name}`;
 
 export const HASHTAG_ROUTE = "api/hashtags";
@@ -99,3 +101,10 @@ export const ADMIN_ESCROW_ROUTE = "api/admin";
 export const ADMIN_GET_WITHDRAWAL_REQUESTS_ROUTE = `${ADMIN_ESCROW_ROUTE}/withdrawal-requests`;
 export const ADMIN_APPROVE_WITHDRAWAL_REQUEST_ROUTE = (escrowId: string) => `${ADMIN_ESCROW_ROUTE}/withdrawal-requests/${escrowId}/approve`;
 export const ADMIN_REJECT_WITHDRAWAL_REQUEST_ROUTE = (escrowId: string) => `${ADMIN_ESCROW_ROUTE}/withdrawal-requests/${escrowId}/reject`;
+
+export const REPORT_ROUTE = "api/reports";
+export const CREATE_REPORT_ROUTE = `${REPORT_ROUTE}`;
+export const GET_REPORTS_ROUTE = `${REPORT_ROUTE}`;
+export const GET_REPORT_BY_ID_ROUTE = (id: string) => `${REPORT_ROUTE}/${id}`;
+export const UPDATE_REPORT_STATUS_ROUTE = (id: string) => `${REPORT_ROUTE}/${id}/status`;
+export const GET_REPORTS_BY_ITEM_ROUTE = (reportedType: string, reportedId: string) => `${REPORT_ROUTE}/item/${reportedType}/${reportedId}`;
