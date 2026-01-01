@@ -145,6 +145,27 @@ export default function CreatePostModal({
     return null;
   };
 
+  // Helper function to extract hashtags from text
+  const extractHashtags = (text: string): string[] => {
+    const hashtagsInText = text.match(/#\w+/g) || [];
+    return hashtagsInText.map((tag) => tag.substring(1).toLowerCase());
+  };
+
+  // Helper function to remove all hashtags from text except the campaign hashtag
+  const removeHashtagsExceptCampaign = (text: string, campaignHashtag: string): string => {
+    const campaignHashtagLower = campaignHashtag.toLowerCase();
+    // Remove all hashtags
+    const textWithoutHashtags = text.replace(/#\w+/g, '').trim();
+    // Remove extra spaces
+    return textWithoutHashtags.replace(/\s+/g, ' ').trim();
+  };
+
+  // Helper function to check if campaign hashtag exists in content text
+  const hasCampaignHashtag = (text: string, campaignHashtag: string): boolean => {
+    const extractedHashtags = extractHashtags(text);
+    return extractedHashtags.includes(campaignHashtag.toLowerCase());
+  };
+
   const handleSubmitPost = async () => {
     if (!contentText.trim() && selectedFiles.length === 0) {
       return;
@@ -164,7 +185,22 @@ export default function CreatePostModal({
         mediaUrls = uploadResults.map((res) => res.secure_url);
         setIsUploading(false);
       }
-      const finalContentText = contentText.trim() || (mediaUrls?.length ? "Đã chia sẻ ảnh" : "");
+      
+      let finalContentText = contentText.trim() || (mediaUrls?.length ? "Đã chia sẻ ảnh" : "");
+      
+      // If campaign is selected and has hashtag, remove all other hashtags and ensure campaign hashtag exists
+      if (selectedCampaign?.hashtag?.name) {
+        const campaignHashtagName = selectedCampaign.hashtag.name;
+        // Remove all hashtags from content (including wrong ones)
+        finalContentText = removeHashtagsExceptCampaign(finalContentText, campaignHashtagName);
+        // Add campaign hashtag to the end if content is not empty, otherwise just the hashtag
+        const hashtagToAdd = `#${campaignHashtagName}`;
+        if (finalContentText.trim()) {
+          finalContentText = `${finalContentText} ${hashtagToAdd}`;
+        } else {
+          finalContentText = hashtagToAdd;
+        }
+      }
       
       const postData: CreatePostData = {
         content_text: finalContentText,
