@@ -1,6 +1,7 @@
 import apiClient from '@/lib/api-client';
 import {
   GET_PENDING_EVENTS_ROUTE,
+  GET_ALL_EVENTS_ROUTE,
   APPROVE_EVENT_ROUTE,
   REJECT_EVENT_ROUTE,
   GET_EVENT_BY_ID_ROUTE,
@@ -8,12 +9,21 @@ import {
 import { Event } from '../event.service';
 
 export interface AdminEvent extends Omit<Event, 'status'> {
-  status: 'draft' | 'pending' | 'published' | 'rejected' | 'cancelled' | 'completed';
+  status: 'pending' | 'published' | 'rejected' | 'cancelled' | 'completed';
 }
 
 export interface GetPendingEventsResponse {
   events: AdminEvent[];
   count: number;
+}
+
+export interface GetAllEventsParams {
+  status?: string;
+  category?: string;
+  city?: string;
+  page?: number;
+  limit?: number;
+  sort?: string;
 }
 
 export const getPendingEvents = async (): Promise<AdminEvent[]> => {
@@ -22,6 +32,19 @@ export const getPendingEvents = async (): Promise<AdminEvent[]> => {
     return response.data.events || [];
   } catch (error) {
     console.error('Error fetching pending events:', error);
+    throw error;
+  }
+};
+
+export const getAllEvents = async (filters?: GetAllEventsParams): Promise<AdminEvent[]> => {
+  try {
+    const response = await apiClient.get<{ events: AdminEvent[] }>(GET_ALL_EVENTS_ROUTE, {
+      params: filters,
+      withCredentials: true,
+    });
+    return response.data.events || [];
+  } catch (error) {
+    console.error('Error fetching all events:', error);
     throw error;
   }
 };

@@ -1,0 +1,274 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import ProtectedRoute from '@/components/guards/ProtectedRoute';
+import EventCard from '@/components/event/EventCard';
+import CreateEventModal from '@/components/event/CreateEventModal';
+import { eventService, Event } from '@/services/event.service';
+import { useAuth } from '@/contexts/AuthContext';
+import { Search, Filter, Plus, Calendar, MapPin } from 'lucide-react';
+import Swal from 'sweetalert2';
+
+function EventsContent() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [events, setEvents] = useState<Event[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('published');
+  const [selectedCity, setSelectedCity] = useState('all');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const categories = [
+    { value: 'all', label: 'Tất cả' },
+    { value: 'volunteering', label: 'Tình nguyện' },
+    { value: 'fundraising', label: 'Gây quỹ' },
+    { value: 'charity_event', label: 'Sự kiện từ thiện' },
+    { value: 'donation_drive', label: 'Tập hợp đóng góp' },
+  ];
+
+  const statuses = [
+    { value: 'all', label: 'Tất cả' },
+    { value: 'published', label: 'Đã duyệt' },
+    { value: 'upcoming', label: 'Sắp diễn ra' },
+    { value: 'past', label: 'Đã qua' },
+  ];
+
+  useEffect(() => {
+    loadEvents();
+  }, [selectedStatus]);
+
+  useEffect(() => {
+    filterEvents();
+  }, [events, searchQuery, selectedCategory, selectedCity]);
+
+  const loadEvents = async () => {
+    try {
+      setLoading(true);
+      let data: Event[] = [];
+
+      if (selectedStatus === 'upcoming') {
+        data = await eventService.getUpcomingEvents(30);
+      } else if (selectedStatus === 'past') {
+        data = await eventService.getPastEvents();
+      } else if (selectedStatus === 'published') {
+        data = await eventService.getAllEvents({ status: 'published' });
+      } else {
+        data = await eventService.getAllEvents();
+      }
+
+      setEvents(data);
+    } catch (err: any) {
+      console.error('Error loading events:', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Không thể tải danh sách sự kiện',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterEvents = () => {
+    let filtered = [...events];
+
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(e => e.category === selectedCategory);
+    }
+
+    // Filter by city
+    if (selectedCity !== 'all') {
+      filtered = filtered.filter(e => e.location.city === selectedCity);
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(e =>
+        e.title.toLowerCase().includes(query) ||
+        e.description?.toLowerCase().includes(query) ||
+        e.location.address?.toLowerCase().includes(query) ||
+        e.location.city?.toLowerCase().includes(query)
+      );
+    }
+
+    setFilteredEvents(filtered);
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      loadEvents();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const data = await eventService.searchEvents(searchQuery, {
+        category: selectedCategory !== 'all' ? selectedCategory : undefined,
+        city: selectedCity !== 'all' ? selectedCity : undefined,
+      });
+      setEvents(data);
+    } catch (err: any) {
+      console.error('Error searching events:', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Không thể tìm kiếm sự kiện',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateEvent = () => {
+    if (!user) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Cần đăng nhập',
+        text: 'Vui lòng đăng nhập để tạo sự kiện',
+      });
+      router.push('/login');
+      return;
+    }
+    setIsCreateModalOpen(true);
+  };
+
+  const handleEventCreated = () => {
+    setIsCreateModalOpen(false);
+    loadEvents();
+  };
+
+  // Get unique cities from events
+  const cities = Array.from(new Set(events.map(e => e.location.city).filter(Boolean)));
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Sự kiện từ thiện
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Khám phá và tham gia các sự kiện từ thiện trong cộng đồng
+          </p>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search */}
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm sự kiện..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+            </div>
+
+            {/* Category Filter */}
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            >
+              {categories.map(cat => (
+                <option key={cat.value} value={cat.value}>{cat.label}</option>
+              ))}
+            </select>
+
+            {/* City Filter */}
+            <select
+              value={selectedCity}
+              onChange={(e) => setSelectedCity(e.target.value)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            >
+              <option value="all">Tất cả thành phố</option>
+              {cities.map(city => (
+                <option key={city} value={city}>{city}</option>
+              ))}
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            >
+              {statuses.map(status => (
+                <option key={status.value} value={status.value}>{status.label}</option>
+              ))}
+            </select>
+
+            {/* Create Button */}
+            <button
+              onClick={handleCreateEvent}
+              className="flex items-center gap-2 px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors font-medium"
+            >
+              <Plus className="w-5 h-5" />
+              Tạo sự kiện
+            </button>
+          </div>
+        </div>
+
+        {/* Events Grid */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="inline-block w-12 h-12 border-4 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
+              <p className="mt-4 text-gray-600 dark:text-gray-400">Đang tải sự kiện...</p>
+            </div>
+          </div>
+        ) : filteredEvents.length === 0 ? (
+          <div className="text-center py-12">
+            <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600 dark:text-gray-400 text-lg">
+              Không tìm thấy sự kiện nào
+            </p>
+            {user && (
+              <button
+                onClick={handleCreateEvent}
+                className="mt-4 px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"
+              >
+                Tạo sự kiện đầu tiên
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredEvents.map((event) => (
+              <EventCard key={event._id} event={event} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Create Event Modal */}
+      <CreateEventModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onEventCreated={handleEventCreated}
+      />
+    </div>
+  );
+}
+
+export default function EventsPage() {
+  return (
+    <ProtectedRoute>
+      <EventsContent />
+    </ProtectedRoute>
+  );
+}
+

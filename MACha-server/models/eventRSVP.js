@@ -18,7 +18,6 @@ const eventRSVPSchema = new mongoose.Schema({
         enum: [
             "going",
             "interested",
-            "maybe",
             "not_going",
         ],
         default: "interested",

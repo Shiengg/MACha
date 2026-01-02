@@ -83,7 +83,6 @@ export const getEventById = async (eventId, userId = null) => {
     const stats = {
         going: { count: 0, guests: 0 },
         interested: { count: 0, guests: 0 },
-        maybe: { count: 0, guests: 0 },
         not_going: { count: 0, guests: 0 }
     };
     
@@ -435,7 +434,6 @@ export const getRSVPStats = async (eventId) => {
     const result = {
         going: { count: 0, guests: 0 },
         interested: { count: 0, guests: 0 },
-        maybe: { count: 0, guests: 0 },
         not_going: { count: 0, guests: 0 }
     };
     

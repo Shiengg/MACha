@@ -81,14 +81,13 @@ const eventSchema = new mongoose.Schema({
     status: {
         type: String,
         enum: [
-            "draft",        // Nháp
             "pending",      // Chờ duyệt
             "published",    // Đã duyệt và công khai
             "rejected",     // Bị từ chối
             "cancelled",    // Đã hủy
             "completed"     // Đã hoàn thành
         ],
-        default: "draft",
+        default: "pending",
         index: true
     },
     capacity: {

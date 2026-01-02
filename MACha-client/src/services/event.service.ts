@@ -45,20 +45,16 @@ export interface Event {
   end_date?: string;
   timezone?: string;
   location: {
-    type: 'physical' | 'online' | 'hybrid';
     venue_name?: string;
-    address?: string;
-    city?: string;
+    address: string;
+    city: string;
     district?: string;
     country?: string;
     latitude?: number;
     longitude?: number;
-    online_link?: string;
-    online_platform?: string;
   };
-  privacy: 'public' | 'friends' | 'private';
-  category: 'volunteering' | 'fundraising' | 'community_meetup' | 'workshop' | 'seminar' | 'charity_event' | 'awareness';
-  status: 'draft' | 'published' | 'cancelled' | 'completed';
+  category: 'volunteering' | 'fundraising' | 'charity_event' | 'donation_drive';
+  status: 'pending' | 'published' | 'rejected' | 'cancelled' | 'completed';
   capacity?: number;
   approved_by?: string;
   approved_at?: string;
@@ -77,7 +73,6 @@ export interface Event {
   rsvpStats?: {
     going: { count: number; guests: number };
     interested: { count: number; guests: number };
-    maybe: { count: number; guests: number };
     not_going: { count: number; guests: number };
   };
   userRSVP?: EventRSVP;
@@ -95,7 +90,7 @@ export interface EventRSVP {
     fullname?: string;
     avatar?: string;
   };
-  status: 'going' | 'interested' | 'maybe' | 'not_going';
+  status: 'going' | 'interested' | 'not_going';
   guests_count: number;
   notes?: string;
   createdAt: string;
@@ -141,19 +136,16 @@ export interface CreateEventPayload {
   end_date?: string;
   timezone?: string;
   location: {
-    type: 'physical' | 'online' | 'hybrid';
     venue_name?: string;
-    address?: string;
-    city?: string;
+    address: string;
+    city: string;
     district?: string;
     country?: string;
     latitude?: number;
     longitude?: number;
-    online_link?: string;
-    online_platform?: string;
   };
-  privacy?: 'public' | 'friends' | 'private';
-  category: 'volunteering' | 'fundraising' | 'community_meetup' | 'workshop' | 'seminar' | 'charity_event' | 'awareness';
+  category: 'volunteering' | 'fundraising' | 'charity_event' | 'donation_drive';
+  status?: 'pending' | 'published' | 'rejected' | 'cancelled' | 'completed';
   capacity?: number;
 }
 
@@ -166,7 +158,6 @@ export interface UpdateEventPayload {
   end_date?: string;
   timezone?: string;
   location?: {
-    type?: 'physical' | 'online' | 'hybrid';
     venue_name?: string;
     address?: string;
     city?: string;
@@ -174,16 +165,13 @@ export interface UpdateEventPayload {
     country?: string;
     latitude?: number;
     longitude?: number;
-    online_link?: string;
-    online_platform?: string;
   };
-  privacy?: 'public' | 'friends' | 'private';
-  category?: 'volunteering' | 'fundraising' | 'community_meetup' | 'workshop' | 'seminar' | 'charity_event' | 'awareness';
+  category?: 'volunteering' | 'fundraising' | 'charity_event' | 'donation_drive';
   capacity?: number;
 }
 
 export interface CreateRSVPPayload {
-  status: 'going' | 'interested' | 'maybe' | 'not_going';
+  status: 'going' | 'interested' | 'not_going';
   guests_count?: number;
   notes?: string;
 }
@@ -196,7 +184,6 @@ export interface CreateEventUpdatePayload {
 export interface EventFilters {
   status?: string;
   category?: string;
-  privacy?: string;
   city?: string;
   page?: number;
   limit?: number;
@@ -311,7 +298,6 @@ export const eventService = {
   async getRSVPStats(eventId: string): Promise<{
     going: { count: number; guests: number };
     interested: { count: number; guests: number };
-    maybe: { count: number; guests: number };
     not_going: { count: number; guests: number };
   }> {
     const response = await apiClient.get(GET_EVENT_RSVP_STATS_ROUTE(eventId));
