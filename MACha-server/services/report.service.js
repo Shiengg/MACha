@@ -114,8 +114,20 @@ const warnUser = async (reportedType, reportedId, adminId, resolutionDetails) =>
 
         if (previousWarnings >= 1) {
             console.log(`User ${userId} has been warned ${previousWarnings} time(s) before. Automatically banning instead.`);
-            const banResult = await banUser(reportedType, reportedId, adminId, resolutionDetails || 'Banned after multiple warnings');
+            const banResult = await banUser(reportedType, reportedId, adminId, resolutionDetails || 'Bị khóa sau nhiều lần cảnh báo');
             return { ...banResult, auto_banned: true };
+        }
+
+        // Gửi notification cho user bị cảnh báo (chỉ lần đầu tiên)
+        try {
+            await queueService.pushJob({
+                type: "USER_WARNED",
+                userId: userId,
+                adminId: adminId,
+                resolutionDetails: resolutionDetails
+            });
+        } catch (error) {
+            console.error('Error pushing USER_WARNED job:', error);
         }
     }
 
@@ -332,7 +344,23 @@ export const updateReportStatus = async (reportId, adminId, updateData) => {
         report.status = status;
         report.reviewed_by = adminId;
         
-        const finalResolution = resolution || (status === 'resolved' ? 'no_action' : 'no_action');
+        let finalResolution = resolution || (status === 'resolved' ? 'no_action' : 'no_action');
+        
+        if (status === 'resolved' && report.reported_type === 'user' && !resolution) {
+            const previousWarnings = await Report.countDocuments({
+                reported_type: 'user',
+                reported_id: report.reported_id,
+                status: 'resolved',
+                resolution: 'user_warned'
+            });
+
+            if (previousWarnings >= 1) {
+                finalResolution = 'user_banned';
+            } else {
+                finalResolution = 'user_warned';
+            }
+        }
+        
         report.resolution = finalResolution;
         
         if (resolution_details) {
@@ -346,7 +374,7 @@ export const updateReportStatus = async (reportId, adminId, updateData) => {
             } else if (executionResult.auto_banned) {
                 report.resolution = 'user_banned';
                 if (!report.resolution_details || report.resolution_details === resolution_details) {
-                    report.resolution_details = resolution_details || 'Banned after multiple warnings';
+                    report.resolution_details = resolution_details || 'Bị khóa sau nhiều lần cảnh báo';
                 }
             }
         }
@@ -472,19 +500,35 @@ export const batchUpdateReportsByItem = async (reportedType, reportedId, adminId
     const shouldSetResolution = resolvedStatuses.includes(status);
 
     let finalResolution = resolution || (status === 'resolved' ? 'no_action' : 'no_action');
+    
+    if (status === 'resolved' && reportedType === 'user' && !resolution) {
+        const previousWarnings = await Report.countDocuments({
+            reported_type: 'user',
+            reported_id: reportedId,
+            status: 'resolved',
+            resolution: 'user_warned'
+        });
+
+        if (previousWarnings >= 1) {
+            finalResolution = 'user_banned';
+        } else {
+            finalResolution = 'user_warned';
+        }
+    }
+    
     let resolutionExecuted = false;
 
-    if (status === 'resolved' && finalResolution === 'user_warned' && reports.length > 0) {
+    if (status === 'resolved' && (finalResolution === 'user_warned' || finalResolution === 'user_banned') && reports.length > 0) {
         const templateReport = reports[0];
         templateReport.resolution = finalResolution;
-        templateReport.resolution_details = resolution_details;
+        templateReport.resolution_details = resolution_details || (finalResolution === 'user_banned' ? 'Bị khóa sau nhiều lần cảnh báo' : '');
         
         const executionResult = await executeResolution(templateReport, finalResolution, adminId);
         resolutionExecuted = true;
         
         if (!executionResult.success) {
             console.error('Error executing resolution:', executionResult.error);
-        } else if (executionResult.auto_banned) {
+        } else if (executionResult.auto_banned && finalResolution === 'user_warned') {
             finalResolution = 'user_banned';
         }
     }
@@ -497,8 +541,8 @@ export const batchUpdateReportsByItem = async (reportedType, reportedId, adminId
             if (resolution_details) {
                 report.resolution_details = resolution_details;
             }
-            if (finalResolution === 'user_banned' && resolution === 'user_warned') {
-                report.resolution_details = resolution_details || 'Banned after multiple warnings';
+            if (finalResolution === 'user_banned' && !resolution_details) {
+                report.resolution_details = 'Bị khóa sau nhiều lần cảnh báo';
             }
         } else {
             report.status = status;
@@ -511,11 +555,20 @@ export const batchUpdateReportsByItem = async (reportedType, reportedId, adminId
     if (!resolutionExecuted && status === 'resolved' && finalResolution !== 'no_action' && reports.length > 0) {
         const templateReport = reports[0];
         templateReport.resolution = finalResolution;
-        templateReport.resolution_details = resolution_details;
+        templateReport.resolution_details = resolution_details || (finalResolution === 'user_banned' ? 'Bị khóa sau nhiều lần cảnh báo' : '');
         
         const executionResult = await executeResolution(templateReport, finalResolution, adminId);
         if (!executionResult.success) {
             console.error('Error executing resolution:', executionResult.error);
+        } else if (executionResult.auto_banned && finalResolution === 'user_warned') {
+            finalResolution = 'user_banned';
+            await Promise.all(reports.map(report => {
+                report.resolution = 'user_banned';
+                if (!report.resolution_details) {
+                    report.resolution_details = 'Bị khóa sau nhiều lần cảnh báo';
+                }
+                return report.save();
+            }));
         }
     }
 

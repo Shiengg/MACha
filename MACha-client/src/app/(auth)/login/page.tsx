@@ -67,12 +67,28 @@ function LoginPageContent() {
       }
     } catch (error: any) {
       const message = error?.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại.";
-      Swal.fire({
-        title: 'Đăng nhập thất bại!',
-        text: message,
-        icon: 'error',
-        confirmButtonText: 'OK'
-      });
+      const banReason = error?.response?.data?.ban_reason;
+      const isBanned = error?.response?.data?.is_banned;
+      
+      if (isBanned) {
+        Swal.fire({
+          title: 'Tài khoản bị khóa!',
+          html: `<div>
+            <p class="mb-2">${message}</p>
+            ${banReason ? `<p class="text-sm text-gray-600 mt-2"><strong>Lý do:</strong> ${banReason}</p>` : ''}
+          </div>`,
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#dc2626'
+        });
+      } else {
+        Swal.fire({
+          title: 'Đăng nhập thất bại!',
+          text: message,
+          icon: 'error',
+          confirmButtonText: 'OK'
+        });
+      }
     }
   }
 

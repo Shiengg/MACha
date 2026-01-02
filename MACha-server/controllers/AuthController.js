@@ -191,6 +191,14 @@ export const login = async (req, res) => {
             })
         }
 
+        if (user.is_banned) {
+            return res.status(HTTP_STATUS.FORBIDDEN).json({
+                message: "Tài khoản của bạn đã bị khóa (ban).",
+                ban_reason: user.ban_reason || "Tài khoản bị khóa bởi quản trị viên",
+                is_banned: true
+            });
+        }
+
         // Reset failed login attempts khi đăng nhập thành công
         await authService.resetFailedLoginAttempts(email);
 

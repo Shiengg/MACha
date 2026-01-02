@@ -79,6 +79,9 @@ async function processQueue() {
                 case "POST_REMOVED":
                     await handlePostRemoved(job);
                     break;
+                case "USER_WARNED":
+                    await handleUserWarned(job);
+                    break;
             }
         } catch (error) {
             console.error('Error processing job:', error);
@@ -490,6 +493,62 @@ async function handlePostRemoved(job) {
 
     } catch (error) {
         console.error('Error processing POST_REMOVED job:', error);
+    }
+}
+
+async function handleUserWarned(job) {
+    try {
+        const userId = job.userId;
+        
+        if (!userId) {
+            console.log('User ID not found in job');
+            return;
+        }
+
+        // Lấy thông tin user bị cảnh báo
+        const user = await User.findById(userId).select('_id username avatar');
+
+        if (!user) {
+            console.log('User not found');
+            return;
+        }
+
+        // Lấy thông tin admin (người gửi notification)
+        let admin = null;
+        if (job.adminId) {
+            admin = await User.findById(job.adminId).select('username avatar');
+        }
+
+        // Tạo notification trong database
+        const notification = await notificationService.createNotification({
+            receiver: user._id,
+            sender: admin ? admin._id : null,
+            type: 'user_warned',
+            message: 'Tài khoản của bạn đã nhận một cảnh báo từ quản trị viên',
+            content: job.resolutionDetails || 'Bạn đã vi phạm quy định của cộng đồng MACha. Vui lòng tuân thủ các quy định để tránh bị khóa tài khoản.',
+            is_read: false
+        });
+
+        // Publish notification event
+        await notificationPublisher.publish('notification:new', JSON.stringify({
+            recipientId: user._id.toString(),
+            notification: {
+                _id: notification._id,
+                type: 'user_warned',
+                message: 'Tài khoản của bạn đã nhận một cảnh báo từ quản trị viên',
+                content: job.resolutionDetails || 'Bạn đã vi phạm quy định của cộng đồng MACha. Vui lòng tuân thủ các quy định để tránh bị khóa tài khoản.',
+                sender: admin ? {
+                    _id: admin._id,
+                    username: admin.username,
+                    avatar: admin.avatar
+                } : null,
+                is_read: false,
+                createdAt: notification.createdAt
+            }
+        }));
+
+    } catch (error) {
+        console.error('Error processing USER_WARNED job:', error);
     }
 }
 

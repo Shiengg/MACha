@@ -106,7 +106,24 @@ export default function AdminReports() {
 
   const handleBatchUpdate = async (item: GroupedReportItem, status: ReportStatus) => {
     if (status === 'resolved') {
-      // Show resolution modal for approve
+      // For user reports, auto-handle without showing modal
+      if (item.reported_type === 'user') {
+        try {
+          await batchUpdateReportsByItem(item.reported_type, item.reported_id, {
+            status,
+          });
+          Swal.fire('Success!', `Đã xử lý ${item.count} báo cáo thành công`, 'success');
+          fetchGroupedReports();
+          if (showItemDetailsModal) {
+            setShowItemDetailsModal(false);
+          }
+        } catch (error: any) {
+          Swal.fire('Error', error?.response?.data?.message || 'Failed to batch update reports', 'error');
+        }
+        return;
+      }
+      
+      // Show resolution modal for approve (post, campaign, event, comment)
       setPendingAction({ type: 'batch', status, item, reportedType: item.reported_type });
       setSelectedResolution('no_action');
       setResolutionDetails('');
@@ -148,7 +165,24 @@ export default function AdminReports() {
       const report = itemReports.find(r => r._id === reportId);
       const reportedType = report?.reported_type || selectedItem?.reported_type;
       
-      // Show resolution modal for approve
+      // For user reports, auto-handle without showing modal
+      if (reportedType === 'user') {
+        try {
+          await updateReportStatus(reportId, {
+            status,
+          });
+          Swal.fire('Success!', 'Report status updated successfully', 'success');
+          if (selectedItem) {
+            handleViewItemDetails(selectedItem);
+          }
+          fetchGroupedReports();
+        } catch (error: any) {
+          Swal.fire('Error', error?.response?.data?.message || 'Failed to update report status', 'error');
+        }
+        return;
+      }
+      
+      // Show resolution modal for approve (post, campaign, event, comment)
       setPendingAction({ type: 'single', status, reportId, reportedType });
       setSelectedResolution('no_action');
       setResolutionDetails('');
@@ -685,7 +719,7 @@ export default function AdminReports() {
       )}
 
       {/* Resolution Selection Modal */}
-      {showResolutionModal && pendingAction && (
+      {showResolutionModal && pendingAction && pendingAction.reportedType !== 'user' && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowResolutionModal(false)}>
           <div className="bg-white rounded-lg max-w-md w-full m-4" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-200">

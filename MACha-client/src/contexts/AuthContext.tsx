@@ -1,9 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
 import apiClient from "@/lib/api-client";
 import { GET_CURRENT_USER_ROUTE, LOGOUT_ROUTE } from "@/constants/api";
+import Swal from 'sweetalert2';
 
 interface User {
     _id?: string;
@@ -43,6 +43,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }
             return false;
         } catch (error: any) {
+            if (error?.response?.status === 403 && (error?.response?.data?.message?.toLowerCase().includes('ban') || error?.response?.data?.message?.toLowerCase().includes('khóa'))) {
+                // User is banned, clear user and show alert
+                setUser(null);
+                const banReason = error?.response?.data?.ban_reason || "Tài khoản bị khóa bởi quản trị viên";
+                
+                // Only show alert if not already on login page to avoid duplicate alerts
+                if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+                    Swal.fire({
+                        title: 'Tài khoản bị khóa!',
+                        html: `<div>
+                            <p class="mb-2">${error?.response?.data?.message || 'Tài khoản của bạn đã bị khóa (ban).'}</p>
+                            <p class="text-sm text-gray-600 mt-2"><strong>Lý do:</strong> ${banReason}</p>
+                        </div>`,
+                        icon: 'error',
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#dc2626'
+                    }).then(() => {
+                        // Redirect to login page after user closes alert
+                        if (typeof window !== 'undefined') {
+                            window.location.href = '/login';
+                        }
+                    });
+                }
+                return false;
+            }
+            
             if (error?.response?.status !== 401) {
                 console.error("Failed to fetch user:", error);
             }
