@@ -139,7 +139,25 @@ export const getReportsByReportedItem = async (req, res) => {
         const ReportedModel = reportedModelMap[reported_type];
         let reportedItem = null;
         if (ReportedModel) {
-            reportedItem = await ReportedModel.findById(reported_id);
+            if (reported_type === 'post') {
+                reportedItem = await ReportedModel.findById(reported_id)
+                    .populate('user', 'username avatar fullname')
+                    .populate('hashtags', 'name')
+                    .populate('campaign_id', 'title');
+            } else if (reported_type === 'campaign') {
+                reportedItem = await ReportedModel.findById(reported_id)
+                    .populate('creator', 'username avatar fullname')
+                    .populate('hashtags', 'name');
+            } else if (reported_type === 'event') {
+                reportedItem = await ReportedModel.findById(reported_id)
+                    .populate('creator', 'username avatar fullname');
+            } else if (reported_type === 'comment') {
+                reportedItem = await ReportedModel.findById(reported_id)
+                    .populate('user', 'username avatar fullname')
+                    .populate('post', '_id');
+            } else {
+                reportedItem = await ReportedModel.findById(reported_id);
+            }
         }
 
         return res.status(HTTP_STATUS.OK).json({

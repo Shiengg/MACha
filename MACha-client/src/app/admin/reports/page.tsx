@@ -15,6 +15,8 @@ import {
 } from '@/services/report.service';
 import Swal from 'sweetalert2';
 import { MoreVertical, ChevronDown, Search, SlidersHorizontal, AlertTriangle, Eye, CheckCircle, XCircle } from 'lucide-react';
+import PostCard from '@/components/shared/PostCard';
+import CampaignCard from '@/components/campaign/CampaignCard';
 
 export default function AdminReports() {
   const [items, setItems] = useState<GroupedReportItem[]>([]);
@@ -87,8 +89,10 @@ export default function AdminReports() {
     setShowItemDetailsModal(true);
     try {
       const response = await getReportsByItem(item.reported_type, item.reported_id);
+      console.log('Response from getReportsByItem:', response);
       setItemReports(response.reports);
       setReportedItem(response.reported_item);
+      console.log('Reported item set:', response.reported_item);
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
@@ -553,12 +557,50 @@ export default function AdminReports() {
               </div>
             </div>
             <div className="p-6 space-y-6">
-              {reportedItem && (
+              {loadingItemDetails ? (
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-gray-900 mb-2">Item được báo cáo:</h3>
-                  <pre className="text-sm text-gray-700 overflow-auto">
-                    {JSON.stringify(reportedItem, null, 2)}
-                  </pre>
+                  <p className="text-sm text-gray-600">Đang tải thông tin item...</p>
+                </div>
+              ) : reportedItem ? (
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-4">Item được báo cáo:</h3>
+                  {selectedItem?.reported_type === 'post' && reportedItem.content_text ? (
+                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                      <PostCard 
+                        post={{
+                          _id: reportedItem._id?.toString() || reportedItem.id?.toString() || '',
+                          user: reportedItem.user && typeof reportedItem.user === 'object' 
+                            ? reportedItem.user 
+                            : { _id: '', username: 'Unknown' },
+                          content_text: reportedItem.content_text || '',
+                          media_url: reportedItem.media_url || [],
+                          hashtags: Array.isArray(reportedItem.hashtags) ? reportedItem.hashtags : [],
+                          campaign_id: reportedItem.campaign_id || null,
+                          createdAt: reportedItem.createdAt || reportedItem.created_at || new Date().toISOString(),
+                          likesCount: 0,
+                          commentsCount: 0,
+                          isLiked: false
+                        }}
+                      />
+                    </div>
+                  ) : selectedItem?.reported_type === 'campaign' && reportedItem.title ? (
+                    <div className="bg-white rounded-lg">
+                      <CampaignCard 
+                        campaign={reportedItem as any}
+                        disableNavigation={true}
+                      />
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <pre className="text-sm text-gray-700 overflow-auto max-h-96">
+                        {JSON.stringify(reportedItem, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Không tìm thấy thông tin item</p>
                 </div>
               )}
               
