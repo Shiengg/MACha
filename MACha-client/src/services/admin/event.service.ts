@@ -7,7 +7,7 @@ import {
 } from '@/constants/api';
 import { Event } from '../event.service';
 
-export interface AdminEvent extends Event {
+export interface AdminEvent extends Omit<Event, 'status'> {
   status: 'draft' | 'pending' | 'published' | 'rejected' | 'cancelled' | 'completed';
 }
 
