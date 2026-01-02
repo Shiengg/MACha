@@ -24,7 +24,6 @@ export type ReportedType = "post" | "campaign" | "user" | "comment";
 
 export type ReportStatus =
   | "pending"
-  | "reviewing"
   | "resolved"
   | "rejected"
   | "auto_resolved";

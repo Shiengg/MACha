@@ -141,10 +141,7 @@ export const updateReportStatus = async (reportId, adminId, updateData) => {
     const resolvedStatuses = ['resolved', 'rejected', 'auto_resolved'];
     const shouldSetResolution = resolvedStatuses.includes(status);
 
-    if (status === 'reviewing') {
-        report.status = 'reviewing';
-        report.reviewed_by = adminId;
-    } else if (shouldSetResolution) {
+    if (shouldSetResolution) {
         report.status = status;
         report.reviewed_by = adminId;
         if (resolution) {
@@ -275,10 +272,7 @@ export const batchUpdateReportsByItem = async (reportedType, reportedId, adminId
     const shouldSetResolution = resolvedStatuses.includes(status);
 
     const updatePromises = reports.map(report => {
-        if (status === 'reviewing') {
-            report.status = 'reviewing';
-            report.reviewed_by = adminId;
-        } else if (shouldSetResolution) {
+        if (shouldSetResolution) {
             report.status = status;
             report.reviewed_by = adminId;
             if (resolution) {

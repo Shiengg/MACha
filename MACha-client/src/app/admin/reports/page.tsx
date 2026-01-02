@@ -98,8 +98,7 @@ export default function AdminReports() {
 
   const handleBatchUpdate = async (item: GroupedReportItem, status: ReportStatus) => {
     const statusLabels: { [key: string]: string } = {
-      'reviewing': 'bắt đầu xem xét',
-      'resolved': 'đánh dấu đã xử lý',
+      'resolved': 'phê duyệt',
       'rejected': 'từ chối'
     };
 
@@ -108,7 +107,7 @@ export default function AdminReports() {
       html: `Bạn có chắc muốn <strong>${statusLabels[status]}</strong> tất cả ${item.pending_count} báo cáo đang chờ của item này?`,
       icon: 'question',
       showCancelButton: true,
-      confirmButtonColor: status === 'rejected' ? '#dc2626' : status === 'resolved' ? '#10b981' : '#2563eb',
+      confirmButtonColor: status === 'rejected' ? '#dc2626' : '#10b981',
       cancelButtonColor: '#6b7280',
       confirmButtonText: 'Xác nhận',
       cancelButtonText: 'Hủy',
@@ -289,9 +288,8 @@ export default function AdminReports() {
                         >
                           <option value="all">Tất cả</option>
                           <option value="pending">Chờ xử lý</option>
-                          <option value="reviewing">Đang xem xét</option>
-                          <option value="resolved">Đã xử lý</option>
-                          <option value="rejected">Từ chối</option>
+                          <option value="resolved">Đã phê duyệt</option>
+                          <option value="rejected">Đã từ chối</option>
                         </select>
                         <ChevronDown className="w-4 h-4 absolute right-3 bottom-2.5 pointer-events-none text-gray-400" />
                       </div>
@@ -385,17 +383,11 @@ export default function AdminReports() {
                             {item.pending_count > 0 && (
                               <>
                                 <button
-                                  onClick={() => handleBatchUpdate(item, 'reviewing')}
-                                  className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-                                >
-                                  Xem xét tất cả
-                                </button>
-                                <button
                                   onClick={() => handleBatchUpdate(item, 'resolved')}
                                   className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors flex items-center gap-1"
                                 >
                                   <CheckCircle className="w-4 h-4" />
-                                  Đã xử lý
+                                  Phê duyệt
                                 </button>
                                 <button
                                   onClick={() => handleBatchUpdate(item, 'rejected')}
@@ -501,16 +493,10 @@ export default function AdminReports() {
                   {selectedItem.pending_count > 0 && (
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleBatchUpdate(selectedItem, 'reviewing')}
-                        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Xem xét tất cả
-                      </button>
-                      <button
                         onClick={() => handleBatchUpdate(selectedItem, 'resolved')}
                         className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                       >
-                        Đánh dấu đã xử lý tất cả
+                        Phê duyệt tất cả
                       </button>
                       <button
                         onClick={() => handleBatchUpdate(selectedItem, 'rejected')}
@@ -539,12 +525,12 @@ export default function AdminReports() {
                             report.status === 'pending' ? 'bg-amber-50 text-amber-700' :
                             report.status === 'resolved' ? 'bg-green-50 text-green-700' :
                             report.status === 'rejected' ? 'bg-red-50 text-red-700' :
-                            'bg-blue-50 text-blue-700'
+                            'bg-gray-50 text-gray-700'
                           }`}>
                             {report.status === 'pending' ? 'Chờ xử lý' :
-                             report.status === 'resolved' ? 'Đã xử lý' :
-                             report.status === 'rejected' ? 'Từ chối' :
-                             'Đang xem xét'}
+                             report.status === 'resolved' ? 'Đã phê duyệt' :
+                             report.status === 'rejected' ? 'Đã từ chối' :
+                             report.status}
                           </span>
                         </div>
                         <div className="text-sm text-gray-700 mb-2">
@@ -558,16 +544,10 @@ export default function AdminReports() {
                         {report.status === 'pending' && (
                           <div className="flex gap-2 mt-3">
                             <button
-                              onClick={() => handleUpdateSingleReport(report._id, 'reviewing')}
-                              className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-                            >
-                              Xem xét
-                            </button>
-                            <button
                               onClick={() => handleUpdateSingleReport(report._id, 'resolved')}
                               className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
                             >
-                              Đã xử lý
+                              Phê duyệt
                             </button>
                             <button
                               onClick={() => handleUpdateSingleReport(report._id, 'rejected')}
