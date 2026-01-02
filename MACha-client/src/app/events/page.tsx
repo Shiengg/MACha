@@ -31,7 +31,6 @@ function EventsContent() {
   ];
 
   const statuses = [
-    { value: 'all', label: 'Tất cả' },
     { value: 'published', label: 'Đã duyệt' },
     { value: 'upcoming', label: 'Sắp diễn ra' },
     { value: 'past', label: 'Đã qua' },
