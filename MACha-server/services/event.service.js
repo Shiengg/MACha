@@ -4,6 +4,7 @@ import EventRSVP from "../models/eventRSVP.js";
 import EventHost from "../models/eventHost.js";
 import EventUpdate from "../models/eventUpdate.js";
 import { redisClient } from "../config/redis.js";
+import { publishEvent } from "./tracking.service.js";
 
 const invalidateEventCaches = async (eventId, category = null, status = null) => {
     const keys = [
@@ -406,6 +407,9 @@ export const createRSVP = async (eventId, userId, payload) => {
         }
     }
     
+    const existingRSVP = await EventRSVP.findOne({ event: eventId, user: userId });
+    const isUpdate = !!existingRSVP;
+    
     const rsvp = await EventRSVP.findOneAndUpdate(
         { event: eventId, user: userId },
         { ...payload, event: eventId, user: userId },
@@ -415,6 +419,33 @@ export const createRSVP = async (eventId, userId, payload) => {
     await redisClient.del(`event:${eventId}`);
     await redisClient.del(`events:rsvp:${eventId}`);
     await redisClient.del(`events:rsvp:stats:${eventId}`);
+    
+    // Get fresh RSVP stats after update
+    const rsvpStats = await getRSVPStats(eventId);
+    
+    // Publish event to Redis for realtime updates
+    const eventData = {
+        eventId: eventId.toString(),
+        userId: userId.toString(),
+        rsvp: {
+            _id: rsvp._id.toString(),
+            status: rsvp.status,
+            guests_count: rsvp.guests_count || 0,
+            user: {
+                _id: rsvp.user._id.toString(),
+                username: rsvp.user.username,
+                fullname: rsvp.user.fullname,
+                avatar: rsvp.user.avatar
+            }
+        },
+        rsvpStats: rsvpStats
+    };
+    
+    if (isUpdate) {
+        await publishEvent("tracking:event:rsvp:updated", eventData);
+    } else {
+        await publishEvent("tracking:event:rsvp:created", eventData);
+    }
     
     return { success: true, rsvp };
 };
@@ -434,6 +465,18 @@ export const deleteRSVP = async (eventId, userId) => {
     await redisClient.del(`event:${eventId}`);
     await redisClient.del(`events:rsvp:${eventId}`);
     await redisClient.del(`events:rsvp:stats:${eventId}`);
+    
+    // Get fresh RSVP stats after deletion
+    const rsvpStats = await getRSVPStats(eventId);
+    
+    // Publish event to Redis for realtime updates
+    const eventData = {
+        eventId: eventId.toString(),
+        userId: userId.toString(),
+        rsvpStats: rsvpStats
+    };
+    
+    await publishEvent("tracking:event:rsvp:deleted", eventData);
     
     return { success: true };
 };

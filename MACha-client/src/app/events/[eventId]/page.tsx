@@ -70,6 +70,15 @@ function EventDetails() {
           };
         });
       }
+      
+      // If current user updated their RSVP, update local state
+      if (eventData.rsvp && user) {
+        const currentUserId = String(user._id || user.id || '');
+        const rsvpUserId = String(eventData.rsvp.user?._id || eventData.rsvp.user?.id || '');
+        if (rsvpUserId === currentUserId) {
+          setRSVP(eventData.rsvp);
+        }
+      }
     };
 
     const handleRSVPDeleted = (eventData: any) => {
@@ -95,10 +104,12 @@ function EventDetails() {
       }
       
       // If current user deleted their RSVP, update local state
-      const currentUserId = String(user?._id || user?.id || '');
-      const deletedUserId = String(eventData.userId || '');
-      if (deletedUserId === currentUserId) {
-        setRSVP(null);
+      if (user) {
+        const currentUserId = String(user._id || user.id || '');
+        const deletedUserId = String(eventData.userId || '');
+        if (deletedUserId === currentUserId) {
+          setRSVP(null);
+        }
       }
     };
 
@@ -108,8 +119,10 @@ function EventDetails() {
     return () => {
       socket.off('event:rsvp:updated', handleRSVPUpdated);
       socket.off('event:rsvp:deleted', handleRSVPDeleted);
+      socket.emit('leave-room', eventRoom);
+      console.log(`🚪 Left event room: ${eventRoom}`);
     };
-  }, [socket, isConnected, eventId, event, user]);
+  }, [socket, isConnected, eventId, user]);
 
   const fetchEvent = async (forceRefresh = false) => {
     try {
