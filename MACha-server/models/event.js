@@ -37,23 +37,17 @@ const eventSchema = new mongoose.Schema({
         default: "Asia/Ho_Chi_Minh"
     },
     location: {
-        type: {
-            type: String,
-            enum: ["physical", "online", "hybrid"],
-            required: true,
-            default: "physical"
-        },
         venue_name: {
             type: String,
             default: null
         },
         address: {
             type: String,
-            default: null
+            required: true
         },
         city: {
             type: String,
-            default: null,
+            required: true,
             index: true
         },
         district: {
@@ -71,32 +65,15 @@ const eventSchema = new mongoose.Schema({
         longitude: {
             type: Number,
             default: null
-        },
-        online_link: {
-            type: String,
-            default: null
-        },
-        online_platform: {
-            type: String,
-            default: null
         }
-    },
-    privacy: {
-        type: String,
-        enum: ["public", "friends", "private"],
-        default: "public",
-        index: true
     },
     category: {
         type: String,
         enum: [
             "volunteering",      // Tình nguyện
-            "fundraising",       // Gây quỹ (offline/online)
-            "community_meetup",  // Gặp gỡ cộng đồng
-            "workshop",          // Workshop / tập huấn
-            "seminar",           // Hội thảo / tọa đàm
-            "charity_event",    // Sự kiện từ thiện tổng hợp
-            "awareness",         // Nâng cao nhận thức
+            "fundraising",       // Gây quỹ
+            "charity_event",     // Sự kiện từ thiện
+            "donation_drive",    // Tập hợp đóng góp (ví dụ: mì gói, quần áo)
         ],
         required: true,
         index: true
@@ -104,10 +81,12 @@ const eventSchema = new mongoose.Schema({
     status: {
         type: String,
         enum: [
-            "draft",
-            "published",
-            "cancelled",
-            "completed"
+            "draft",        // Nháp
+            "pending",      // Chờ duyệt
+            "published",    // Đã duyệt và công khai
+            "rejected",     // Bị từ chối
+            "cancelled",    // Đã hủy
+            "completed"     // Đã hoàn thành
         ],
         default: "draft",
         index: true
@@ -162,7 +141,6 @@ const eventSchema = new mongoose.Schema({
 eventSchema.index({ creator: 1, status: 1 });
 eventSchema.index({ status: 1, start_date: 1 });
 eventSchema.index({ category: 1, status: 1 });
-eventSchema.index({ privacy: 1, status: 1 });
 eventSchema.index({ "location.city": 1, status: 1 });
 
 const Event = mongoose.model("Event", eventSchema)

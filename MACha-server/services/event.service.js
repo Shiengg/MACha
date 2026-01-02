@@ -25,7 +25,7 @@ const invalidateEventCaches = async (eventId, category = null, status = null) =>
 };
 
 export const getEvents = async (filters = {}) => {
-    const { status, category, privacy, city, page = 0, limit = 20, sort = 'createdAt' } = filters;
+    const { status, category, city, page = 0, limit = 20, sort = 'createdAt' } = filters;
     
     const cacheKey = `events:all:${JSON.stringify(filters)}`;
     const cached = await redisClient.get(cacheKey);
@@ -36,7 +36,6 @@ export const getEvents = async (filters = {}) => {
     const query = {};
     if (status) query.status = status;
     if (category) query.category = category;
-    if (privacy) query.privacy = privacy;
     if (city) query['location.city'] = city;
     
     const events = await Event.find(query)
