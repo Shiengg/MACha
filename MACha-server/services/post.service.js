@@ -6,19 +6,11 @@ import Notification from "../models/notification.js";
 import Campaign from "../models/campaign.js";
 import { redisClient } from "../config/redis.js";
 
-// ==================== HELPER FUNCTIONS ====================
-
-/**
- * Extract hashtags from text content
- */
 const extractHashtags = (content_text) => {
     const hashtagsInText = content_text.match(/#\w+/g) || [];
     return hashtagsInText.map((tag) => tag.substring(1).toLowerCase());
 };
 
-/**
- * Find or create hashtags
- */
 const findOrCreateHashtags = async (hashtagNames) => {
     return await Promise.all(
         hashtagNames.map(async (name) => {
@@ -31,58 +23,40 @@ const findOrCreateHashtags = async (hashtagNames) => {
     );
 };
 
-/**
- * Get post counts (likes, comments) with cache
- */
 const getPostCounts = async (postId) => {
     const countKey = `post:counts:${postId}`;
-
-    // Check cache
     const cached = await redisClient.get(countKey);
     if (cached) {
         return JSON.parse(cached);
     }
 
-    // Query database
     const [likesCount, commentsCount] = await Promise.all([
         Like.countDocuments({ post: postId }),
         Comment.countDocuments({ post: postId })
     ]);
 
     const counts = { likesCount, commentsCount };
-
-    // Cache for 2 minutes
     await redisClient.setEx(countKey, 120, JSON.stringify(counts));
 
     return counts;
 };
 
-/**
- * Check if user liked a post
- */
 const checkUserLiked = async (postId, userId) => {
     if (!userId) return false;
 
     const likeKey = `post:liked:${postId}:${userId}`;
-
     const cached = await redisClient.get(likeKey);
     if (cached !== null) {
         return cached === 'true';
     }
 
-    // Query database
     const like = await Like.findOne({ post: postId, user: userId });
     const isLiked = !!like;
-
-    // Cache for 5 minutes
     await redisClient.setEx(likeKey, 300, isLiked.toString());
 
     return isLiked;
 };
 
-/**
- * Enrich post with counts and isLiked status
- */
 const enrichPostWithMetadata = async (post, userId = null) => {
     const { likesCount, commentsCount } = await getPostCounts(post._id);
     const isLiked = await checkUserLiked(post._id, userId);
@@ -95,27 +69,37 @@ const enrichPostWithMetadata = async (post, userId = null) => {
     };
 };
 
-/**
- * Invalidate all post-related caches
- */
 const invalidatePostCaches = async (postId) => {
     const keys = [
         'posts:all',
         `post:${postId}`,
         `post:counts:${postId}`,
     ];
-
     await Promise.all(keys.map(key => redisClient.del(key)));
-
-    // Also invalidate all user-specific liked cache for this post
-    // Note: In production, you might want to use Redis SCAN for this
 };
 
-// ==================== MAIN SERVICE FUNCTIONS ====================
+/**
+ * Invalidate all post list caches (for feed/pagination)
+ */
+export const invalidateAllPostListCaches = async () => {
+    const keySet = 'posts:all:keys';
+    const keys = await redisClient.sMembers(keySet);
+
+    if (keys.length > 0) {
+        await redisClient.del(...keys);
+    }
+
+    await redisClient.del(keySet);
+};
 
 /**
- * Create a new post
+ * Invalidate post cache by post ID
  */
+export const invalidatePostCache = async (postId) => {
+    await invalidatePostCaches(postId);
+    await invalidateAllPostListCaches();
+};
+
 export const createPost = async (userId, postData) => {
     const { content_text, media_url, campaign_id } = postData;
 
@@ -140,14 +124,12 @@ export const createPost = async (userId, postData) => {
         campaign_id: campaign_id || null,
     });
 
-    // Populate post
     const populatedPost = await post.populate([
         { path: "user", select: "username avatar fullname" },
         { path: "hashtags", select: "name" },
         { path: "campaign_id", select: "title" },
     ]);
 
-    // Enrich with metadata (new post has 0 likes/comments)
     const postWithCounts = {
         ...populatedPost.toObject(),
         likesCount: 0,
@@ -167,18 +149,21 @@ export const createPost = async (userId, postData) => {
     return postWithCounts;
 };
 
-/**
- * Get all posts with Cache-Aside Pattern
- */
-export const getPosts = async (userId = null, page = 0, limit = 20) => {
+export const getPosts = async (userId = null, userRole = null, page = 0, limit = 20) => {
     const postsKey = `posts:all:page:${page}:limit:${limit}`;
     const cached = await redisClient.get(postsKey);
     if (cached) {
         const posts = JSON.parse(cached);
+        
+        const filteredPosts = posts.filter(post => {
+            if (!post.is_hidden) return true;
+            if (userRole === 'admin' || userRole === 'owner') return true;
+            return false;
+        });
 
         if (userId) {
             const enrichedPosts = await Promise.all(
-                posts.map(async (post) => ({
+                filteredPosts.map(async (post) => ({
                     ...post,
                     isLiked: await checkUserLiked(post._id, userId)
                 }))
@@ -186,10 +171,15 @@ export const getPosts = async (userId = null, page = 0, limit = 20) => {
             return enrichedPosts;
         }
 
-        return posts;
+        return filteredPosts;
     }
 
-    const posts = await Post.find()
+    const query = {};
+    if (userRole !== 'admin' && userRole !== 'owner') {
+        query.is_hidden = false;
+    }
+
+    const posts = await Post.find(query)
         .populate("user", "username avatar fullname")
         .populate("hashtags", "name")
         .populate("campaign_id", "title")
@@ -197,49 +187,24 @@ export const getPosts = async (userId = null, page = 0, limit = 20) => {
         .limit(limit)
         .sort({ createdAt: -1 });
 
-    // 3. Enrich posts with metadata
     const postsWithCounts = await Promise.all(
         posts.map(async (post) => await enrichPostWithMetadata(post, userId))
     );
 
-    // 4. Cache the posts (without user-specific isLiked)
     const postsToCache = postsWithCounts.map(post => ({
         ...post,
-        isLiked: false // Don't cache user-specific data
+        isLiked: false
     }));
 
     await redisClient.setEx(postsKey, 120, JSON.stringify(postsToCache));
-
-    // Add key to set for cache invalidation
     await redisClient.sAdd('posts:all:keys', postsKey);
 
     return postsWithCounts;
 };
 
-/**
- * Get post by ID with Cache-Aside Pattern
- */
-export const getPostById = async (postId, userId = null) => {
+export const getPostById = async (postId, userId = null, userRole = null) => {
     const postKey = `post:${postId}`;
 
-    // 1. Check cache first
-    const cached = await redisClient.get(postKey);
-    if (cached) {
-        const post = JSON.parse(cached);
-
-        // Get fresh counts and isLiked status
-        const { likesCount, commentsCount } = await getPostCounts(postId);
-        const isLiked = await checkUserLiked(postId, userId);
-
-        return {
-            ...post,
-            likesCount,
-            commentsCount,
-            isLiked,
-        };
-    }
-
-    // 2. Cache miss - Query database
     const post = await Post.findById(postId)
         .populate("user", "username avatar fullname")
         .populate("hashtags", "name")
@@ -249,10 +214,29 @@ export const getPostById = async (postId, userId = null) => {
         return null;
     }
 
-    // 3. Enrich with metadata
-    const postWithMetadata = await enrichPostWithMetadata(post, userId);
+    if (post.is_hidden) {
+        if (userRole === 'admin' || userRole === 'owner') {
+        } else if (userId && post.user && post.user._id && post.user._id.toString() === userId.toString()) {
+        } else {
+            return null;
+        }
+    }
 
-    // 4. Cache the post (without counts and isLiked as they change frequently)
+    const cached = await redisClient.get(postKey);
+    if (cached) {
+        const cachedPost = JSON.parse(cached);
+        const { likesCount, commentsCount } = await getPostCounts(postId);
+        const isLiked = await checkUserLiked(postId, userId);
+
+        return {
+            ...cachedPost,
+            likesCount,
+            commentsCount,
+            isLiked,
+        };
+    }
+
+    const postWithMetadata = await enrichPostWithMetadata(post, userId);
     const postToCache = {
         ...post.toObject()
     };
@@ -360,7 +344,7 @@ export const deletePost = async (postId, userId) => {
     return { success: true };
 };
 
-export const getPostsByHashtag = async (hashtagName, userId = null, page = 1, limit = 50) => {
+export const getPostsByHashtag = async (hashtagName, userId = null, userRole = null, page = 1, limit = 50) => {
     const normalizedName = hashtagName.toLowerCase();
     const skip = (page - 1) * limit;
 
@@ -369,11 +353,18 @@ export const getPostsByHashtag = async (hashtagName, userId = null, page = 1, li
         return { success: false, error: 'HASHTAG_NOT_FOUND' };
     }
 
+    // Build query to exclude hidden posts (unless user is admin/owner)
+    let query = { hashtags: hashtag._id };
+    if (userRole !== 'admin' && userRole !== 'owner') {
+        // All non-admin users (including post owners) can only see non-hidden posts in feed
+        query.is_hidden = false;
+    }
+
     // Get total count for pagination
-    const totalCount = await Post.countDocuments({ hashtags: hashtag._id });
+    const totalCount = await Post.countDocuments(query);
 
     // Get paginated posts
-    const posts = await Post.find({ hashtags: hashtag._id })
+    const posts = await Post.find(query)
         .populate("user", "username avatar fullname")
         .populate("hashtags", "name")
         .populate("campaign_id", "title")
@@ -399,7 +390,7 @@ export const getPostsByHashtag = async (hashtagName, userId = null, page = 1, li
     };
 };
 
-export const searchPostsByHashtag = async (searchTerm, userId = null) => {
+export const searchPostsByHashtag = async (searchTerm, userId = null, userRole = null) => {
     if (!searchTerm || searchTerm.trim() === "") {
         return { success: false, error: 'EMPTY_SEARCH_TERM' };
     }
@@ -409,11 +400,16 @@ export const searchPostsByHashtag = async (searchTerm, userId = null) => {
     const cached = await redisClient.get(searchKey);
     if (cached) {
         const posts = JSON.parse(cached);
+        
+        const filteredPosts = posts.filter(post => {
+            if (!post.is_hidden) return true;
+            if (userRole === 'admin' || userRole === 'owner') return true;
+            return false;
+        });
 
-        // Enrich with user-specific isLiked status
         if (userId) {
             const enrichedPosts = await Promise.all(
-                posts.map(async (post) => ({
+                filteredPosts.map(async (post) => ({
                     ...post,
                     isLiked: await checkUserLiked(post._id, userId)
                 }))
@@ -421,10 +417,9 @@ export const searchPostsByHashtag = async (searchTerm, userId = null) => {
             return { success: true, posts: enrichedPosts };
         }
 
-        return { success: true, posts };
+        return { success: true, posts: filteredPosts };
     }
 
-    // 2. Find matching hashtags
     const matchingHashtags = await Hashtag.find({
         name: { $regex: searchTerm, $options: "i" },
     });
@@ -433,20 +428,22 @@ export const searchPostsByHashtag = async (searchTerm, userId = null) => {
         return { success: true, posts: [] };
     }
 
-    // 3. Query posts
     const hashtagIds = matchingHashtags.map((h) => h._id);
-    const posts = await Post.find({ hashtags: { $in: hashtagIds } })
+    let query = { hashtags: { $in: hashtagIds } };
+    if (userRole !== 'admin' && userRole !== 'owner') {
+        query.is_hidden = false;
+    }
+    
+    const posts = await Post.find(query)
         .populate("user", "username avatar fullname")
         .populate("hashtags", "name")
         .populate("campaign_id", "title")
         .sort({ createdAt: -1 });
 
-    // 4. Enrich with metadata
     const postsWithCounts = await Promise.all(
         posts.map(async (post) => await enrichPostWithMetadata(post, userId))
     );
 
-    // 5. Cache the search results
     const postsToCache = postsWithCounts.map(post => ({
         ...post,
         isLiked: false
@@ -524,7 +521,7 @@ const calculatePostRelevanceScore = (content, searchTerm, searchWords, createdAt
     return score;
 };
 
-export const searchPostsByTitle = async (searchTerm, userId = null, limit = 50) => {
+export const searchPostsByTitle = async (searchTerm, userId = null, userRole = null, limit = 50) => {
     if (!searchTerm || searchTerm.trim() === "") {
         return { success: true, posts: [] };
     }
@@ -535,9 +532,12 @@ export const searchPostsByTitle = async (searchTerm, userId = null, limit = 50) 
     const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const searchRegex = new RegExp(escapedSearch, 'i');
 
-    const allPosts = await Post.find({
-        content_text: searchRegex
-    })
+    let query = { content_text: searchRegex };
+    if (userRole !== 'admin' && userRole !== 'owner') {
+        query.is_hidden = false;
+    }
+
+    const allPosts = await Post.find(query)
         .populate("user", "username avatar fullname")
         .populate("hashtags", "name")
         .populate("campaign_id", "title")

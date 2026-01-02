@@ -20,7 +20,7 @@ export type ReportReason =
   | "misinformation"
   | "other";
 
-export type ReportedType = "post" | "campaign" | "user" | "comment";
+export type ReportedType = "post" | "campaign" | "user" | "comment" | "event";
 
 export type ReportStatus =
   | "pending"

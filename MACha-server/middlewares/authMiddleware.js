@@ -32,6 +32,16 @@ export const authMiddleware = async (req, res, next) => {
                 .json({ message: "User not found or token invalid" });
         }
 
+        // Check if user is banned
+        if (user.is_banned) {
+            return res
+                .status(HTTP_STATUS.FORBIDDEN)
+                .json({ 
+                    message: "Your account has been banned",
+                    ban_reason: user.ban_reason || "Account banned by administrator"
+                });
+        }
+
         req.user = user;
 
         next();

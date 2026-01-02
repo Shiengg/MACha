@@ -30,6 +30,11 @@ const postSchema = new mongoose.Schema({
         default: null,
         index: true
     },
+    is_hidden: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
 },
     {
         timestamps: true

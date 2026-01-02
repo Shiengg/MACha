@@ -29,7 +29,8 @@ export const createPost = async (req, res) => {
 export const getPosts = async (req, res) => {
     try {
         const userId = req.user ? req.user._id : null;
-        const posts = await postService.getPosts(userId);
+        const userRole = req.user ? req.user.role : null;
+        const posts = await postService.getPosts(userId, userRole);
 
         return res.status(HTTP_STATUS.OK).json(posts);
     } catch (error) {
@@ -40,7 +41,8 @@ export const getPosts = async (req, res) => {
 export const getPostById = async (req, res) => {
     try {
         const userId = req.user ? req.user._id : null;
-        const post = await postService.getPostById(req.params.id, userId);
+        const userRole = req.user ? req.user.role : null;
+        const post = await postService.getPostById(req.params.id, userId, userRole);
 
         if (!post) {
             return res.status(HTTP_STATUS.NOT_FOUND).json({ message: HTTP_STATUS_TEXT.NOT_FOUND });
@@ -107,11 +109,12 @@ export const getPostsByHashtag = async (req, res) => {
         const { name } = req.params;
         const { page = 1, limit = 50 } = req.query;
         const userId = req.user ? req.user._id : null;
+        const userRole = req.user ? req.user.role : null;
         
         const pageNum = parseInt(page, 10);
         const limitNum = parseInt(limit, 10);
         
-        const result = await postService.getPostsByHashtag(name, userId, pageNum, limitNum);
+        const result = await postService.getPostsByHashtag(name, userId, userRole, pageNum, limitNum);
 
         if (!result.success) {
             if (result.error === 'HASHTAG_NOT_FOUND') {
@@ -134,8 +137,9 @@ export const searchPostsByHashtag = async (req, res) => {
         const { hashtag, query } = req.query;
         const searchTerm = hashtag || query;
         const userId = req.user ? req.user._id : null;
+        const userRole = req.user ? req.user.role : null;
 
-        const result = await postService.searchPostsByHashtag(searchTerm, userId);
+        const result = await postService.searchPostsByHashtag(searchTerm, userId, userRole);
 
         if (!result.success) {
             if (result.error === 'EMPTY_SEARCH_TERM') {
@@ -162,6 +166,7 @@ export const searchPostsByTitle = async (req, res) => {
         
         const searchTerm = q || query || title;
         const userId = req.user ? req.user._id : null;
+        const userRole = req.user ? req.user.role : null;
 
         if (!searchTerm || searchTerm.trim() === "") {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({
@@ -170,7 +175,7 @@ export const searchPostsByTitle = async (req, res) => {
         }
 
         const limitNum = limit ? parseInt(limit) : 50;
-        const result = await postService.searchPostsByTitle(searchTerm, userId, limitNum);
+        const result = await postService.searchPostsByTitle(searchTerm, userId, userRole, limitNum);
 
         if (!result.success) {
             return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 

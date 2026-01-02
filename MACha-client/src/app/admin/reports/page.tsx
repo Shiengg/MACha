@@ -32,6 +32,10 @@ export default function AdminReports() {
   const [totalCount, setTotalCount] = useState(0);
   const filterRef = useRef<HTMLDivElement | null>(null);
   const itemsPerPage = 10;
+  const [showResolutionModal, setShowResolutionModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{type: 'batch' | 'single', status: ReportStatus, item?: GroupedReportItem, reportId?: string, reportedType?: ReportedType} | null>(null);
+  const [selectedResolution, setSelectedResolution] = useState<'removed' | 'user_warned' | 'user_banned' | 'no_action'>('no_action');
+  const [resolutionDetails, setResolutionDetails] = useState('');
 
   useEffect(() => {
     fetchGroupedReports();
@@ -97,52 +101,82 @@ export default function AdminReports() {
   };
 
   const handleBatchUpdate = async (item: GroupedReportItem, status: ReportStatus) => {
-    const statusLabels: { [key: string]: string } = {
-      'resolved': 'phê duyệt',
-      'rejected': 'từ chối'
-    };
+    if (status === 'resolved') {
+      // Show resolution modal for approve
+      setPendingAction({ type: 'batch', status, item, reportedType: item.reported_type });
+      setSelectedResolution('no_action');
+      setResolutionDetails('');
+      setShowResolutionModal(true);
+    } else {
+      // For reject, just show confirmation and use no_action
+      const result = await Swal.fire({
+        title: `Xử lý tất cả ${item.count} báo cáo?`,
+        html: `Bạn có chắc muốn <strong>từ chối</strong> tất cả ${item.pending_count} báo cáo đang chờ của item này?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Xác nhận',
+        cancelButtonText: 'Hủy',
+      });
 
-    const result = await Swal.fire({
-      title: `Xử lý tất cả ${item.count} báo cáo?`,
-      html: `Bạn có chắc muốn <strong>${statusLabels[status]}</strong> tất cả ${item.pending_count} báo cáo đang chờ của item này?`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: status === 'rejected' ? '#dc2626' : '#10b981',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Xác nhận',
-      cancelButtonText: 'Hủy',
-    });
-
-    if (result.isConfirmed) {
-      try {
-        await batchUpdateReportsByItem(item.reported_type, item.reported_id, {
-          status,
-          resolution: status === 'resolved' || status === 'rejected' ? 'no_action' : undefined,
-        });
-        Swal.fire('Success!', `Đã xử lý ${item.count} báo cáo thành công`, 'success');
-        fetchGroupedReports();
-        if (showItemDetailsModal) {
-          setShowItemDetailsModal(false);
+      if (result.isConfirmed) {
+        try {
+          await batchUpdateReportsByItem(item.reported_type, item.reported_id, {
+            status,
+            resolution: 'no_action',
+          });
+          Swal.fire('Success!', `Đã xử lý ${item.count} báo cáo thành công`, 'success');
+          fetchGroupedReports();
+          if (showItemDetailsModal) {
+            setShowItemDetailsModal(false);
+          }
+        } catch (error: any) {
+          Swal.fire('Error', error?.response?.data?.message || 'Failed to batch update reports', 'error');
         }
-      } catch (error: any) {
-        Swal.fire('Error', error?.response?.data?.message || 'Failed to batch update reports', 'error');
       }
     }
   };
 
   const handleUpdateSingleReport = async (reportId: string, status: ReportStatus) => {
-    try {
-      await updateReportStatus(reportId, {
-        status,
-        resolution: status === 'resolved' || status === 'rejected' ? 'no_action' : undefined,
+    if (status === 'resolved') {
+      // Find the report to get reported_type
+      const report = itemReports.find(r => r._id === reportId);
+      const reportedType = report?.reported_type || selectedItem?.reported_type;
+      
+      // Show resolution modal for approve
+      setPendingAction({ type: 'single', status, reportId, reportedType });
+      setSelectedResolution('no_action');
+      setResolutionDetails('');
+      setShowResolutionModal(true);
+    } else {
+      // For reject, just show confirmation and use no_action
+      const result = await Swal.fire({
+        title: 'Từ chối báo cáo?',
+        text: 'Bạn có chắc muốn từ chối báo cáo này?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Xác nhận',
+        cancelButtonText: 'Hủy',
       });
-      Swal.fire('Success!', 'Report status updated successfully', 'success');
-      if (selectedItem) {
-        handleViewItemDetails(selectedItem);
+
+      if (result.isConfirmed) {
+        try {
+          await updateReportStatus(reportId, {
+            status,
+            resolution: 'no_action',
+          });
+          Swal.fire('Success!', 'Report status updated successfully', 'success');
+          if (selectedItem) {
+            handleViewItemDetails(selectedItem);
+          }
+          fetchGroupedReports();
+        } catch (error: any) {
+          Swal.fire('Error', error?.response?.data?.message || 'Failed to update report status', 'error');
+        }
       }
-      fetchGroupedReports();
-    } catch (error: any) {
-      Swal.fire('Error', error?.response?.data?.message || 'Failed to update report status', 'error');
     }
   };
 
@@ -233,6 +267,47 @@ export default function AdminReports() {
     if (entries.length === 0) return 'N/A';
     entries.sort((a, b) => b[1] - a[1]);
     return getReasonLabel(entries[0][0]);
+  };
+
+  const handleConfirmResolution = async () => {
+    if (!pendingAction) return;
+
+    try {
+      if (pendingAction.type === 'batch' && pendingAction.item) {
+        await batchUpdateReportsByItem(
+          pendingAction.item.reported_type,
+          pendingAction.item.reported_id,
+          {
+            status: pendingAction.status,
+            resolution: selectedResolution,
+            resolution_details: resolutionDetails || undefined,
+          }
+        );
+        Swal.fire('Success!', `Đã xử lý ${pendingAction.item.count} báo cáo thành công`, 'success');
+        fetchGroupedReports();
+        if (showItemDetailsModal) {
+          setShowItemDetailsModal(false);
+        }
+      } else if (pendingAction.type === 'single' && pendingAction.reportId) {
+        await updateReportStatus(pendingAction.reportId, {
+          status: pendingAction.status,
+          resolution: selectedResolution,
+          resolution_details: resolutionDetails || undefined,
+        });
+        Swal.fire('Success!', 'Report status updated successfully', 'success');
+        if (selectedItem) {
+          handleViewItemDetails(selectedItem);
+        }
+        fetchGroupedReports();
+      }
+      
+      setShowResolutionModal(false);
+      setPendingAction(null);
+      setSelectedResolution('no_action');
+      setResolutionDetails('');
+    } catch (error: any) {
+      Swal.fire('Error', error?.response?.data?.message || 'Failed to update reports', 'error');
+    }
   };
 
   return (
@@ -562,6 +637,107 @@ export default function AdminReports() {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resolution Selection Modal */}
+      {showResolutionModal && pendingAction && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowResolutionModal(false)}>
+          <div className="bg-white rounded-lg max-w-md w-full m-4" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Chọn hành động xử lý</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Hành động:
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="resolution"
+                      value="no_action"
+                      checked={selectedResolution === 'no_action'}
+                      onChange={(e) => setSelectedResolution(e.target.value as any)}
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">Không làm gì</span>
+                  </label>
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="resolution"
+                      value="removed"
+                      checked={selectedResolution === 'removed'}
+                      onChange={(e) => setSelectedResolution(e.target.value as any)}
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">Xóa/Ẩn item</span>
+                  </label>
+                  {/* Chỉ hiển thị "Cảnh báo user" và "Ban user" nếu không phải post, campaign, event */}
+                  {pendingAction.reportedType && !['post', 'campaign', 'event'].includes(pendingAction.reportedType) && (
+                    <>
+                      <label className="flex items-center space-x-3 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="resolution"
+                          value="user_warned"
+                          checked={selectedResolution === 'user_warned'}
+                          onChange={(e) => setSelectedResolution(e.target.value as any)}
+                          className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">Cảnh báo user</span>
+                      </label>
+                      <label className="flex items-center space-x-3 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="resolution"
+                          value="user_banned"
+                          checked={selectedResolution === 'user_banned'}
+                          onChange={(e) => setSelectedResolution(e.target.value as any)}
+                          className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">Ban user</span>
+                      </label>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lý do (tùy chọn):
+                </label>
+                <textarea
+                  value={resolutionDetails}
+                  onChange={(e) => setResolutionDetails(e.target.value)}
+                  placeholder="Nhập lý do xử lý..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowResolutionModal(false);
+                  setPendingAction(null);
+                  setSelectedResolution('no_action');
+                  setResolutionDetails('');
+                }}
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmResolution}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Xác nhận
+              </button>
             </div>
           </div>
         </div>

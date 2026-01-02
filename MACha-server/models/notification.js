@@ -26,6 +26,9 @@ const notificationSchema = new mongoose.Schema({
             "event_update",
             "event_reminder",
             "event_rsvp_change",
+            "post_removed",
+            "campaign_removed",
+            "event_removed",
             "system"
         ],
         required: true,

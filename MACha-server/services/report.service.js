@@ -5,6 +5,193 @@ import User from "../models/user.js";
 import Comment from "../models/comment.js";
 import Event from "../models/event.js";
 import { redisClient } from "../config/redis.js";
+import * as queueService from "./queue.service.js";
+import * as postService from "./post.service.js";
+
+const removeReportedItem = async (reportedType, reportedId, resolutionDetails, adminId = null) => {
+    const reportedModelMap = {
+        post: Post,
+        campaign: Campaign,
+        comment: Comment,
+        event: Event
+    };
+
+    const ReportedModel = reportedModelMap[reportedType];
+    if (!ReportedModel) {
+        return { success: false, error: 'INVALID_TYPE' };
+    }
+
+    const reportedItem = await ReportedModel.findById(reportedId);
+    if (!reportedItem) {
+        return { success: false, error: 'NOT_FOUND' };
+    }
+
+    let creatorId = null;
+
+    switch (reportedType) {
+        case 'post':
+            creatorId = reportedItem.user;
+            reportedItem.is_hidden = true;
+            await reportedItem.save();
+            
+            try {
+                await postService.invalidatePostCache(reportedId);
+            } catch (error) {
+                console.error('Error invalidating post cache:', error);
+            }
+            
+            try {
+                await queueService.pushJob({
+                    type: "POST_REMOVED",
+                    postId: reportedId,
+                    adminId: adminId,
+                    resolutionDetails: resolutionDetails
+                });
+            } catch (error) {
+                console.error('Error pushing POST_REMOVED job:', error);
+            }
+            break;
+        case 'comment':
+            creatorId = reportedItem.user;
+            reportedItem.is_hidden = true;
+            await reportedItem.save();
+            break;
+        case 'campaign':
+            creatorId = reportedItem.creator;
+            reportedItem.status = 'cancelled';
+            reportedItem.cancellation_reason = resolutionDetails || 'Removed due to report';
+            reportedItem.cancelled_at = new Date();
+            await reportedItem.save();
+            break;
+        case 'event':
+            creatorId = reportedItem.creator;
+            reportedItem.status = 'cancelled';
+            reportedItem.cancellation_reason = resolutionDetails || 'Removed due to report';
+            reportedItem.cancelled_at = new Date();
+            await reportedItem.save();
+            break;
+        case 'user':
+            return { success: false, error: 'USER_SHOULD_BE_BANNED_NOT_REMOVED' };
+        default:
+            return { success: false, error: 'UNSUPPORTED_TYPE' };
+    }
+
+    return { success: true, message: 'Item removed successfully' };
+};
+
+const warnUser = async (reportedType, reportedId, adminId, resolutionDetails) => {
+    let userId = null;
+
+    if (reportedType === 'user') {
+        userId = reportedId;
+    } else {
+        const reportedModelMap = {
+            post: Post,
+            campaign: Campaign,
+            comment: Comment,
+            event: Event
+        };
+        const ReportedModel = reportedModelMap[reportedType];
+        if (ReportedModel) {
+            const reportedItem = await ReportedModel.findById(reportedId);
+            if (reportedItem) {
+                userId = reportedItem.user || reportedItem.creator;
+            }
+        }
+    }
+
+    if (!userId) {
+        return { success: false, error: 'USER_NOT_FOUND' };
+    }
+
+    if (reportedType === 'user') {
+        const previousWarnings = await Report.countDocuments({
+            reported_type: 'user',
+            reported_id: userId,
+            status: 'resolved',
+            resolution: 'user_warned'
+        });
+
+        if (previousWarnings >= 1) {
+            console.log(`User ${userId} has been warned ${previousWarnings} time(s) before. Automatically banning instead.`);
+            const banResult = await banUser(reportedType, reportedId, adminId, resolutionDetails || 'Banned after multiple warnings');
+            return { ...banResult, auto_banned: true };
+        }
+    }
+
+    // TODO: Implement warning storage if needed (e.g., warnings array in User model)
+    console.log(`Warning issued to user ${userId} by admin ${adminId}: ${resolutionDetails || 'No details provided'}`);
+    
+    return { success: true, message: 'User warned successfully' };
+};
+
+const banUser = async (reportedType, reportedId, adminId, resolutionDetails) => {
+    let userId = null;
+
+    if (reportedType === 'user') {
+        userId = reportedId;
+    } else {
+        const reportedModelMap = {
+            post: Post,
+            campaign: Campaign,
+            comment: Comment,
+            event: Event
+        };
+        const ReportedModel = reportedModelMap[reportedType];
+        if (ReportedModel) {
+            const reportedItem = await ReportedModel.findById(reportedId);
+            if (reportedItem) {
+                userId = reportedItem.user || reportedItem.creator;
+            }
+        }
+    }
+
+    if (!userId) {
+        return { success: false, error: 'USER_NOT_FOUND' };
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+        return { success: false, error: 'USER_NOT_FOUND' };
+    }
+
+    user.is_banned = true;
+    user.banned_at = new Date();
+    user.banned_by = adminId;
+    user.ban_reason = resolutionDetails || 'Banned due to report';
+    await user.save();
+
+    // TODO: Gửi email thông báo cho user khi bị ban
+
+    return { success: true, message: 'User banned successfully' };
+};
+
+export const executeResolution = async (report, resolution, adminId) => {
+    if (!resolution || resolution === 'no_action') {
+        return { success: true, message: 'No action taken' };
+    }
+
+    const { reported_type, reported_id, resolution_details } = report;
+
+    try {
+        switch (resolution) {
+            case 'removed':
+                return await removeReportedItem(reported_type, reported_id, resolution_details, adminId);
+            
+            case 'user_warned':
+                return await warnUser(reported_type, reported_id, adminId, resolution_details);
+            
+            case 'user_banned':
+                return await banUser(reported_type, reported_id, adminId, resolution_details);
+            
+            default:
+                return { success: false, error: 'INVALID_RESOLUTION' };
+        }
+    } catch (error) {
+        console.error('Error executing resolution:', error);
+        return { success: false, error: error.message };
+    }
+};
 
 export const createReport = async (reporterId, reportData) => {
     const { reported_type, reported_id, reported_reason, description } = reportData;
@@ -144,11 +331,24 @@ export const updateReportStatus = async (reportId, adminId, updateData) => {
     if (shouldSetResolution) {
         report.status = status;
         report.reviewed_by = adminId;
-        if (resolution) {
-            report.resolution = resolution;
-        }
+        
+        const finalResolution = resolution || (status === 'resolved' ? 'no_action' : 'no_action');
+        report.resolution = finalResolution;
+        
         if (resolution_details) {
             report.resolution_details = resolution_details;
+        }
+
+        if (status === 'resolved' && finalResolution !== 'no_action') {
+            const executionResult = await executeResolution(report, finalResolution, adminId);
+            if (!executionResult.success) {
+                console.error('Error executing resolution:', executionResult.error);
+            } else if (executionResult.auto_banned) {
+                report.resolution = 'user_banned';
+                if (!report.resolution_details || report.resolution_details === resolution_details) {
+                    report.resolution_details = resolution_details || 'Banned after multiple warnings';
+                }
+            }
         }
     } else {
         report.status = status;
@@ -271,15 +471,34 @@ export const batchUpdateReportsByItem = async (reportedType, reportedId, adminId
     const resolvedStatuses = ['resolved', 'rejected', 'auto_resolved'];
     const shouldSetResolution = resolvedStatuses.includes(status);
 
+    let finalResolution = resolution || (status === 'resolved' ? 'no_action' : 'no_action');
+    let resolutionExecuted = false;
+
+    if (status === 'resolved' && finalResolution === 'user_warned' && reports.length > 0) {
+        const templateReport = reports[0];
+        templateReport.resolution = finalResolution;
+        templateReport.resolution_details = resolution_details;
+        
+        const executionResult = await executeResolution(templateReport, finalResolution, adminId);
+        resolutionExecuted = true;
+        
+        if (!executionResult.success) {
+            console.error('Error executing resolution:', executionResult.error);
+        } else if (executionResult.auto_banned) {
+            finalResolution = 'user_banned';
+        }
+    }
+
     const updatePromises = reports.map(report => {
         if (shouldSetResolution) {
             report.status = status;
             report.reviewed_by = adminId;
-            if (resolution) {
-                report.resolution = resolution;
-            }
+            report.resolution = finalResolution;
             if (resolution_details) {
                 report.resolution_details = resolution_details;
+            }
+            if (finalResolution === 'user_banned' && resolution === 'user_warned') {
+                report.resolution_details = resolution_details || 'Banned after multiple warnings';
             }
         } else {
             report.status = status;
@@ -288,6 +507,17 @@ export const batchUpdateReportsByItem = async (reportedType, reportedId, adminId
     });
 
     await Promise.all(updatePromises);
+
+    if (!resolutionExecuted && status === 'resolved' && finalResolution !== 'no_action' && reports.length > 0) {
+        const templateReport = reports[0];
+        templateReport.resolution = finalResolution;
+        templateReport.resolution_details = resolution_details;
+        
+        const executionResult = await executeResolution(templateReport, finalResolution, adminId);
+        if (!executionResult.success) {
+            console.error('Error executing resolution:', executionResult.error);
+        }
+    }
 
     const keySet = 'reports:keys';
     const keys = await redisClient.sMembers(keySet);
