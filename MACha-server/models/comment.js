@@ -14,7 +14,12 @@ const commentSchema = new mongoose.Schema({
     content_text: {
         type: String,
         required: true
-    }
+    },
+    is_hidden: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
 },
     {
         timestamps: true

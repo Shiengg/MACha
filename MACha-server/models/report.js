@@ -9,7 +9,7 @@ const reportSchema = new mongoose.Schema({
     },
     reported_type: {
         type: String,
-        enum: ["post", "campaign", "user", "comment"],
+        enum: ["post", "campaign", "user", "comment", "event"],
         required: true,
         index: true
     },
@@ -42,7 +42,7 @@ const reportSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["pending", "reviewing", "resolved", "rejected", "auto_resolved"],
+        enum: ["pending", "resolved", "rejected", "auto_resolved"],
         default: "pending",
         index: true
     },

@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Loader2, Info } from 'lucide-react';
+import { Send, Paperclip, Loader2, Info, X, Image as ImageIcon } from 'lucide-react';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
 import { useOnlineStatus } from '@/contexts/OnlineStatusContext';
 import { getMessages, sendMessage, type Message } from '@/services/message.service';
 import type { Conversation } from '@/services/conversation.service';
+import { cloudinaryService } from '@/services/cloudinary.service';
 
 interface ChatWindowProps {
     conversation: Conversation | null;
@@ -25,9 +26,12 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
     const [error, setError] = useState<string | null>(null);
     const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
     const [showTooltip, setShowTooltip] = useState(false);
+    const [selectedImage, setSelectedImage] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [uploadingImage, setUploadingImage] = useState(false);
     const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    // Lưu các messageId vừa gửi để tránh add 2 lần (REST + Socket)
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const sentMessageIdsRef = useRef<Set<string>>(new Set());
 
     const currentUserId = user?._id || user?.id;
@@ -146,11 +150,81 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
         };
     }, [socket, conversationId]);
 
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            setError('Chỉ chấp nhận file ảnh');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            setError('File ảnh quá lớn (tối đa 5MB)');
+            return;
+        }
+
+        setSelectedImage(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+        setError(null);
+    };
+
+    const handleRemoveImage = () => {
+        setSelectedImage(null);
+        setImagePreview(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            
+            if (item.type.indexOf('image') !== -1) {
+                e.preventDefault();
+                
+                const file = item.getAsFile();
+                if (!file) return;
+
+                if (!file.type.startsWith('image/')) {
+                    setError('Chỉ chấp nhận file ảnh');
+                    return;
+                }
+
+                if (file.size > 5 * 1024 * 1024) {
+                    setError('File ảnh quá lớn (tối đa 5MB)');
+                    return;
+                }
+
+                setSelectedImage(file);
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setImagePreview(reader.result as string);
+                };
+                reader.readAsDataURL(file);
+                setError(null);
+                break;
+            }
+        }
+    };
+
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         const trimmed = message.trim();
 
-        if (!trimmed || !conversationId || !currentUserId || sending) {
+        if (!trimmed && !selectedImage) {
+            return;
+        }
+
+        if (!conversationId || !currentUserId || sending || uploadingImage) {
             return;
         }
 
@@ -158,9 +232,28 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
             setSending(true);
             setError(null);
 
+            let content = trimmed;
+            let type: 'text' | 'image' = 'text';
+
+            if (selectedImage) {
+                setUploadingImage(true);
+                try {
+                    const uploadResult = await cloudinaryService.uploadImage(selectedImage, 'messages');
+                    content = uploadResult.secure_url;
+                    type = 'image';
+                } catch (uploadErr: any) {
+                    console.error('Error uploading image:', uploadErr);
+                    setError('Không thể tải ảnh lên. Vui lòng thử lại.');
+                    setUploadingImage(false);
+                    setSending(false);
+                    return;
+                }
+                setUploadingImage(false);
+            }
+
             const newMessage = await sendMessage(conversationId, {
-                content: trimmed,
-                type: 'text',
+                content,
+                type,
             });
 
             const idStr = String(newMessage._id);
@@ -173,11 +266,13 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
             });
             sentMessageIdsRef.current.add(idStr);
             setMessage('');
+            handleRemoveImage();
         } catch (err: any) {
             console.error('Error sending message:', err);
             setError(err?.response?.data?.message || 'Không thể gửi tin nhắn');
         } finally {
             setSending(false);
+            setUploadingImage(false);
         }
     };
 
@@ -418,11 +513,24 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                                     <div className="max-w-[70%] flex flex-row-reverse gap-2 relative">
                                         <div className="flex flex-col relative">
                                             <div
-                                                className={`px-4 py-2 ${bubbleBaseClasses} ${bubbleShapeClasses}`}
+                                                className={`${msg.type === 'image' ? 'p-1' : 'px-4 py-2'} ${bubbleBaseClasses} ${bubbleShapeClasses}`}
                                             >
-                                                <p className="text-base whitespace-pre-wrap break-words">
-                                                    {renderMessageContent(msg.content)}
-                                                </p>
+                                                {msg.type === 'image' ? (
+                                                    <div className="relative rounded-lg overflow-hidden max-w-sm">
+                                                        <Image
+                                                            src={msg.content}
+                                                            alt="Message image"
+                                                            width={400}
+                                                            height={400}
+                                                            className="object-contain max-h-96 w-auto"
+                                                            unoptimized
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-base whitespace-pre-wrap break-words">
+                                                        {renderMessageContent(msg.content)}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                         {hoveredMessageId === msg._id && showTooltip && (
@@ -465,11 +573,24 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                                     {/* Cột bubble, luôn thẳng hàng, chừa chỗ avatar bên trái */}
                                     <div className="ml-10 flex flex-col relative group">
                                         <div
-                                            className={`px-4 py-2 ${bubbleBaseClasses} ${bubbleShapeClasses}`}
+                                            className={`${msg.type === 'image' ? 'p-1' : 'px-4 py-2'} ${bubbleBaseClasses} ${bubbleShapeClasses}`}
                                         >
-                                            <p className="text-base whitespace-pre-wrap break-words">
-                                                {renderMessageContent(msg.content)}
-                                            </p>
+                                            {msg.type === 'image' ? (
+                                                <div className="relative rounded-lg overflow-hidden max-w-sm">
+                                                    <Image
+                                                        src={msg.content}
+                                                        alt="Message image"
+                                                        width={400}
+                                                        height={400}
+                                                        className="object-contain max-h-96 w-auto"
+                                                        unoptimized
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <p className="text-base whitespace-pre-wrap break-words">
+                                                    {renderMessageContent(msg.content)}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                     {hoveredMessageId === msg._id && showTooltip && (
@@ -502,16 +623,52 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                 <div ref={messagesEndRef} />
             </div>
 
+            {/* Image Preview */}
+            {imagePreview && (
+                <div className="px-4 pt-2 bg-gray-50">
+                    <div className="relative inline-block">
+                        <div className="relative w-32 h-32 rounded-lg overflow-hidden border-2 border-orange-500">
+                            <Image
+                                src={imagePreview}
+                                alt="Preview"
+                                fill
+                                className="object-cover"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleRemoveImage}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Message Input */}
             <div className="px-4 pb-4 pt-2 bg-gray-50">
                 <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                    {/* Attachment Button */}
+                    {/* Image Upload Button */}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                    />
                     <button
                         type="button"
-                        className="flex-shrink-0 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
-                        aria-label="Attach file"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingImage || sending}
+                        className="flex-shrink-0 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label="Attach image"
                     >
-                        <Paperclip className="w-5 h-5" />
+                        {uploadingImage ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <ImageIcon className="w-5 h-5" />
+                        )}
                     </button>
 
                     {/* Message Input - Bo tròn 2 đầu */}
@@ -519,13 +676,14 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                         <textarea
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
+                            onPaste={handlePaste}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault();
                                     handleSendMessage(e);
                                 }
                             }}
-                            placeholder={sending ? "Đang gửi..." : "Nhập tin nhắn..."}
+                            placeholder={sending || uploadingImage ? "Đang gửi..." : "Nhập tin nhắn..."}
                             rows={1}
                             className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 focus:bg-white transition-all text-sm self-end"
                             style={{
@@ -538,11 +696,15 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                     {/* Send Button */}
                     <button
                         type="submit"
-                        disabled={!message.trim() || sending}
+                        disabled={(!message.trim() && !selectedImage) || sending || uploadingImage}
                         className="flex-shrink-0 p-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         aria-label="Send message"
                     >
-                        <Send className="w-5 h-5" />
+                        {sending || uploadingImage ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <Send className="w-5 h-5" />
+                        )}
                     </button>
                 </form>
             </div>

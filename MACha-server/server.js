@@ -62,6 +62,7 @@ app.use("/api/conversations", routes.conversationRoutes);
 app.use("/api/messages", routes.messageRoutes);
 app.use("/api/reports", routes.reportRoutes);
 app.use("/api/search", routes.searchRoutes);
+app.use("/api/events", routes.eventRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {

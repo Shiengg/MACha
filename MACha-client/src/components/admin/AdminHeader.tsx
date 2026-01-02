@@ -9,8 +9,10 @@ const getPageTitle = (pathname: string): string => {
     '/admin/dashboard': 'Dashboard',
     '/admin/users': 'User management',
     '/admin/campaigns': 'Campaign management',
+    '/admin/events': 'Event management',
     '/admin/kyc': 'KYC Approval',
     '/admin/withdrawal-requests': 'Withdrawal Requests',
+    '/admin/reports': 'Reports management',
     '/admin/settings': 'Settings',
   };
 

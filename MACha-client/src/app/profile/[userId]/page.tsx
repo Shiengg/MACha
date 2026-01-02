@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from "@/components/guards/ProtectedRoute";
 import { getUserById, followUser, unfollowUser } from '@/services/user.service';
@@ -9,6 +9,8 @@ import CampaignCard from '@/components/campaign/CampaignCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
 import { createConversationPrivate } from '@/services/conversation.service';
+import ReportModal from '@/components/shared/ReportModal';
+import { MoreHorizontal, Flag } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 import type { User } from '@/services/user.service';
@@ -29,6 +31,9 @@ function ProfileContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'activity' | 'campaigns' | 'achievements' | 'about'>('campaigns');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // So sánh ID: API trả về _id, nhưng AuthContext có thể có id hoặc _id
   // So sánh cả userId từ URL params và user._id từ API response
@@ -162,6 +167,21 @@ function ProfileContent() {
       socket.off('user:unfollowed', handleUserUnfollowed);
     };
   }, [socket, isConnected, userId, currentUserId, isOwnProfile, setCurrentUser, currentUser]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showDropdown]);
 
   const handleFollow = async () => {
     if (!currentUser) {
@@ -341,7 +361,7 @@ function ProfileContent() {
     <div className="min-h-screen bg-[#f5f7fb] pb-12">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
         {/* Profile Header */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 relative">
           <div className="px-6 pt-6 pb-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
               {/* Avatar */}
@@ -371,13 +391,39 @@ function ProfileContent() {
               {/* User Info + Actions */}
               <div className="flex-1 w-full">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h1 className="text-2xl md:text-3xl font-semibold text-gray-900">
                         {user.fullname || user.username}
                       </h1>
                       {getKYCBadge()}
                       {getRoleBadge()}
+                      {!isOwnProfile && (
+                        <div className="relative ml-auto" ref={dropdownRef}>
+                          <button
+                            onClick={() => setShowDropdown(!showDropdown)}
+                            className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                            aria-label="More options"
+                          >
+                            <MoreHorizontal className="w-5 h-5 text-gray-600" />
+                          </button>
+                          
+                          {showDropdown && (
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                              <button
+                                onClick={() => {
+                                  setShowReportModal(true);
+                                  setShowDropdown(false);
+                                }}
+                                className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors text-red-600"
+                              >
+                                <Flag className="w-4 h-4" />
+                                <span className="text-sm font-medium">Báo cáo người dùng</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <p className="text-gray-500 mt-1 text-sm md:text-base">
                       @{user.username}
@@ -685,6 +731,19 @@ function ProfileContent() {
           )}
         </div>
       </div>
+
+      {/* Report Modal */}
+      {user && (
+        <ReportModal
+          reportedType="user"
+          reportedId={user._id}
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          onSuccess={() => {
+            console.log('Report submitted successfully');
+          }}
+        />
+      )}
     </div>
   );
 }

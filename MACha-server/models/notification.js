@@ -4,7 +4,8 @@ const notificationSchema = new mongoose.Schema({
     receiver: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-        required: true
+        required: true,
+        index: true
     },
     sender: {
         type: mongoose.Schema.Types.ObjectId,
@@ -21,9 +22,19 @@ const notificationSchema = new mongoose.Schema({
             "campaign_update",
             "campaign_approved",
             "campaign_rejected",
+            "event_invite",
+            "event_update",
+            "event_reminder",
+            "event_rsvp_change",
+            "post_removed",
+            "campaign_removed",
+            "event_removed",
+            "user_warned",
+            "user_banned",
             "system"
         ],
-        required: true
+        required: true,
+        index: true
     },
     post: {
         type: mongoose.Schema.Types.ObjectId,
@@ -33,6 +44,10 @@ const notificationSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Campaign"
     },
+    event: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Event"
+    },
     message: {
         type: String
     },
@@ -41,13 +56,17 @@ const notificationSchema = new mongoose.Schema({
     },
     is_read: {
         type: Boolean,
-        default: false
+        default: false,
+        index: true
     }
 },
     {
         timestamps: true
     }
 )
+
+notificationSchema.index({ receiver: 1, is_read: 1, createdAt: -1 });
+notificationSchema.index({ receiver: 1, type: 1, createdAt: -1 });
 
 const Notification = mongoose.model("Notification", notificationSchema);
 export default Notification;

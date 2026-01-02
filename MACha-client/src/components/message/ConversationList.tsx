@@ -140,6 +140,18 @@ export default function ConversationList({
         }
     };
 
+    const isCloudinaryImageUrl = (content: string): boolean => {
+        if (!content) return false;
+        return content.includes('cloudinary.com') || content.includes('res.cloudinary.com');
+    };
+
+    const formatLastMessageContent = (content: string): string => {
+        if (isCloudinaryImageUrl(content)) {
+            return 'Đã gửi ảnh';
+        }
+        return content;
+    };
+
     // Filter conversations by search query
     const filteredConversations = conversations.filter((conversation) => {
         if (!searchQuery.trim()) return true;
@@ -147,10 +159,16 @@ export default function ConversationList({
         const otherParticipant = getOtherParticipant(conversation.members, currentUserId);
         const searchLower = searchQuery.toLowerCase();
         
+        const lastMessageText = conversation.lastMessage 
+            ? (isCloudinaryImageUrl(conversation.lastMessage.content) 
+                ? 'đã gửi ảnh' 
+                : conversation.lastMessage.content.toLowerCase())
+            : '';
+        
         return (
             otherParticipant.username?.toLowerCase().includes(searchLower) ||
             otherParticipant.email?.toLowerCase().includes(searchLower) ||
-            conversation.lastMessage?.content.toLowerCase().includes(searchLower)
+            lastMessageText.includes(searchLower)
         );
     });
 
@@ -262,7 +280,7 @@ export default function ConversationList({
                                             {conversation.lastMessage && (
                                                 <p className="text-sm text-gray-600 truncate">
                                                     {isLastFromCurrentUser ? 'Bạn: ' : ''}
-                                                    {conversation.lastMessage.content}
+                                                    {formatLastMessageContent(conversation.lastMessage.content)}
                                                 </p>
                                             )}
                                         </div>
