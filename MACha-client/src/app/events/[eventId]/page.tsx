@@ -290,7 +290,6 @@ function EventDetails() {
   const isPast = new Date(event.start_date) < new Date();
   const totalAttendees = (event.rsvpStats?.going.count || 0) + (event.rsvpStats?.going.guests || 0);
   const isCreator = user && (user._id === event.creator._id || user.id === event.creator._id);
-  const isHost = event.isHost || false;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

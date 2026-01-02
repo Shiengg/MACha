@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import Event from "../models/event.js";
 import EventRSVP from "../models/eventRSVP.js";
-import EventHost from "../models/eventHost.js";
 import EventUpdate from "../models/eventUpdate.js";
 import { redisClient } from "../config/redis.js";
 import { publishEvent } from "./tracking.service.js";
@@ -84,14 +83,10 @@ export const getEventById = async (eventId, userId = null) => {
         event.rsvpStats = stats;
         
         if (userId) {
-            const [rsvp, isHost] = await Promise.all([
-                EventRSVP.findOne({ event: eventId, user: userId }),
-                EventHost.findOne({ event: eventId, user: userId })
-            ]);
+            const rsvp = await EventRSVP.findOne({ event: eventId, user: userId });
             return {
                 ...event,
-                userRSVP: rsvp,
-                isHost: !!isHost
+                userRSVP: rsvp
             };
         }
         return event;
@@ -102,27 +97,19 @@ export const getEventById = async (eventId, userId = null) => {
     
     if (!event) return null;
     
-    const hosts = await EventHost.find({ event: eventId }).populate("user", "username fullname avatar");
-    
     const result = {
         ...event.toObject(),
-        hosts: hosts.map(h => h.user),
         rsvpStats: stats
     };
     
     if (userId) {
-        const [rsvp, isHost] = await Promise.all([
-            EventRSVP.findOne({ event: eventId, user: userId }),
-            EventHost.findOne({ event: eventId, user: userId })
-        ]);
+        const rsvp = await EventRSVP.findOne({ event: eventId, user: userId });
         result.userRSVP = rsvp;
-        result.isHost = !!isHost;
     }
     
     const resultToCache = {
         ...result,
-        userRSVP: null,
-        isHost: false
+        userRSVP: null
     };
     await redisClient.setEx(eventKey, 300, JSON.stringify(resultToCache));
     return result;
@@ -144,10 +131,7 @@ export const updateEvent = async (eventId, userId, payload) => {
         return { success: false, error: 'NOT_FOUND' };
     }
     
-    const isCreator = event.creator.toString() === userId.toString();
-    const isCoHost = await EventHost.findOne({ event: eventId, user: userId });
-    
-    if (!isCreator && !isCoHost) {
+    if (event.creator.toString() !== userId.toString()) {
         return { success: false, error: 'FORBIDDEN' };
     }
     
@@ -190,7 +174,6 @@ export const deleteEvent = async (eventId, userId) => {
     
     await Promise.all([
         EventRSVP.deleteMany({ event: eventId }),
-        EventHost.deleteMany({ event: eventId }),
         EventUpdate.deleteMany({ event: eventId }),
         Event.findByIdAndDelete(eventId)
     ]);
@@ -206,10 +189,7 @@ export const cancelEvent = async (eventId, userId, reason) => {
         return { success: false, error: 'NOT_FOUND' };
     }
     
-    const isCreator = event.creator.toString() === userId.toString();
-    const isCoHost = await EventHost.findOne({ event: eventId, user: userId });
-    
-    if (!isCreator && !isCoHost) {
+    if (event.creator.toString() !== userId.toString()) {
         return { success: false, error: 'FORBIDDEN' };
     }
     
@@ -531,99 +511,13 @@ export const getRSVPList = async (eventId, filters = {}) => {
     return rsvps;
 };
 
-export const addHost = async (eventId, userId, targetUserId) => {
-    const event = await Event.findById(eventId);
-    if (!event) {
-        return { success: false, error: 'EVENT_NOT_FOUND' };
-    }
-    
-    if (event.creator.toString() !== userId.toString()) {
-        return { success: false, error: 'FORBIDDEN' };
-    }
-    
-    if (event.creator.toString() === targetUserId.toString()) {
-        return { success: false, error: 'CANNOT_ADD_CREATOR' };
-    }
-    
-    const existingHost = await EventHost.findOne({ event: eventId, user: targetUserId });
-    if (existingHost) {
-        return { success: false, error: 'ALREADY_HOST' };
-    }
-    
-    const host = await EventHost.create({
-        event: eventId,
-        user: targetUserId,
-        role: 'co_host',
-        added_by: userId
-    });
-    
-    await host.populate("user", "username fullname avatar");
-    await redisClient.del(`event:${eventId}`);
-    await redisClient.del(`events:hosts:${eventId}`);
-    
-    return { success: true, host };
-};
-
-export const removeHost = async (eventId, userId, targetUserId) => {
-    const event = await Event.findById(eventId);
-    if (!event) {
-        return { success: false, error: 'EVENT_NOT_FOUND' };
-    }
-    
-    if (event.creator.toString() !== userId.toString()) {
-        return { success: false, error: 'FORBIDDEN' };
-    }
-    
-    const host = await EventHost.findOneAndDelete({ event: eventId, user: targetUserId });
-    if (!host) {
-        return { success: false, error: 'NOT_FOUND' };
-    }
-    
-    await redisClient.del(`event:${eventId}`);
-    await redisClient.del(`events:hosts:${eventId}`);
-    
-    return { success: true };
-};
-
-export const getHosts = async (eventId) => {
-    const cacheKey = `events:hosts:${eventId}`;
-    const cached = await redisClient.get(cacheKey);
-    if (cached) return JSON.parse(cached);
-    
-    const hosts = await EventHost.find({ event: eventId })
-        .populate("user", "username fullname avatar")
-        .populate("added_by", "username");
-    
-    await redisClient.setEx(cacheKey, 300, JSON.stringify(hosts));
-    return hosts;
-};
-
-export const getEventsByHost = async (userId) => {
-    const cacheKey = `events:host:${userId}`;
-    const cached = await redisClient.get(cacheKey);
-    if (cached) return JSON.parse(cached);
-    
-    const hostEvents = await EventHost.find({ user: userId })
-        .populate({
-            path: "event",
-            populate: { path: "creator", select: "username fullname avatar" }
-        });
-    
-    const events = hostEvents.map(he => he.event).filter(e => e);
-    await redisClient.setEx(cacheKey, 300, JSON.stringify(events));
-    return events;
-};
-
 export const createEventUpdate = async (eventId, userId, payload) => {
     const event = await Event.findById(eventId);
     if (!event) {
         return { success: false, error: 'EVENT_NOT_FOUND' };
     }
     
-    const isCreator = event.creator.toString() === userId.toString();
-    const isCoHost = await EventHost.findOne({ event: eventId, user: userId });
-    
-    if (!isCreator && !isCoHost) {
+    if (event.creator.toString() !== userId.toString()) {
         return { success: false, error: 'FORBIDDEN' };
     }
     
@@ -685,9 +579,8 @@ export const deleteEventUpdate = async (updateId, userId) => {
     const event = await Event.findById(update.event);
     const isAuthor = update.author.toString() === userId.toString();
     const isCreator = event?.creator.toString() === userId.toString();
-    const isCoHost = await EventHost.findOne({ event: update.event, user: userId });
     
-    if (!isAuthor && !isCreator && !isCoHost) {
+    if (!isAuthor && !isCreator) {
         return { success: false, error: 'FORBIDDEN' };
     }
     

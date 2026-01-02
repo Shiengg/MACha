@@ -19,10 +19,6 @@ import {
     deleteRSVP,
     getRSVPStats,
     getRSVPList,
-    addHost,
-    removeHost,
-    getHosts,
-    getEventsByHost,
     createEventUpdate,
     getEventUpdates,
     updateEventUpdate,
@@ -47,7 +43,6 @@ eventRoutes.get('/creator', authMiddleware, RateLimitMiddleware.rateLimitByIP(10
 eventRoutes.get('/my-events', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), getMyEvents);
 eventRoutes.get('/my-rsvps', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), getMyRSVPs);
 eventRoutes.get('/upcoming-rsvps', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), getUpcomingRSVPs);
-eventRoutes.get('/hosts/my-events', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), getEventsByHost);
 eventRoutes.get('/:id', RateLimitMiddleware.rateLimitByIP(100, 60), getEventById);
 eventRoutes.post('/', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createEvent);
 eventRoutes.patch('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), updateEvent);
@@ -61,10 +56,6 @@ eventRoutes.get('/:eventId/rsvp', authMiddleware, RateLimitMiddleware.rateLimitB
 eventRoutes.delete('/:eventId/rsvp', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), deleteRSVP);
 eventRoutes.get('/:eventId/rsvp/stats', RateLimitMiddleware.rateLimitByIP(100, 60), getRSVPStats);
 eventRoutes.get('/:eventId/rsvp/list', RateLimitMiddleware.rateLimitByIP(100, 60), getRSVPList);
-
-eventRoutes.post('/:eventId/hosts', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), addHost);
-eventRoutes.delete('/:eventId/hosts/:userId', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), removeHost);
-eventRoutes.get('/:eventId/hosts', RateLimitMiddleware.rateLimitByIP(100, 60), getHosts);
 
 eventRoutes.post('/:eventId/updates', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createEventUpdate);
 eventRoutes.get('/:eventId/updates', RateLimitMiddleware.rateLimitByIP(100, 60), getEventUpdates);
