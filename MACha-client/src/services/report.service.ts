@@ -2,9 +2,11 @@ import apiClient from "@/lib/api-client";
 import {
   CREATE_REPORT_ROUTE,
   GET_REPORTS_ROUTE,
+  GET_GROUPED_REPORTS_ROUTE,
   GET_REPORT_BY_ID_ROUTE,
   UPDATE_REPORT_STATUS_ROUTE,
   GET_REPORTS_BY_ITEM_ROUTE,
+  BATCH_UPDATE_REPORTS_BY_ITEM_ROUTE,
 } from "@/constants/api";
 
 export type ReportReason =
@@ -164,9 +166,9 @@ export const updateReportStatus = async (
 export const getReportsByItem = async (
   reportedType: ReportedType,
   reportedId: string
-): Promise<GetReportsByItemResponse> => {
+): Promise<GetReportsByItemResponse & { reported_item?: any }> => {
   try {
-    const response = await apiClient.get<GetReportsByItemResponse>(
+    const response = await apiClient.get<GetReportsByItemResponse & { reported_item?: any }>(
       GET_REPORTS_BY_ITEM_ROUTE(reportedType, reportedId)
     );
     return response.data;
@@ -175,6 +177,66 @@ export const getReportsByItem = async (
       `Error fetching reports for ${reportedType} ${reportedId}:`,
       error
     );
+    throw error;
+  }
+};
+
+export interface GroupedReportItem {
+  reported_type: ReportedType;
+  reported_id: string;
+  reports: Report[];
+  count: number;
+  pending_count: number;
+  latest_report_at: string;
+  reasons: { [key: string]: number };
+}
+
+export interface GetGroupedReportsResponse {
+  items: GroupedReportItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export const getGroupedReports = async (
+  filters?: {
+    status?: ReportStatus;
+    reported_type?: ReportedType;
+  },
+  page?: number,
+  limit?: number
+): Promise<GetGroupedReportsResponse> => {
+  try {
+    const params: any = {};
+    if (filters?.status) params.status = filters.status;
+    if (filters?.reported_type) params.reported_type = filters.reported_type;
+    if (page !== undefined) params.page = page;
+    if (limit !== undefined) params.limit = limit;
+
+    const response = await apiClient.get<GetGroupedReportsResponse>(GET_GROUPED_REPORTS_ROUTE, {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching grouped reports:", error);
+    throw error;
+  }
+};
+
+export const batchUpdateReportsByItem = async (
+  reportedType: ReportedType,
+  reportedId: string,
+  data: UpdateReportStatusData
+): Promise<{ message: string; count: number }> => {
+  try {
+    const response = await apiClient.put<{ message: string; count: number }>(
+      BATCH_UPDATE_REPORTS_BY_ITEM_ROUTE(reportedType, reportedId),
+      data
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error batch updating reports for ${reportedType} ${reportedId}:`, error);
     throw error;
   }
 };

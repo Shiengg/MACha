@@ -105,9 +105,11 @@ export const ADMIN_REJECT_WITHDRAWAL_REQUEST_ROUTE = (escrowId: string) => `${AD
 export const REPORT_ROUTE = "api/reports";
 export const CREATE_REPORT_ROUTE = `${REPORT_ROUTE}`;
 export const GET_REPORTS_ROUTE = `${REPORT_ROUTE}`;
+export const GET_GROUPED_REPORTS_ROUTE = `${REPORT_ROUTE}/grouped`;
 export const GET_REPORT_BY_ID_ROUTE = (id: string) => `${REPORT_ROUTE}/${id}`;
 export const UPDATE_REPORT_STATUS_ROUTE = (id: string) => `${REPORT_ROUTE}/${id}/status`;
 export const GET_REPORTS_BY_ITEM_ROUTE = (reportedType: string, reportedId: string) => `${REPORT_ROUTE}/item/${reportedType}/${reportedId}`;
+export const BATCH_UPDATE_REPORTS_BY_ITEM_ROUTE = (reportedType: string, reportedId: string) => `${REPORT_ROUTE}/item/${reportedType}/${reportedId}/batch`;
 
 export const SEARCH_ROUTE = "api/search";
 export const SAVE_SEARCH_HISTORY_ROUTE = `${SEARCH_ROUTE}/history`;

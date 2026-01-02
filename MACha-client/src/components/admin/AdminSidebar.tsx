@@ -11,7 +11,9 @@ import {
   DollarSign, 
   Settings, 
   MoreVertical,
-  LogOut
+  LogOut,
+  Calendar,
+  AlertTriangle
 } from 'lucide-react';
 
 interface MenuItem {
@@ -50,8 +52,10 @@ export default function AdminSidebar() {
       items: [
         { icon: Users, label: 'Quản lý người dùng', href: '/admin/users' },
         { icon: Megaphone, label: 'Quản lý campaign', href: '/admin/campaigns' },
+        { icon: Calendar, label: 'Quản lý sự kiện', href: '/admin/events' },
         { icon: CheckCircle, label: 'Duyệt người dùng', href: '/admin/kyc' },
         { icon: DollarSign, label: 'Yêu cầu rút tiền', href: '/admin/withdrawal-requests' },
+        { icon: AlertTriangle, label: 'Quản lý báo cáo', href: '/admin/reports' },
       ],
       showMenuIcon: true,
     },

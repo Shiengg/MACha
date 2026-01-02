@@ -122,9 +122,81 @@ export const getReportsByReportedItem = async (req, res) => {
 
         const reports = await reportService.getReportsByReportedItem(reported_type, reported_id);
 
+        const Post = (await import("../models/post.js")).default;
+        const Campaign = (await import("../models/campaign.js")).default;
+        const User = (await import("../models/user.js")).default;
+        const Comment = (await import("../models/comment.js")).default;
+        const Event = (await import("../models/event.js")).default;
+        
+        const reportedModelMap = {
+            post: Post,
+            campaign: Campaign,
+            user: User,
+            comment: Comment,
+            event: Event
+        };
+
+        const ReportedModel = reportedModelMap[reported_type];
+        let reportedItem = null;
+        if (ReportedModel) {
+            reportedItem = await ReportedModel.findById(reported_id);
+        }
+
         return res.status(HTTP_STATUS.OK).json({
             count: reports.length,
-            reports
+            reports,
+            reported_item: reportedItem
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const getGroupedReports = async (req, res) => {
+    try {
+        const { status, reported_type } = req.query;
+        const page = parseInt(req.query.page) || 0;
+        const limit = parseInt(req.query.limit) || 20;
+
+        const filters = {};
+        if (status) filters.status = status;
+        if (reported_type) filters.reported_type = reported_type;
+
+        const result = await reportService.getGroupedReports(filters, page, limit);
+
+        return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const batchUpdateReportsByItem = async (req, res) => {
+    try {
+        const { reported_type, reported_id } = req.params;
+        const { status, resolution, resolution_details } = req.body;
+
+        if (!status) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "status is required"
+            });
+        }
+
+        const result = await reportService.batchUpdateReportsByItem(
+            reported_type,
+            reported_id,
+            req.user._id,
+            { status, resolution, resolution_details }
+        );
+
+        if (!result.success) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                message: HTTP_STATUS_TEXT.NOT_FOUND
+            });
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: `Updated ${result.count} reports successfully`,
+            count: result.count
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
