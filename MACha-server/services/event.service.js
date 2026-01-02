@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Event from "../models/event.js";
 import EventRSVP from "../models/eventRSVP.js";
 import EventHost from "../models/eventHost.js";
@@ -25,7 +26,7 @@ const invalidateEventCaches = async (eventId, category = null, status = null) =>
 };
 
 export const getEvents = async (filters = {}) => {
-    const { status, category, privacy, city, page = 0, limit = 20, sort = 'createdAt' } = filters;
+    const { status, category, city, page = 0, limit = 20, sort = 'createdAt' } = filters;
     
     const cacheKey = `events:all:${JSON.stringify(filters)}`;
     const cached = await redisClient.get(cacheKey);
@@ -36,7 +37,6 @@ export const getEvents = async (filters = {}) => {
     const query = {};
     if (status) query.status = status;
     if (category) query.category = category;
-    if (privacy) query.privacy = privacy;
     if (city) query['location.city'] = city;
     
     const events = await Event.find(query)
@@ -52,8 +52,36 @@ export const getEvents = async (filters = {}) => {
 export const getEventById = async (eventId, userId = null) => {
     const eventKey = `event:${eventId}`;
     const cached = await redisClient.get(eventKey);
+    
+    // Convert eventId to ObjectId for aggregate query
+    const eventObjectId = mongoose.Types.ObjectId.isValid(eventId) 
+        ? new mongoose.Types.ObjectId(eventId) 
+        : eventId;
+    
+    // Always calculate fresh rsvpStats since they change frequently
+    const rsvpStatsResult = await EventRSVP.aggregate([
+        { $match: { event: eventObjectId } },
+        { $group: { _id: "$status", count: { $sum: 1 }, guests: { $sum: "$guests_count" } } }
+    ]);
+    
+    const stats = {
+        going: { count: 0, guests: 0 },
+        interested: { count: 0, guests: 0 },
+        not_going: { count: 0, guests: 0 }
+    };
+    
+    rsvpStatsResult.forEach(stat => {
+        if (stats[stat._id]) {
+            stats[stat._id].count = stat.count;
+            stats[stat._id].guests = stat.guests;
+        }
+    });
+    
     if (cached) {
         const event = JSON.parse(cached);
+        // Update rsvpStats with fresh data
+        event.rsvpStats = stats;
+        
         if (userId) {
             const [rsvp, isHost] = await Promise.all([
                 EventRSVP.findOne({ event: eventId, user: userId }),
@@ -73,27 +101,7 @@ export const getEventById = async (eventId, userId = null) => {
     
     if (!event) return null;
     
-    const [hosts, rsvpStats] = await Promise.all([
-        EventHost.find({ event: eventId }).populate("user", "username fullname avatar"),
-        EventRSVP.aggregate([
-            { $match: { event: eventId } },
-            { $group: { _id: "$status", count: { $sum: 1 }, guests: { $sum: "$guests_count" } } }
-        ])
-    ]);
-    
-    const stats = {
-        going: { count: 0, guests: 0 },
-        interested: { count: 0, guests: 0 },
-        maybe: { count: 0, guests: 0 },
-        not_going: { count: 0, guests: 0 }
-    };
-    
-    rsvpStats.forEach(stat => {
-        if (stats[stat._id]) {
-            stats[stat._id].count = stat.count;
-            stats[stat._id].guests = stat.guests;
-        }
-    });
+    const hosts = await EventHost.find({ event: eventId }).populate("user", "username fullname avatar");
     
     const result = {
         ...event.toObject(),
@@ -381,9 +389,14 @@ export const createRSVP = async (eventId, userId, payload) => {
     }
     
     if (payload.status === 'going' && event.capacity) {
-        const goingCount = await EventRSVP.countDocuments({ event: eventId, status: 'going' });
+        // Convert eventId to ObjectId for queries
+        const eventObjectId = mongoose.Types.ObjectId.isValid(eventId) 
+            ? new mongoose.Types.ObjectId(eventId) 
+            : eventId;
+        
+        const goingCount = await EventRSVP.countDocuments({ event: eventObjectId, status: 'going' });
         const totalGuests = await EventRSVP.aggregate([
-            { $match: { event: eventId, status: 'going' } },
+            { $match: { event: eventObjectId, status: 'going' } },
             { $group: { _id: null, total: { $sum: "$guests_count" } } }
         ]);
         const totalAttendees = goingCount + (totalGuests[0]?.total || 0) + (payload.guests_count || 0);
@@ -401,6 +414,7 @@ export const createRSVP = async (eventId, userId, payload) => {
     
     await redisClient.del(`event:${eventId}`);
     await redisClient.del(`events:rsvp:${eventId}`);
+    await redisClient.del(`events:rsvp:stats:${eventId}`);
     
     return { success: true, rsvp };
 };
@@ -419,6 +433,7 @@ export const deleteRSVP = async (eventId, userId) => {
     
     await redisClient.del(`event:${eventId}`);
     await redisClient.del(`events:rsvp:${eventId}`);
+    await redisClient.del(`events:rsvp:stats:${eventId}`);
     
     return { success: true };
 };
@@ -428,15 +443,18 @@ export const getRSVPStats = async (eventId) => {
     const cached = await redisClient.get(cacheKey);
     if (cached) return JSON.parse(cached);
     
+    const eventObjectId = mongoose.Types.ObjectId.isValid(eventId) 
+        ? new mongoose.Types.ObjectId(eventId) 
+        : eventId;
+    
     const stats = await EventRSVP.aggregate([
-        { $match: { event: eventId } },
+        { $match: { event: eventObjectId } },
         { $group: { _id: "$status", count: { $sum: 1 }, guests: { $sum: "$guests_count" } } }
     ]);
     
     const result = {
         going: { count: 0, guests: 0 },
         interested: { count: 0, guests: 0 },
-        maybe: { count: 0, guests: 0 },
         not_going: { count: 0, guests: 0 }
     };
     

@@ -6,7 +6,6 @@ export const getAllEvents = async (req, res) => {
         const filters = {
             status: req.query.status,
             category: req.query.category,
-            privacy: req.query.privacy,
             city: req.query.city,
             page: parseInt(req.query.page) || 0,
             limit: parseInt(req.query.limit) || 20,
@@ -48,8 +47,7 @@ export const getEventsByCategory = async (req, res) => {
         }
         
         const validCategories = [
-            "volunteering", "fundraising", "community_meetup", "workshop",
-            "seminar", "charity_event", "awareness"
+            "volunteering", "fundraising", "charity_event", "donation_drive"
         ];
         
         if (!validCategories.includes(category)) {

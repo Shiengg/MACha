@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
-import { getPendingEvents, approveEvent, rejectEvent, AdminEvent } from '@/services/admin/event.service';
+import EventDetailModal from '@/components/admin/EventDetailModal';
+import { getPendingEvents, getAllEvents, approveEvent, rejectEvent, AdminEvent } from '@/services/admin/event.service';
 import Swal from 'sweetalert2';
 import { MoreVertical, ChevronDown, Search, SlidersHorizontal } from 'lucide-react';
 
@@ -19,13 +20,15 @@ export default function AdminEventApproval() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const filterRef = useRef<HTMLDivElement | null>(null);
   const itemsPerPage = 10;
 
   useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [statusFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -57,14 +60,25 @@ export default function AdminEventApproval() {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const data = await getPendingEvents();
-      setEvents(data);
+      let data: AdminEvent[] = [];
+      
+      if (statusFilter === 'pending') {
+        data = await getPendingEvents();
+      } else if (statusFilter === 'all') {
+        data = await getAllEvents();
+      } else {
+        data = await getAllEvents({ status: statusFilter });
+      }
+      
+      setEvents(data || []);
     } catch (error: any) {
+      console.error('Error fetching events:', error);
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to fetch events',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể tải danh sách sự kiện',
       });
+      setEvents([]);
     } finally {
       setLoading(false);
     }
@@ -136,6 +150,10 @@ export default function AdminEventApproval() {
         await approveEvent(id);
         Swal.fire('Đã duyệt!', 'Sự kiện đã được duyệt thành công', 'success');
         fetchEvents();
+        if (showDetailModal && selectedEventId === id) {
+          setShowDetailModal(false);
+          setSelectedEventId(null);
+        }
       } catch (error: any) {
         Swal.fire('Lỗi', error?.response?.data?.message || 'Không thể duyệt sự kiện', 'error');
       }
@@ -144,7 +162,8 @@ export default function AdminEventApproval() {
 
   const handleViewDetails = (eventId: string) => {
     setOpenMenuId(null);
-    router.push(`/events/${eventId}`);
+    setSelectedEventId(eventId);
+    setShowDetailModal(true);
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -191,6 +210,10 @@ export default function AdminEventApproval() {
         await rejectEvent(id, reason);
         Swal.fire('Đã từ chối!', 'Sự kiện đã được từ chối', 'success');
         fetchEvents();
+        if (showDetailModal && selectedEventId === id) {
+          setShowDetailModal(false);
+          setSelectedEventId(null);
+        }
       } catch (error: any) {
         Swal.fire('Lỗi', error?.response?.data?.message || 'Không thể từ chối sự kiện', 'error');
       }
@@ -275,8 +298,6 @@ export default function AdminEventApproval() {
         return { label: 'Chờ duyệt', bgColor: 'bg-amber-50', textColor: 'text-amber-700' };
       case 'rejected':
         return { label: 'Từ chối', bgColor: 'bg-red-50', textColor: 'text-red-700' };
-      case 'draft':
-        return { label: 'Bản nháp', bgColor: 'bg-gray-50', textColor: 'text-gray-700' };
       case 'cancelled':
         return { label: 'Đã hủy', bgColor: 'bg-gray-50', textColor: 'text-gray-700' };
       case 'completed':
@@ -290,11 +311,8 @@ export default function AdminEventApproval() {
     const categories: { [key: string]: string } = {
       'volunteering': 'Tình nguyện',
       'fundraising': 'Gây quỹ',
-      'community_meetup': 'Gặp gỡ cộng đồng',
-      'workshop': 'Workshop',
-      'seminar': 'Hội thảo',
       'charity_event': 'Sự kiện từ thiện',
-      'awareness': 'Nâng cao nhận thức',
+      'donation_drive': 'Tập hợp đóng góp',
     };
     return categories[category] || category;
   };
@@ -316,7 +334,10 @@ export default function AdminEventApproval() {
           <div className="mb-6 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                Sự kiện chờ duyệt <span className="text-gray-500 font-normal">({filteredEvents.length})</span>
+                {statusFilter === 'pending' ? 'Sự kiện chờ duyệt' : 
+                 statusFilter === 'all' ? 'Tất cả sự kiện' :
+                 `Sự kiện ${getStatusBadge(statusFilter).label.toLowerCase()}`}
+                <span className="text-gray-500 font-normal"> ({filteredEvents.length})</span>
               </h2>
             </div>
             <div className="flex items-center gap-3">
@@ -360,7 +381,6 @@ export default function AdminEventApproval() {
                           <option value="pending">Chờ duyệt</option>
                           <option value="published">Đã xuất bản</option>
                           <option value="rejected">Từ chối</option>
-                          <option value="draft">Bản nháp</option>
                           <option value="cancelled">Đã hủy</option>
                           <option value="completed">Hoàn thành</option>
                         </select>
@@ -385,7 +405,18 @@ export default function AdminEventApproval() {
                 </div>
               ) : filteredEvents.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-600">Không tìm thấy sự kiện</p>
+                  <p className="text-gray-600 mb-2">
+                    {statusFilter === 'pending' 
+                      ? 'Không có sự kiện nào đang chờ duyệt'
+                      : searchQuery
+                      ? 'Không tìm thấy sự kiện phù hợp với từ khóa'
+                      : `Không có sự kiện nào với trạng thái "${getStatusBadge(statusFilter).label}"`}
+                  </p>
+                  {statusFilter === 'pending' && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      Các sự kiện mới tạo sẽ có trạng thái "Chờ duyệt" và xuất hiện ở đây
+                    </p>
+                  )}
                 </div>
               ) : (
                 <table className="w-full">
@@ -556,6 +587,21 @@ export default function AdminEventApproval() {
           </div>
         </div>
       </div>
+
+      {/* Event Detail Modal */}
+      {selectedEventId && (
+        <EventDetailModal
+          isOpen={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedEventId(null);
+          }}
+          eventId={selectedEventId}
+          onEventUpdated={() => {
+            fetchEvents();
+          }}
+        />
+      )}
     </div>
   );
 }

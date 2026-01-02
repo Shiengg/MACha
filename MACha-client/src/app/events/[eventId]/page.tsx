@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import { eventService, Event, EventRSVP, EventUpdate } from '@/services/event.service';
 import { useAuth } from '@/contexts/AuthContext';
-import { Calendar, MapPin, Users, Clock, User, CheckCircle, XCircle, HelpCircle } from 'lucide-react';
+import { useSocket } from '@/contexts/SocketContext';
+import { Calendar, MapPin, Users, Clock, User, CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
 import Swal from 'sweetalert2';
 
@@ -14,6 +15,7 @@ function EventDetails() {
   const router = useRouter();
   const eventId = params.eventId as string;
   const { user } = useAuth();
+  const { socket, isConnected } = useSocket();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [rsvp, setRSVP] = useState<EventRSVP | null>(null);
@@ -32,20 +34,121 @@ function EventDetails() {
     }
   }, [eventId, user]);
 
-  const fetchEvent = async () => {
+  // Join event room and listen for realtime RSVP updates
+  useEffect(() => {
+    if (!socket || !isConnected || !eventId) return;
+
+    // Join event room
+    const eventRoom = `event:${eventId}`;
+    socket.emit('join-room', eventRoom);
+    console.log(`🏠 Joined event room: ${eventRoom}`);
+
+    // Listen for RSVP updates
+    const handleRSVPUpdated = (eventData: any) => {
+      const receivedEventId = String(eventData.eventId || '');
+      const currentEventId = String(eventId || '');
+      
+      if (receivedEventId !== currentEventId) {
+        console.log('⚠️ Event ID mismatch:', receivedEventId, 'vs', currentEventId);
+        return;
+      }
+      
+      console.log('🔄 Real-time RSVP update received:', eventData);
+      
+      // Update event RSVP stats - always update
+      if (eventData.rsvpStats) {
+        setEvent(prev => {
+          if (!prev) {
+            // If event not loaded yet, fetch it in background but don't block
+            fetchEvent(true).catch(err => console.error('Error fetching event:', err));
+            return null;
+          }
+          console.log('✅ Updating RSVP stats:', eventData.rsvpStats);
+          return {
+            ...prev,
+            rsvpStats: eventData.rsvpStats
+          };
+        });
+      }
+    };
+
+    const handleRSVPDeleted = (eventData: any) => {
+      const receivedEventId = String(eventData.eventId || '');
+      const currentEventId = String(eventId || '');
+      
+      if (receivedEventId !== currentEventId) {
+        console.log('⚠️ Event ID mismatch:', receivedEventId, 'vs', currentEventId);
+        return;
+      }
+      
+      console.log('🗑️ Real-time RSVP deleted:', eventData);
+      
+      // Update event RSVP stats
+      if (eventData.rsvpStats) {
+        setEvent(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            rsvpStats: eventData.rsvpStats
+          };
+        });
+      }
+      
+      // If current user deleted their RSVP, update local state
+      const currentUserId = String(user?._id || user?.id || '');
+      const deletedUserId = String(eventData.userId || '');
+      if (deletedUserId === currentUserId) {
+        setRSVP(null);
+      }
+    };
+
+    socket.on('event:rsvp:updated', handleRSVPUpdated);
+    socket.on('event:rsvp:deleted', handleRSVPDeleted);
+
+    return () => {
+      socket.off('event:rsvp:updated', handleRSVPUpdated);
+      socket.off('event:rsvp:deleted', handleRSVPDeleted);
+    };
+  }, [socket, isConnected, eventId, event, user]);
+
+  const fetchEvent = async (forceRefresh = false) => {
     try {
-      setLoading(true);
+      if (!forceRefresh) {
+        setLoading(true);
+      }
       const data = await eventService.getEventById(eventId);
-      setEvent(data);
+      if (data) {
+        // Ensure rsvpStats exists
+        if (!data.rsvpStats) {
+          // If no stats, fetch them separately
+          try {
+            const stats = await eventService.getRSVPStats(eventId);
+            data.rsvpStats = stats;
+          } catch (err) {
+            console.error('Error fetching RSVP stats:', err);
+            // Set default stats if fetch fails
+            data.rsvpStats = {
+              going: { count: 0, guests: 0 },
+              interested: { count: 0, guests: 0 },
+              not_going: { count: 0, guests: 0 }
+            };
+          }
+        }
+        setEvent(data);
+      }
     } catch (err: any) {
       console.error('Error loading event:', err);
-      Swal.fire({
-        icon: 'error',
-        title: 'Lỗi',
-        text: 'Không thể tải thông tin sự kiện',
-      }).then(() => router.push('/events'));
+      if (!forceRefresh) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Lỗi',
+          text: 'Không thể tải thông tin sự kiện',
+        }).then(() => router.push('/events'));
+      }
     } finally {
-      setLoading(false);
+      if (!forceRefresh) {
+        setLoading(false);
+      }
     }
   };
 
@@ -74,7 +177,7 @@ function EventDetails() {
     }
   };
 
-  const handleRSVP = async (status: 'going' | 'interested' | 'maybe' | 'not_going') => {
+  const handleRSVP = async (status: 'going' | 'interested' | 'not_going') => {
     if (!user) {
       Swal.fire({
         icon: 'warning',
@@ -89,16 +192,22 @@ function EventDetails() {
         status,
         guests_count: 0,
       });
-      await fetchRSVP();
-      await fetchEvent();
+      
+      // Refresh RSVP và event để có stats mới nhất (force refresh để bypass cache)
+      await Promise.all([
+        fetchRSVP(),
+        fetchEvent(true) // Force refresh để có stats mới nhất
+      ]);
+      
       Swal.fire({
         icon: 'success',
         title: 'Thành công',
-        text: `Bạn đã ${status === 'going' ? 'tham gia' : status === 'interested' ? 'quan tâm' : status === 'maybe' ? 'có thể tham gia' : 'không tham gia'} sự kiện`,
+        text: `Bạn đã ${status === 'going' ? 'tham gia' : status === 'interested' ? 'quan tâm' : 'không tham gia'} sự kiện`,
         timer: 2000,
         showConfirmButton: false,
       });
     } catch (err: any) {
+      console.error('Error creating RSVP:', err);
       Swal.fire({
         icon: 'error',
         title: 'Lỗi',
@@ -144,11 +253,8 @@ function EventDetails() {
     const labels: { [key: string]: string } = {
       'volunteering': 'Tình nguyện',
       'fundraising': 'Gây quỹ',
-      'community_meetup': 'Gặp gỡ cộng đồng',
-      'workshop': 'Workshop',
-      'seminar': 'Hội thảo',
       'charity_event': 'Sự kiện từ thiện',
-      'awareness': 'Nâng cao nhận thức',
+      'donation_drive': 'Tập hợp đóng góp',
     };
     return labels[category] || category;
   };
@@ -254,34 +360,13 @@ function EventDetails() {
                 <MapPin className="w-5 h-5 text-orange-500 mt-1" />
                 <div>
                   <div className="font-medium text-gray-900 dark:text-white">Địa điểm</div>
-                  {event.location.type === 'online' ? (
-                    <div className="text-gray-600 dark:text-gray-400">
-                      Trực tuyến
-                      {event.location.online_link && (
-                        <a href={event.location.online_link} target="_blank" rel="noopener noreferrer" className="ml-2 text-orange-500 hover:underline">
-                          Tham gia
-                        </a>
-                      )}
-                    </div>
-                  ) : event.location.type === 'hybrid' ? (
-                    <div className="text-gray-600 dark:text-gray-400">
-                      Kết hợp
-                      <div className="mt-1">{event.location.venue_name || event.location.address}</div>
-                      {event.location.online_link && (
-                        <a href={event.location.online_link} target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">
-                          Link trực tuyến
-                        </a>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-gray-600 dark:text-gray-400">
-                      {event.location.venue_name && <div>{event.location.venue_name}</div>}
-                      {event.location.address && <div>{event.location.address}</div>}
-                      {event.location.district && event.location.city && (
-                        <div>{event.location.district}, {event.location.city}</div>
-                      )}
-                    </div>
-                  )}
+                  <div className="text-gray-600 dark:text-gray-400">
+                    {event.location.venue_name && <div className="font-medium">{event.location.venue_name}</div>}
+                    {event.location.address && <div>{event.location.address}</div>}
+                    {event.location.district && <div>{event.location.district}</div>}
+                    {event.location.city && <div>{event.location.city}</div>}
+                    {event.location.country && <div>{event.location.country}</div>}
+                  </div>
                 </div>
               </div>
 
@@ -292,11 +377,9 @@ function EventDetails() {
                   <div className="text-gray-600 dark:text-gray-400">
                     {totalAttendees} {event.capacity ? `/ ${event.capacity}` : ''} người
                   </div>
-                  {event.rsvpStats && (
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      {event.rsvpStats.going.count} tham gia, {event.rsvpStats.interested.count} quan tâm
-                    </div>
-                  )}
+                  <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {event.rsvpStats?.going.count || 0} tham gia, {event.rsvpStats?.interested.count || 0} quan tâm
+                  </div>
                 </div>
               </div>
             </div>
@@ -309,8 +392,7 @@ function EventDetails() {
                     <span className="text-gray-700 dark:text-gray-300">
                       Bạn đã chọn: <strong>
                         {rsvp.status === 'going' ? 'Tham gia' : 
-                         rsvp.status === 'interested' ? 'Quan tâm' : 
-                         rsvp.status === 'maybe' ? 'Có thể' : 'Không tham gia'}
+                         rsvp.status === 'interested' ? 'Quan tâm' : 'Không tham gia'}
                       </strong>
                     </span>
                     <button
@@ -335,13 +417,6 @@ function EventDetails() {
                     >
                       <Users className="w-4 h-4" />
                       Quan tâm
-                    </button>
-                    <button
-                      onClick={() => handleRSVP('maybe')}
-                      className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors"
-                    >
-                      <HelpCircle className="w-4 h-4" />
-                      Có thể
                     </button>
                     <button
                       onClick={() => handleRSVP('not_going')}
