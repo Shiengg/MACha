@@ -22,6 +22,12 @@ export interface Admin {
   avatar?: string;
   createdAt: string;
   is_verified?: boolean;
+  is_banned?: boolean;
+  stats?: {
+    approvals: number;
+    rejections: number;
+    total: number;
+  };
 }
 
 export interface DashboardData {

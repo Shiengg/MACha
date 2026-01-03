@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
 import { ownerService, Admin } from '@/services/owner.service';
@@ -32,6 +33,9 @@ export default function OwnerAdmins() {
   const [editForm, setEditForm] = useState({ fullname: '', avatar: '', bio: '' });
   const [banReason, setBanReason] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+  const menuRef = useRef<HTMLDivElement>(null);
   const [sortField, setSortField] = useState<keyof Admin | ''>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'unverified' | 'banned'>('all');
@@ -40,6 +44,26 @@ export default function OwnerAdmins() {
   useEffect(() => {
     fetchAdmins();
   }, [currentPage]);
+
+  // Handle click outside to close menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openMenuId && menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        const button = buttonRefs.current[openMenuId];
+        if (button && !button.contains(event.target as Node)) {
+          setOpenMenuId(null);
+          setMenuPosition(null);
+        }
+      }
+    };
+
+    if (openMenuId) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [openMenuId]);
 
   const fetchAdmins = async () => {
     try {
@@ -143,6 +167,8 @@ export default function OwnerAdmins() {
           title: 'Success',
           text: 'Admin removed successfully',
         });
+        setOpenMenuId(null);
+        setMenuPosition(null);
         fetchAdmins();
       } catch (error: any) {
         Swal.fire({
@@ -185,6 +211,8 @@ export default function OwnerAdmins() {
         title: 'Success',
         text: 'Admin unbanned successfully',
       });
+      setOpenMenuId(null);
+      setMenuPosition(null);
       fetchAdmins();
     } catch (error: any) {
       Swal.fire({
@@ -204,6 +232,7 @@ export default function OwnerAdmins() {
     });
     setShowEditModal(true);
     setOpenMenuId(null);
+    setMenuPosition(null);
   };
 
   const openBanModal = (admin: Admin) => {
@@ -211,11 +240,30 @@ export default function OwnerAdmins() {
     setBanReason('');
     setShowBanModal(true);
     setOpenMenuId(null);
+    setMenuPosition(null);
   };
 
   const viewAdminDetails = (admin: Admin) => {
     router.push(`/owner/admin-activities?adminId=${admin._id}`);
     setOpenMenuId(null);
+    setMenuPosition(null);
+  };
+
+  const handleToggleMenu = (adminId: string) => {
+    if (openMenuId === adminId) {
+      setOpenMenuId(null);
+      setMenuPosition(null);
+    } else {
+      const button = buttonRefs.current[adminId];
+      if (button) {
+        const rect = button.getBoundingClientRect();
+        setMenuPosition({
+          top: rect.bottom + 8, // Use viewport coordinates for fixed positioning
+          left: rect.right - 192, // 192 = w-48 (12rem = 192px)
+        });
+      }
+      setOpenMenuId(adminId);
+    }
   };
 
   const handleSort = (field: keyof Admin) => {
@@ -465,56 +513,15 @@ export default function OwnerAdmins() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex items-center justify-end gap-2">
-                              <div className="relative">
-                                <button
-                                  onClick={() => setOpenMenuId(openMenuId === admin._id ? null : admin._id)}
-                                  className="text-gray-600 hover:text-gray-900"
-                                >
-                                  <MoreVertical className="w-5 h-5" />
-                                </button>
-                                {openMenuId === admin._id && (
-                                  <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                                    <button
-                                      onClick={() => viewAdminDetails(admin)}
-                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                    >
-                                      <Eye className="w-4 h-4" />
-                                      View Details
-                                    </button>
-                                    <button
-                                      onClick={() => openEditModal(admin)}
-                                      className="w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2"
-                                    >
-                                      <Edit className="w-4 h-4" />
-                                      Edit
-                                    </button>
-                                    {admin.is_banned ? (
-                                      <button
-                                        onClick={() => handleUnbanAdmin(admin._id)}
-                                        className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 flex items-center gap-2"
-                                      >
-                                        <Unlock className="w-4 h-4" />
-                                        Unban
-                                      </button>
-                                    ) : (
-                                      <button
-                                        onClick={() => openBanModal(admin)}
-                                        className="w-full text-left px-4 py-2 text-sm text-orange-700 hover:bg-orange-50 flex items-center gap-2"
-                                      >
-                                        <Ban className="w-4 h-4" />
-                                        Ban
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={() => handleDeleteAdmin(admin._id)}
-                                      className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center gap-2"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                      Remove Admin
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
+                              <button
+                                ref={(el) => {
+                                  buttonRefs.current[admin._id] = el;
+                                }}
+                                onClick={() => handleToggleMenu(admin._id)}
+                                className="text-gray-600 hover:text-gray-900"
+                              >
+                                <MoreVertical className="w-5 h-5" />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -714,6 +721,68 @@ export default function OwnerAdmins() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Portal-rendered dropdown menu */}
+      {openMenuId && menuPosition && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+            zIndex: 9999,
+          }}
+          className="w-48 bg-white border border-gray-200 rounded-lg shadow-lg"
+        >
+          {(() => {
+            const admin = admins.find(a => a._id === openMenuId);
+            if (!admin) return null;
+            return (
+              <>
+                <button
+                  onClick={() => viewAdminDetails(admin)}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  View Details
+                </button>
+                <button
+                  onClick={() => openEditModal(admin)}
+                  className="w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit
+                </button>
+                {admin.is_banned ? (
+                  <button
+                    onClick={() => handleUnbanAdmin(admin._id)}
+                    className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 flex items-center gap-2"
+                  >
+                    <Unlock className="w-4 h-4" />
+                    Unban
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => openBanModal(admin)}
+                    className="w-full text-left px-4 py-2 text-sm text-orange-700 hover:bg-orange-50 flex items-center gap-2"
+                  >
+                    <Ban className="w-4 h-4" />
+                    Ban
+                  </button>
+                )}
+                <button
+                  onClick={() => handleDeleteAdmin(admin._id)}
+                  className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Remove Admin
+                </button>
+              </>
+            );
+          })()}
+        </div>,
+        document.body
       )}
     </div>
   );

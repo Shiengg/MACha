@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { getPendingKYCs, getKYCDetails, approveKYC, rejectKYC, KYCUser, KYCDetails } from '@/services/admin/kyc.service';
@@ -18,9 +19,11 @@ export default function AdminKYCApproval() {
   const [selectedKYC, setSelectedKYC] = useState<KYCDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; isLastTwo: boolean } | null>(null);
   const [selectedKYCs, setSelectedKYCs] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
-  const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+  const menuRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement | null>(null);
   const itemsPerPage = 10;
 
@@ -36,11 +39,14 @@ export default function AdminKYCApproval() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      Object.entries(menuRefs.current).forEach(([kycId, ref]) => {
-        if (ref && !ref.contains(target) && openMenuId === kycId) {
+      
+      if (openMenuId && menuRef.current && !menuRef.current.contains(target)) {
+        const button = buttonRefs.current[openMenuId];
+        if (button && !button.contains(target)) {
           setOpenMenuId(null);
+          setMenuPosition(null);
         }
-      });
+      }
       
       if (filterRef.current && !filterRef.current.contains(target) && showFilters) {
         setShowFilters(false);
@@ -71,8 +77,28 @@ export default function AdminKYCApproval() {
     }
   };
 
+  const handleToggleMenu = (requestId: string, userId: string, isLastTwo: boolean) => {
+    if (openMenuId === requestId) {
+      setOpenMenuId(null);
+      setMenuPosition(null);
+    } else {
+      const button = buttonRefs.current[requestId];
+      if (button) {
+        const rect = button.getBoundingClientRect();
+        const menuHeight = 150;
+        setMenuPosition({
+          top: isLastTwo ? rect.top - menuHeight + 30 : rect.bottom + 8,
+          left: rect.right - 192,
+          isLastTwo,
+        });
+      }
+      setOpenMenuId(requestId);
+    }
+  };
+
   const handleViewDetails = async (userId: string) => {
     setOpenMenuId(null);
+    setMenuPosition(null);
     try {
       setLoadingDetails(true);
       setShowDetailsModal(true);
@@ -110,6 +136,7 @@ export default function AdminKYCApproval() {
 
   const handleApprove = async (userId: string) => {
     setOpenMenuId(null);
+    setMenuPosition(null);
     const result = await Swal.fire({
       title: 'Duyệt KYC?',
       text: 'Người dùng sẽ được xác thực và có thể tạo chiến dịch',
@@ -135,6 +162,7 @@ export default function AdminKYCApproval() {
 
   const handleReject = async (userId: string) => {
     setOpenMenuId(null);
+    setMenuPosition(null);
     const { value: reason } = await Swal.fire({
       title: 'Từ chối KYC',
       input: 'textarea',
@@ -409,57 +437,15 @@ export default function AdminKYCApproval() {
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="relative" ref={(el) => { menuRefs.current[request._id] = el; }}>
-                              <button
-                                onClick={() => setOpenMenuId(openMenuId === request._id ? null : request._id)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-                              >
-                                <MoreVertical className="w-5 h-5" />
-                              </button>
-                              {openMenuId === request._id && (
-                                <div 
-                                  className={`absolute right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 ${
-                                    isLastTwo ? 'bottom-full mb-2' : 'mt-2'
-                                  }`}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleViewDetails(userId);
-                                    }}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                  >
-                                    Xem chi tiết
-                                  </button>
-                                  {status === 'pending' && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleApprove(userId);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
-                                      >
-                                        Duyệt
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleReject(userId);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
-                                      >
-                                        Từ chối
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              )}
-                            </div>
+                            <button
+                              ref={(el) => {
+                                buttonRefs.current[request._id] = el;
+                              }}
+                              onClick={() => handleToggleMenu(request._id, userId, isLastTwo)}
+                              className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                            >
+                              <MoreVertical className="w-5 h-5" />
+                            </button>
                           </td>
                         </tr>
                       );
@@ -758,6 +744,66 @@ export default function AdminKYCApproval() {
             ) : null}
           </div>
         </div>
+      )}
+      {/* Portal-rendered dropdown menu */}
+      {openMenuId && menuPosition && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+            zIndex: 9999,
+          }}
+          className="w-48 bg-white border border-gray-200 rounded-lg shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {(() => {
+            const request = kycRequests.find(r => r._id === openMenuId);
+            if (!request) return null;
+            const status = request.status || request.kyc_status || 'unverified';
+            const userId = request.user?._id || request._id;
+            return (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewDetails(userId);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Xem chi tiết
+                </button>
+                {status === 'pending' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleApprove(userId);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
+                    >
+                      Duyệt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReject(userId);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
+                    >
+                      Từ chối
+                    </button>
+                  </>
+                )}
+              </>
+            );
+          })()}
+        </div>,
+        document.body
       )}
     </div>
   );
