@@ -48,7 +48,9 @@ function LoginPageContent() {
         const returnUrl = searchParams.get('returnUrl');
         const redirectParam = searchParams.get('redirect');
 
-        if (userRole === 'admin') {
+        if (userRole === 'owner') {
+          router.push(redirectParam || '/owner/dashboard');
+        } else if (userRole === 'admin') {
           router.push(redirectParam || '/admin/dashboard');
         } else {
           // ✅ Check if returnUrl is a profile page

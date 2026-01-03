@@ -15,11 +15,13 @@ function PublicRouteContent({ children }: PublicRouteProps) {
 
     useEffect(() => {
         if (!loading && isAuthenticated) {
-            if (user?.role === 'admin') {
+            if (user?.role === 'owner') {
+                router.push('/owner/dashboard');
+            } else if (user?.role === 'admin') {
                 router.push('/admin/dashboard');
             } else {
-            const returnUrl = searchParams.get('returnUrl') || '/';
-            router.push(returnUrl);
+                const returnUrl = searchParams.get('returnUrl') || '/';
+                router.push(returnUrl);
             }
         }
     }, [user, isAuthenticated, loading, router, searchParams]);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -17,9 +18,11 @@ export default function AdminCampaignApproval() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; isLastTwo: boolean } | null>(null);
   const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
-  const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+  const menuRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement | null>(null);
   const itemsPerPage = 10;
 
@@ -35,11 +38,14 @@ export default function AdminCampaignApproval() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      Object.entries(menuRefs.current).forEach(([campaignId, ref]) => {
-        if (ref && !ref.contains(target) && openMenuId === campaignId) {
+      
+      if (openMenuId && menuRef.current && !menuRef.current.contains(target)) {
+        const button = buttonRefs.current[openMenuId];
+        if (button && !button.contains(target)) {
           setOpenMenuId(null);
+          setMenuPosition(null);
         }
-      });
+      }
       
       if (filterRef.current && !filterRef.current.contains(target) && showFilters) {
         setShowFilters(false);
@@ -70,8 +76,28 @@ export default function AdminCampaignApproval() {
     }
   };
 
+  const handleToggleMenu = (campaignId: string, isLastTwo: boolean) => {
+    if (openMenuId === campaignId) {
+      setOpenMenuId(null);
+      setMenuPosition(null);
+    } else {
+      const button = buttonRefs.current[campaignId];
+      if (button) {
+        const rect = button.getBoundingClientRect();
+        const menuHeight = 150;
+        setMenuPosition({
+          top: isLastTwo ? rect.top - menuHeight + 30 : rect.bottom + 8,
+          left: rect.right - 192,
+          isLastTwo,
+        });
+      }
+      setOpenMenuId(campaignId);
+    }
+  };
+
   const handleApprove = async (id: string) => {
     setOpenMenuId(null);
+    setMenuPosition(null);
     const result = await Swal.fire({
       title: 'Duyệt chiến dịch?',
       html: `
@@ -146,6 +172,7 @@ export default function AdminCampaignApproval() {
 
   const handleViewDetails = (campaignId: string) => {
     setOpenMenuId(null);
+    setMenuPosition(null);
     router.push(`/admin/campaigns/${campaignId}`);
   };
 
@@ -169,6 +196,7 @@ export default function AdminCampaignApproval() {
 
   const handleReject = async (id: string) => {
     setOpenMenuId(null);
+    setMenuPosition(null);
     const { value: reason } = await Swal.fire({
       title: 'Reject Campaign',
       input: 'textarea',
@@ -435,57 +463,15 @@ export default function AdminCampaignApproval() {
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="relative" ref={(el) => { menuRefs.current[campaign._id] = el; }}>
-                              <button
-                                onClick={() => setOpenMenuId(openMenuId === campaign._id ? null : campaign._id)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-                              >
-                                <MoreVertical className="w-5 h-5" />
-                              </button>
-                              {openMenuId === campaign._id && (
-                                <div 
-                                  className={`absolute right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 ${
-                                    isLastTwo ? 'bottom-full mb-2' : 'mt-2'
-                                  }`}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {campaign.status === 'pending' ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleApprove(campaign._id);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
-                                      >
-                                        Duyệt
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleReject(campaign._id);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
-                                      >
-                                        Từ chối
-                                      </button>
-                                    </>
-                                  ) : null}
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleViewDetails(campaign._id);
-                                    }}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                  >
-                                    Xem chi tiết
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                            <button
+                              ref={(el) => {
+                                buttonRefs.current[campaign._id] = el;
+                              }}
+                              onClick={() => handleToggleMenu(campaign._id, isLastTwo)}
+                              className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                            >
+                              <MoreVertical className="w-5 h-5" />
+                            </button>
                           </td>
                         </tr>
                       );
@@ -550,6 +536,65 @@ export default function AdminCampaignApproval() {
           </div>
         </div>
       </div>
+
+      {/* Portal-rendered dropdown menu */}
+      {openMenuId && menuPosition && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+            zIndex: 9999,
+          }}
+          className="w-48 bg-white border border-gray-200 rounded-lg shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {(() => {
+            const campaign = campaigns.find(c => c._id === openMenuId);
+            if (!campaign) return null;
+            return (
+              <>
+                {campaign.status === 'pending' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleApprove(campaign._id);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
+                    >
+                      Duyệt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReject(campaign._id);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
+                    >
+                      Từ chối
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewDetails(campaign._id);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Xem chi tiết
+                </button>
+              </>
+            );
+          })()}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

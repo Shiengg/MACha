@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -18,11 +19,13 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; isLastTwo: boolean } | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [sortColumn, setSortColumn] = useState<'dateAdded' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showFilters, setShowFilters] = useState(false);
-  const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+  const menuRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement | null>(null);
   const itemsPerPage = 10;
 
@@ -38,11 +41,14 @@ export default function AdminUsers() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      Object.entries(menuRefs.current).forEach(([userId, ref]) => {
-        if (ref && !ref.contains(target) && openMenuId === userId) {
+      
+      if (openMenuId && menuRef.current && !menuRef.current.contains(target)) {
+        const button = buttonRefs.current[openMenuId];
+        if (button && !button.contains(target)) {
           setOpenMenuId(null);
+          setMenuPosition(null);
         }
-      });
+      }
       
       if (filterRef.current && !filterRef.current.contains(target) && showFilters) {
         setShowFilters(false);
@@ -57,8 +63,28 @@ export default function AdminUsers() {
     }
   }, [openMenuId, showFilters]);
 
+  const handleToggleMenu = (userId: string, isLastTwo: boolean) => {
+    if (openMenuId === userId) {
+      setOpenMenuId(null);
+      setMenuPosition(null);
+    } else {
+      const button = buttonRefs.current[userId];
+      if (button) {
+        const rect = button.getBoundingClientRect();
+        const menuHeight = 50;
+        setMenuPosition({
+          top: isLastTwo ? rect.top - menuHeight + 30 : rect.bottom + 8,
+          left: rect.right - 192,
+          isLastTwo,
+        });
+      }
+      setOpenMenuId(userId);
+    }
+  };
+
   const handleViewDetails = (userId: string) => {
     setOpenMenuId(null);
+    setMenuPosition(null);
     router.push(`/admin/users/${userId}`);
   };
 
@@ -392,33 +418,15 @@ export default function AdminUsers() {
                             <div className="text-sm text-gray-900">{formatDate(user.createdAt)}</div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="relative" ref={(el) => { menuRefs.current[user._id] = el; }}>
-                            <button
-                              onClick={() => setOpenMenuId(openMenuId === user._id ? null : user._id)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-                            >
-                                <MoreVertical className="w-5 h-5" />
-                            </button>
-                            {openMenuId === user._id && (
-                              <div 
-                                  className={`absolute right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 ${
-                                    isLastTwo ? 'bottom-full mb-2' : 'mt-2'
-                                  }`}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewDetails(user._id);
-                                  }}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                >
-                                  Xem chi tiết
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          <button
+                            ref={(el) => {
+                              buttonRefs.current[user._id] = el;
+                            }}
+                            onClick={() => handleToggleMenu(user._id, isLastTwo)}
+                            className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                          >
+                            <MoreVertical className="w-5 h-5" />
+                          </button>
                         </td>
                       </tr>
                       );
@@ -483,6 +491,39 @@ export default function AdminUsers() {
           </div>
         </div>
       </div>
+
+      {/* Portal-rendered dropdown menu */}
+      {openMenuId && menuPosition && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+            zIndex: 9999,
+          }}
+          className="w-48 bg-white border border-gray-200 rounded-lg shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {(() => {
+            const user = users.find(u => u._id === openMenuId);
+            if (!user) return null;
+            return (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleViewDetails(user._id);
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Xem chi tiết
+              </button>
+            );
+          })()}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

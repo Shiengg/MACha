@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -18,11 +19,13 @@ export default function AdminEventApproval() {
   const [statusFilter, setStatusFilter] = useState<string>('pending');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; isLastTwo: boolean } | null>(null);
   const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const menuRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+  const menuRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement | null>(null);
   const itemsPerPage = 10;
 
@@ -38,11 +41,14 @@ export default function AdminEventApproval() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      Object.entries(menuRefs.current).forEach(([eventId, ref]) => {
-        if (ref && !ref.contains(target) && openMenuId === eventId) {
+      
+      if (openMenuId && menuRef.current && !menuRef.current.contains(target)) {
+        const button = buttonRefs.current[openMenuId];
+        if (button && !button.contains(target)) {
           setOpenMenuId(null);
+          setMenuPosition(null);
         }
-      });
+      }
       
       if (filterRef.current && !filterRef.current.contains(target) && showFilters) {
         setShowFilters(false);
@@ -84,8 +90,29 @@ export default function AdminEventApproval() {
     }
   };
 
+  const handleToggleMenu = (eventId: string, isLastTwo: boolean) => {
+    if (openMenuId === eventId) {
+      setOpenMenuId(null);
+      setMenuPosition(null);
+    } else {
+      const button = buttonRefs.current[eventId];
+      if (button) {
+        const rect = button.getBoundingClientRect();
+        // Estimate menu height is about 150px for 3 items
+        const menuHeight = 150;
+        setMenuPosition({
+          top: isLastTwo ? rect.top - menuHeight + 30 : rect.bottom + 8,
+          left: rect.right - 192, // 192 = w-48 (12rem = 192px)
+          isLastTwo,
+        });
+      }
+      setOpenMenuId(eventId);
+    }
+  };
+
   const handleApprove = async (id: string) => {
     setOpenMenuId(null);
+    setMenuPosition(null);
     const result = await Swal.fire({
       title: 'Duyệt sự kiện?',
       html: `
@@ -162,6 +189,7 @@ export default function AdminEventApproval() {
 
   const handleViewDetails = (eventId: string) => {
     setOpenMenuId(null);
+    setMenuPosition(null);
     setSelectedEventId(eventId);
     setShowDetailModal(true);
   };
@@ -186,6 +214,7 @@ export default function AdminEventApproval() {
 
   const handleReject = async (id: string) => {
     setOpenMenuId(null);
+    setMenuPosition(null);
     const { value: reason } = await Swal.fire({
       title: 'Từ chối sự kiện',
       input: 'textarea',
@@ -472,57 +501,15 @@ export default function AdminEventApproval() {
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="relative" ref={(el) => { menuRefs.current[event._id] = el; }}>
-                              <button
-                                onClick={() => setOpenMenuId(openMenuId === event._id ? null : event._id)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-                              >
-                                <MoreVertical className="w-5 h-5" />
-                              </button>
-                              {openMenuId === event._id && (
-                                <div 
-                                  className={`absolute right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 ${
-                                    isLastTwo ? 'bottom-full mb-2' : 'mt-2'
-                                  }`}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {event.status === 'pending' && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleApprove(event._id);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
-                                      >
-                                        Duyệt
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleReject(event._id);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
-                                      >
-                                        Từ chối
-                                      </button>
-                                    </>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleViewDetails(event._id);
-                                    }}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                  >
-                                    Xem chi tiết
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                            <button
+                              ref={(el) => {
+                                buttonRefs.current[event._id] = el;
+                              }}
+                              onClick={() => handleToggleMenu(event._id, isLastTwo)}
+                              className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                            >
+                              <MoreVertical className="w-5 h-5" />
+                            </button>
                           </td>
                         </tr>
                       );
@@ -601,6 +588,65 @@ export default function AdminEventApproval() {
             fetchEvents();
           }}
         />
+      )}
+
+      {/* Portal-rendered dropdown menu */}
+      {openMenuId && menuPosition && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+            zIndex: 9999,
+          }}
+          className="w-48 bg-white border border-gray-200 rounded-lg shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {(() => {
+            const event = events.find(e => e._id === openMenuId);
+            if (!event) return null;
+            return (
+              <>
+                {event.status === 'pending' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleApprove(event._id);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
+                    >
+                      Duyệt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReject(event._id);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
+                    >
+                      Từ chối
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewDetails(event._id);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Xem chi tiết
+                </button>
+              </>
+            );
+          })()}
+        </div>,
+        document.body
       )}
     </div>
   );
