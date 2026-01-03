@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import User from "../models/user.js";
 import Donation from "../models/donation.js";
 import Escrow from "../models/escrow.js";
@@ -662,10 +663,46 @@ export const getAdminActivities = async (adminId = null, page = 1, limit = 20) =
     let adminInfo = null;
 
     if (adminId) {
+        // Validate ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(adminId)) {
+            return {
+                statistics: {
+                    campaign_approvals: 0,
+                    campaign_rejections: 0,
+                    event_approvals: 0,
+                    event_rejections: 0,
+                    kyc_approvals: 0,
+                    kyc_rejections: 0,
+                    report_resolutions: 0,
+                    withdrawal_approvals: 0,
+                    withdrawal_rejections: 0,
+                    total_actions: 0
+                },
+                admin: null,
+                pagination: {
+                    page,
+                    limit,
+                    total: 0,
+                    pages: 0
+                }
+            };
+        }
+
         const admin = await User.findById(adminId).select("_id username");
         if (!admin || admin.role !== "admin") {
             return {
-                statistics: {},
+                statistics: {
+                    campaign_approvals: 0,
+                    campaign_rejections: 0,
+                    event_approvals: 0,
+                    event_rejections: 0,
+                    kyc_approvals: 0,
+                    kyc_rejections: 0,
+                    report_resolutions: 0,
+                    withdrawal_approvals: 0,
+                    withdrawal_rejections: 0,
+                    total_actions: 0
+                },
                 admin: null,
                 pagination: {
                     page,
@@ -683,6 +720,31 @@ export const getAdminActivities = async (adminId = null, page = 1, limit = 20) =
     } else {
         const admins = await User.find({ role: "admin" }).select("_id username");
         adminIds = admins.map(a => a._id);
+    }
+
+    // If no admins found, return empty statistics
+    if (!adminIds || adminIds.length === 0) {
+        return {
+            statistics: {
+                campaign_approvals: 0,
+                campaign_rejections: 0,
+                event_approvals: 0,
+                event_rejections: 0,
+                kyc_approvals: 0,
+                kyc_rejections: 0,
+                report_resolutions: 0,
+                withdrawal_approvals: 0,
+                withdrawal_rejections: 0,
+                total_actions: 0
+            },
+            admin: adminInfo,
+            pagination: {
+                page,
+                limit,
+                total: adminId ? 1 : 0,
+                pages: 0
+            }
+        };
     }
 
     const [
