@@ -54,12 +54,10 @@ export const getEventById = async (eventId, userId = null) => {
     const eventKey = `event:${eventId}`;
     const cached = await redisClient.get(eventKey);
     
-    // Convert eventId to ObjectId for aggregate query
     const eventObjectId = mongoose.Types.ObjectId.isValid(eventId) 
         ? new mongoose.Types.ObjectId(eventId) 
         : eventId;
     
-    // Always calculate fresh rsvpStats since they change frequently
     const rsvpStatsResult = await EventRSVP.aggregate([
         { $match: { event: eventObjectId } },
         { $group: { _id: "$status", count: { $sum: 1 }, guests: { $sum: "$guests_count" } } }
@@ -80,7 +78,6 @@ export const getEventById = async (eventId, userId = null) => {
     
     if (cached) {
         const event = JSON.parse(cached);
-        // Update rsvpStats with fresh data
         event.rsvpStats = stats;
         
         if (userId) {
@@ -371,7 +368,6 @@ export const createRSVP = async (eventId, userId, payload) => {
     }
     
     if (payload.status === 'going' && event.capacity) {
-        // Convert eventId to ObjectId for queries
         const eventObjectId = mongoose.Types.ObjectId.isValid(eventId) 
             ? new mongoose.Types.ObjectId(eventId) 
             : eventId;
@@ -401,10 +397,8 @@ export const createRSVP = async (eventId, userId, payload) => {
     await redisClient.del(`events:rsvp:${eventId}`);
     await redisClient.del(`events:rsvp:stats:${eventId}`);
     
-    // Get fresh RSVP stats after update
     const rsvpStats = await getRSVPStats(eventId);
     
-    // Publish event to Redis for realtime updates
     const eventData = {
         eventId: eventId.toString(),
         userId: userId.toString(),
@@ -447,10 +441,8 @@ export const deleteRSVP = async (eventId, userId) => {
     await redisClient.del(`events:rsvp:${eventId}`);
     await redisClient.del(`events:rsvp:stats:${eventId}`);
     
-    // Get fresh RSVP stats after deletion
     const rsvpStats = await getRSVPStats(eventId);
     
-    // Publish event to Redis for realtime updates
     const eventData = {
         eventId: eventId.toString(),
         userId: userId.toString(),
@@ -531,7 +523,6 @@ export const createEventUpdate = async (eventId, userId, payload) => {
     await update.populate("author", "username fullname avatar");
     await redisClient.del(`events:updates:${eventId}`);
     
-    // Queue job to create notifications for RSVP users (non-blocking)
     try {
         await queueService.pushJob({
             type: "EVENT_UPDATE_CREATED",
@@ -544,7 +535,6 @@ export const createEventUpdate = async (eventId, userId, payload) => {
         console.error('Error queueing event update notification job:', queueError);
     }
     
-    // Publish event update to Redis for real-time updates
     try {
         const updateObject = update.toObject ? update.toObject() : JSON.parse(JSON.stringify(update));
         const eventData = {

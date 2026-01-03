@@ -6,9 +6,12 @@ import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import { eventService, Event, EventRSVP, EventUpdate } from '@/services/event.service';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
-import { Calendar, MapPin, Users, Clock, User, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, User, CheckCircle, XCircle, MoreHorizontal } from 'lucide-react';
+import { FaFlag } from 'react-icons/fa';
 import Image from 'next/image';
 import Swal from 'sweetalert2';
+import ReportModal from '@/components/shared/ReportModal';
+import { getReportsByItem } from '@/services/report.service';
 
 function EventDetails() {
   const params = useParams();
@@ -23,6 +26,10 @@ function EventDetails() {
   const [loading, setLoading] = useState(true);
   const [rsvpLoading, setRsvpLoading] = useState(false);
   const [updatesLoading, setUpdatesLoading] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [hasReported, setHasReported] = useState(false);
+  const [isCheckingReport, setIsCheckingReport] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (eventId) {
@@ -148,6 +155,24 @@ function EventDetails() {
       console.log(`🚪 Left event room: ${eventRoom}`);
     };
   }, [socket, isConnected, eventId, user]);
+
+  // Handle click outside dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (isDropdownOpen && !(target as Element).closest('.dropdown-container')) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
 
   const fetchEvent = async (forceRefresh = false) => {
     try {
@@ -368,6 +393,67 @@ function EventDetails() {
                   </span>
                 </div>
               </div>
+              {user && !isCreator && (
+                <div className="relative ml-4 dropdown-container">
+                  <button
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="w-10 h-10 flex items-center justify-center bg-gray-200 hover:bg-gray-300 dark:hover:bg-gray-700 rounded-full transition-colors"
+                    aria-label="More options"
+                  >
+                    <MoreHorizontal className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                  </button>
+                  {isDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                      <button
+                        onClick={async () => {
+                          setIsDropdownOpen(false);
+                          
+                          if (hasReported) {
+                            Swal.fire({
+                              icon: 'info',
+                              title: 'Đã báo cáo',
+                              text: 'Bạn đã báo cáo sự kiện này rồi. Vui lòng chờ admin xử lý.',
+                            });
+                            return;
+                          }
+
+                          setIsCheckingReport(true);
+                          try {
+                            const { reports } = await getReportsByItem('event', eventId);
+                            const currentUserId = (user as any)?._id || user?.id;
+                            const userReport = reports.find(
+                              (report) => report.reporter._id === currentUserId
+                            );
+                            
+                            if (userReport) {
+                              setHasReported(true);
+                              Swal.fire({
+                                icon: 'info',
+                                title: 'Đã báo cáo',
+                                text: 'Bạn đã báo cáo sự kiện này rồi. Vui lòng chờ admin xử lý.',
+                              });
+                            } else {
+                              setShowReportModal(true);
+                            }
+                          } catch (error) {
+                            console.error('Error checking report:', error);
+                            setShowReportModal(true);
+                          } finally {
+                            setIsCheckingReport(false);
+                          }
+                        }}
+                        disabled={isCheckingReport || hasReported}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <FaFlag className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                        <span className="text-sm font-medium">
+                          {hasReported ? 'Đã báo cáo' : 'Báo cáo sự kiện'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {event.description && (
@@ -541,6 +627,17 @@ function EventDetails() {
           </div>
         </div>
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        reportedType="event"
+        reportedId={eventId}
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        onSuccess={() => {
+          setHasReported(true);
+        }}
+      />
     </div>
   );
 }

@@ -12,7 +12,6 @@ export const initEventSubscriber = async (io) => {
             console.log("🎉 Received event RSVP created event!");
             console.log("📦 Event data:", event);
             
-            // If user RSVP'd as going or interested, tell them to join the event room
             if (event.rsvp && (event.rsvp.status === 'going' || event.rsvp.status === 'interested')) {
                 const userRoom = `user:${event.userId}`;
                 io.to(userRoom).emit("event:join-room", { 
@@ -22,9 +21,7 @@ export const initEventSubscriber = async (io) => {
                 console.log(`📢 Told user ${event.userId} to join event room: event:${event.eventId}`);
             }
             
-            // Emit to all clients
             io.emit("event:rsvp:updated", event);
-            // Also emit to event-specific room
             const room = `event:${event.eventId}`;
             io.to(room).emit("event:rsvp:updated", event);
             
@@ -40,7 +37,6 @@ export const initEventSubscriber = async (io) => {
             console.log("🔄 Received event RSVP updated event!");
             console.log("📦 Event data:", event);
             
-            // If user RSVP'd as going or interested, tell them to join the event room
             if (event.rsvp && (event.rsvp.status === 'going' || event.rsvp.status === 'interested')) {
                 const userRoom = `user:${event.userId}`;
                 io.to(userRoom).emit("event:join-room", { 
@@ -50,9 +46,7 @@ export const initEventSubscriber = async (io) => {
                 console.log(`📢 Told user ${event.userId} to join event room: event:${event.eventId}`);
             }
             
-            // Emit to all clients
             io.emit("event:rsvp:updated", event);
-            // Also emit to event-specific room
             const room = `event:${event.eventId}`;
             io.to(room).emit("event:rsvp:updated", event);
             
@@ -68,9 +62,7 @@ export const initEventSubscriber = async (io) => {
             console.log("🗑️ Received event RSVP deleted event!");
             console.log("📦 Event data:", event);
             
-            // Emit to all clients
             io.emit("event:rsvp:deleted", event);
-            // Also emit to event-specific room
             const room = `event:${event.eventId}`;
             io.to(room).emit("event:rsvp:deleted", event);
             
@@ -86,9 +78,7 @@ export const initEventSubscriber = async (io) => {
             console.log("📢 Received event update created event!");
             console.log("📦 Event data:", event);
             
-            // Emit to all clients
             io.emit("event:update:created", event);
-            // Also emit to event-specific room (for users who RSVP'd)
             const room = `event:${event.eventId}`;
             io.to(room).emit("event:update:created", event);
             
