@@ -64,6 +64,7 @@ app.use("/api/messages", routes.messageRoutes);
 app.use("/api/reports", routes.reportRoutes);
 app.use("/api/search", routes.searchRoutes);
 app.use("/api/events", routes.eventRoutes);
+app.use("/api/owner", routes.ownerRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {

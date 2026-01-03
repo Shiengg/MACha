@@ -1,0 +1,335 @@
+import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
+import * as ownerService from "../services/owner.service.js";
+
+export const getDashboard = async (req, res) => {
+    try {
+        const dashboard = await ownerService.getDashboard();
+        return res.status(HTTP_STATUS.OK).json(dashboard);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const getAdmins = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const result = await ownerService.getAdmins(page, limit);
+        return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const createAdmin = async (req, res) => {
+    try {
+        const { userId } = req.body;
+
+        // Validate input
+        if (!userId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "User ID is required"
+            });
+        }
+
+        if (typeof userId !== 'string' || userId.trim().length === 0) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Invalid user ID format"
+            });
+        }
+
+        // Prevent owner from creating themselves as admin
+        if (req.user._id.toString() === userId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Cannot create yourself as admin"
+            });
+        }
+
+        const result = await ownerService.createAdmin(userId);
+
+        if (!result.success) {
+            if (result.error === "USER_NOT_FOUND") {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "User not found"
+                });
+            }
+            if (result.error === "ALREADY_ADMIN") {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "User is already an admin"
+                });
+            }
+            if (result.error === "CANNOT_DEMOTE_OWNER") {
+                return res.status(HTTP_STATUS.FORBIDDEN).json({
+                    message: "Cannot change owner role"
+                });
+            }
+        }
+
+        return res.status(HTTP_STATUS.CREATED).json({
+            message: "Admin created successfully",
+            admin: result.admin
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const updateAdmin = async (req, res) => {
+    try {
+        const adminId = req.params.id;
+        const updates = req.body;
+
+        // Validate input
+        if (!adminId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Admin ID is required"
+            });
+        }
+
+        // Validate updates object
+        if (!updates || typeof updates !== 'object') {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Invalid update data"
+            });
+        }
+
+        // Validate allowed fields
+        const allowedFields = ["fullname", "avatar", "bio"];
+        const updateKeys = Object.keys(updates);
+        const invalidFields = updateKeys.filter(key => !allowedFields.includes(key));
+        
+        if (invalidFields.length > 0) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: `Invalid fields: ${invalidFields.join(', ')}`
+            });
+        }
+
+        // Validate field values
+        if (updates.fullname !== undefined && (typeof updates.fullname !== 'string' || updates.fullname.length > 100)) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Fullname must be a string with max 100 characters"
+            });
+        }
+
+        if (updates.avatar !== undefined && (typeof updates.avatar !== 'string' || updates.avatar.length > 500)) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Avatar URL must be a string with max 500 characters"
+            });
+        }
+
+        if (updates.bio !== undefined && (typeof updates.bio !== 'string' || updates.bio.length > 500)) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Bio must be a string with max 500 characters"
+            });
+        }
+
+        const result = await ownerService.updateAdmin(adminId, updates);
+
+        if (!result.success) {
+            if (result.error === "ADMIN_NOT_FOUND") {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "Admin not found"
+                });
+            }
+            if (result.error === "NOT_AN_ADMIN") {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "User is not an admin"
+                });
+            }
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: "Admin updated successfully",
+            admin: result.admin
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const deleteAdmin = async (req, res) => {
+    try {
+        const adminId = req.params.id;
+        const ownerId = req.user._id;
+
+        // Validate input
+        if (!adminId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Admin ID is required"
+            });
+        }
+
+        // Prevent owner from deleting themselves
+        if (ownerId.toString() === adminId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Cannot delete yourself"
+            });
+        }
+
+        const result = await ownerService.deleteAdmin(adminId, ownerId);
+
+        if (!result.success) {
+            if (result.error === "ADMIN_NOT_FOUND") {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "Admin not found"
+                });
+            }
+            if (result.error === "NOT_AN_ADMIN") {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "User is not an admin"
+                });
+            }
+            if (result.error === "CANNOT_DELETE_SELF") {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "Cannot delete yourself"
+                });
+            }
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: "Admin removed successfully"
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const getFinancialOverview = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+
+        const overview = await ownerService.getFinancialOverview(startDate, endDate);
+        return res.status(HTTP_STATUS.OK).json(overview);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const getCampaignFinancials = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const result = await ownerService.getCampaignFinancials(page, limit);
+        return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const getAdminActivities = async (req, res) => {
+    try {
+        const adminId = req.query.adminId || null;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+
+        const result = await ownerService.getAdminActivities(adminId, page, limit);
+        return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const getApprovalHistory = async (req, res) => {
+    try {
+        const filters = {
+            type: req.query.type || null,
+            adminId: req.query.adminId || null,
+            startDate: req.query.startDate || null,
+            endDate: req.query.endDate || null
+        };
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+
+        const result = await ownerService.getApprovalHistory(filters, page, limit);
+        return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const banAdmin = async (req, res) => {
+    try {
+        const adminId = req.params.id;
+        const { reason } = req.body;
+        const ownerId = req.user._id;
+
+        // Validate input
+        if (!adminId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Admin ID is required"
+            });
+        }
+
+        // Prevent owner from banning themselves
+        if (ownerId.toString() === adminId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Cannot ban yourself"
+            });
+        }
+
+        // Validate reason
+        if (reason && (typeof reason !== 'string' || reason.length > 500)) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Reason must be a string with max 500 characters"
+            });
+        }
+
+        const result = await ownerService.banAdmin(adminId, reason, ownerId);
+
+        if (!result.success) {
+            if (result.error === "ADMIN_NOT_FOUND") {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "Admin not found"
+                });
+            }
+            if (result.error === "NOT_AN_ADMIN") {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "User is not an admin"
+                });
+            }
+            if (result.error === "CANNOT_BAN_OWNER") {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "Cannot ban owner"
+                });
+            }
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: "Admin banned successfully",
+            admin: result.admin
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const unbanAdmin = async (req, res) => {
+    try {
+        const adminId = req.params.id;
+
+        const result = await ownerService.unbanAdmin(adminId);
+
+        if (!result.success) {
+            if (result.error === "ADMIN_NOT_FOUND") {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "Admin not found"
+                });
+            }
+            if (result.error === "NOT_AN_ADMIN") {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "User is not an admin"
+                });
+            }
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: "Admin unbanned successfully",
+            admin: result.admin
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+

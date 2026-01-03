@@ -16,12 +16,13 @@ export default function Header() {
     const [searchQuery, setSearchQuery] = useState("");
     const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
 
-    // Hide header on auth pages
+    // Hide header on auth pages, admin pages, and owner pages
     const authPages = ['/login', '/register', '/forgot-password'];
     const isAuthPage = authPages.includes(pathname);
     const isAdminPage = pathname.startsWith('/admin');
+    const isOwnerPage = pathname.startsWith('/owner');
 
-    if (isAuthPage || isAdminPage) {
+    if (isAuthPage || isAdminPage || isOwnerPage) {
         return null;
     }
 

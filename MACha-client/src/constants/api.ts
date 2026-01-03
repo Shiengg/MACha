@@ -145,3 +145,16 @@ export const CREATE_EVENT_UPDATE_ROUTE = (eventId: string) => `${EVENT_ROUTE}/${
 export const GET_EVENT_UPDATES_ROUTE = (eventId: string) => `${EVENT_ROUTE}/${eventId}/updates`;
 export const UPDATE_EVENT_UPDATE_ROUTE = (eventId: string, updateId: string) => `${EVENT_ROUTE}/${eventId}/updates/${updateId}`;
 export const DELETE_EVENT_UPDATE_ROUTE = (eventId: string, updateId: string) => `${EVENT_ROUTE}/${eventId}/updates/${updateId}`;
+
+export const OWNER_ROUTE = "api/owner";
+export const OWNER_DASHBOARD_ROUTE = `${OWNER_ROUTE}/dashboard`;
+export const OWNER_GET_ADMINS_ROUTE = `${OWNER_ROUTE}/admins`;
+export const OWNER_CREATE_ADMIN_ROUTE = `${OWNER_ROUTE}/admins`;
+export const OWNER_UPDATE_ADMIN_ROUTE = (adminId: string) => `${OWNER_ROUTE}/admins/${adminId}`;
+export const OWNER_DELETE_ADMIN_ROUTE = (adminId: string) => `${OWNER_ROUTE}/admins/${adminId}`;
+export const OWNER_BAN_ADMIN_ROUTE = (adminId: string) => `${OWNER_ROUTE}/admins/${adminId}/ban`;
+export const OWNER_UNBAN_ADMIN_ROUTE = (adminId: string) => `${OWNER_ROUTE}/admins/${adminId}/unban`;
+export const OWNER_FINANCIAL_OVERVIEW_ROUTE = `${OWNER_ROUTE}/financial-overview`;
+export const OWNER_CAMPAIGN_FINANCIALS_ROUTE = `${OWNER_ROUTE}/financial/campaigns`;
+export const OWNER_ADMIN_ACTIVITIES_ROUTE = `${OWNER_ROUTE}/admin-activities`;
+export const OWNER_APPROVAL_HISTORY_ROUTE = `${OWNER_ROUTE}/approval-history`;
