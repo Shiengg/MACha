@@ -688,7 +688,7 @@ export const getAdminActivities = async (adminId = null, page = 1, limit = 20) =
             };
         }
 
-        const admin = await User.findById(adminId).select("_id username");
+        const admin = await User.findById(adminId).select("_id username role");
         if (!admin || admin.role !== "admin") {
             return {
                 statistics: {
@@ -712,7 +712,8 @@ export const getAdminActivities = async (adminId = null, page = 1, limit = 20) =
                 }
             };
         }
-        adminIds = [adminId];
+        // Use admin._id (ObjectId) instead of adminId (string) for proper MongoDB matching
+        adminIds = [admin._id];
         adminInfo = {
             _id: admin._id,
             username: admin.username
@@ -747,6 +748,14 @@ export const getAdminActivities = async (adminId = null, page = 1, limit = 20) =
         };
     }
 
+    // Ensure adminIds are ObjectIds for proper matching
+    const adminIdsAsObjectIds = adminIds.map(id => {
+        if (id instanceof mongoose.Types.ObjectId) {
+            return id;
+        }
+        return new mongoose.Types.ObjectId(id);
+    });
+    
     const [
         campaignApprovalsCount,
         campaignRejectionsCount,
@@ -758,19 +767,19 @@ export const getAdminActivities = async (adminId = null, page = 1, limit = 20) =
         withdrawalApprovalsCount,
         withdrawalRejectionsCount
     ] = await Promise.all([
-        Campaign.countDocuments({ approved_by: { $in: adminIds } }),
-        Campaign.countDocuments({ rejected_by: { $in: adminIds } }),
-        Event.countDocuments({ approved_by: { $in: adminIds } }),
-        Event.countDocuments({ rejected_by: { $in: adminIds } }),
-        KYC.countDocuments({ verified_by: { $in: adminIds } }),
-        KYC.countDocuments({ rejected_by: { $in: adminIds } }),
-        Report.countDocuments({ reviewed_by: { $in: adminIds } }),
+        Campaign.countDocuments({ approved_by: { $in: adminIdsAsObjectIds } }),
+        Campaign.countDocuments({ rejected_by: { $in: adminIdsAsObjectIds } }),
+        Event.countDocuments({ approved_by: { $in: adminIdsAsObjectIds } }),
+        Event.countDocuments({ rejected_by: { $in: adminIdsAsObjectIds } }),
+        KYC.countDocuments({ verified_by: { $in: adminIdsAsObjectIds } }),
+        KYC.countDocuments({ rejected_by: { $in: adminIdsAsObjectIds } }),
+        Report.countDocuments({ reviewed_by: { $in: adminIdsAsObjectIds } }),
         Escrow.countDocuments({ 
-            admin_reviewed_by: { $in: adminIds },
+            admin_reviewed_by: { $in: adminIdsAsObjectIds },
             request_status: "admin_approved"
         }),
         Escrow.countDocuments({ 
-            admin_reviewed_by: { $in: adminIds },
+            admin_reviewed_by: { $in: adminIdsAsObjectIds },
             request_status: "admin_rejected"
         })
     ]);
