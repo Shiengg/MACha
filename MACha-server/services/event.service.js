@@ -1,9 +1,10 @@
 import mongoose from "mongoose";
 import Event from "../models/event.js";
 import EventRSVP from "../models/eventRSVP.js";
-import EventHost from "../models/eventHost.js";
 import EventUpdate from "../models/eventUpdate.js";
 import { redisClient } from "../config/redis.js";
+import { publishEvent } from "./tracking.service.js";
+import * as queueService from "./queue.service.js";
 
 const invalidateEventCaches = async (eventId, category = null, status = null) => {
     const keys = [
@@ -53,12 +54,10 @@ export const getEventById = async (eventId, userId = null) => {
     const eventKey = `event:${eventId}`;
     const cached = await redisClient.get(eventKey);
     
-    // Convert eventId to ObjectId for aggregate query
     const eventObjectId = mongoose.Types.ObjectId.isValid(eventId) 
         ? new mongoose.Types.ObjectId(eventId) 
         : eventId;
     
-    // Always calculate fresh rsvpStats since they change frequently
     const rsvpStatsResult = await EventRSVP.aggregate([
         { $match: { event: eventObjectId } },
         { $group: { _id: "$status", count: { $sum: 1 }, guests: { $sum: "$guests_count" } } }
@@ -79,18 +78,13 @@ export const getEventById = async (eventId, userId = null) => {
     
     if (cached) {
         const event = JSON.parse(cached);
-        // Update rsvpStats with fresh data
         event.rsvpStats = stats;
         
         if (userId) {
-            const [rsvp, isHost] = await Promise.all([
-                EventRSVP.findOne({ event: eventId, user: userId }),
-                EventHost.findOne({ event: eventId, user: userId })
-            ]);
+            const rsvp = await EventRSVP.findOne({ event: eventId, user: userId });
             return {
                 ...event,
-                userRSVP: rsvp,
-                isHost: !!isHost
+                userRSVP: rsvp
             };
         }
         return event;
@@ -101,27 +95,19 @@ export const getEventById = async (eventId, userId = null) => {
     
     if (!event) return null;
     
-    const hosts = await EventHost.find({ event: eventId }).populate("user", "username fullname avatar");
-    
     const result = {
         ...event.toObject(),
-        hosts: hosts.map(h => h.user),
         rsvpStats: stats
     };
     
     if (userId) {
-        const [rsvp, isHost] = await Promise.all([
-            EventRSVP.findOne({ event: eventId, user: userId }),
-            EventHost.findOne({ event: eventId, user: userId })
-        ]);
+        const rsvp = await EventRSVP.findOne({ event: eventId, user: userId });
         result.userRSVP = rsvp;
-        result.isHost = !!isHost;
     }
     
     const resultToCache = {
         ...result,
-        userRSVP: null,
-        isHost: false
+        userRSVP: null
     };
     await redisClient.setEx(eventKey, 300, JSON.stringify(resultToCache));
     return result;
@@ -143,10 +129,7 @@ export const updateEvent = async (eventId, userId, payload) => {
         return { success: false, error: 'NOT_FOUND' };
     }
     
-    const isCreator = event.creator.toString() === userId.toString();
-    const isCoHost = await EventHost.findOne({ event: eventId, user: userId });
-    
-    if (!isCreator && !isCoHost) {
+    if (event.creator.toString() !== userId.toString()) {
         return { success: false, error: 'FORBIDDEN' };
     }
     
@@ -189,7 +172,6 @@ export const deleteEvent = async (eventId, userId) => {
     
     await Promise.all([
         EventRSVP.deleteMany({ event: eventId }),
-        EventHost.deleteMany({ event: eventId }),
         EventUpdate.deleteMany({ event: eventId }),
         Event.findByIdAndDelete(eventId)
     ]);
@@ -205,10 +187,7 @@ export const cancelEvent = async (eventId, userId, reason) => {
         return { success: false, error: 'NOT_FOUND' };
     }
     
-    const isCreator = event.creator.toString() === userId.toString();
-    const isCoHost = await EventHost.findOne({ event: eventId, user: userId });
-    
-    if (!isCreator && !isCoHost) {
+    if (event.creator.toString() !== userId.toString()) {
         return { success: false, error: 'FORBIDDEN' };
     }
     
@@ -389,7 +368,6 @@ export const createRSVP = async (eventId, userId, payload) => {
     }
     
     if (payload.status === 'going' && event.capacity) {
-        // Convert eventId to ObjectId for queries
         const eventObjectId = mongoose.Types.ObjectId.isValid(eventId) 
             ? new mongoose.Types.ObjectId(eventId) 
             : eventId;
@@ -406,6 +384,9 @@ export const createRSVP = async (eventId, userId, payload) => {
         }
     }
     
+    const existingRSVP = await EventRSVP.findOne({ event: eventId, user: userId });
+    const isUpdate = !!existingRSVP;
+    
     const rsvp = await EventRSVP.findOneAndUpdate(
         { event: eventId, user: userId },
         { ...payload, event: eventId, user: userId },
@@ -415,6 +396,31 @@ export const createRSVP = async (eventId, userId, payload) => {
     await redisClient.del(`event:${eventId}`);
     await redisClient.del(`events:rsvp:${eventId}`);
     await redisClient.del(`events:rsvp:stats:${eventId}`);
+    
+    const rsvpStats = await getRSVPStats(eventId);
+    
+    const eventData = {
+        eventId: eventId.toString(),
+        userId: userId.toString(),
+        rsvp: {
+            _id: rsvp._id.toString(),
+            status: rsvp.status,
+            guests_count: rsvp.guests_count || 0,
+            user: {
+                _id: rsvp.user._id.toString(),
+                username: rsvp.user.username,
+                fullname: rsvp.user.fullname,
+                avatar: rsvp.user.avatar
+            }
+        },
+        rsvpStats: rsvpStats
+    };
+    
+    if (isUpdate) {
+        await publishEvent("tracking:event:rsvp:updated", eventData);
+    } else {
+        await publishEvent("tracking:event:rsvp:created", eventData);
+    }
     
     return { success: true, rsvp };
 };
@@ -434,6 +440,16 @@ export const deleteRSVP = async (eventId, userId) => {
     await redisClient.del(`event:${eventId}`);
     await redisClient.del(`events:rsvp:${eventId}`);
     await redisClient.del(`events:rsvp:stats:${eventId}`);
+    
+    const rsvpStats = await getRSVPStats(eventId);
+    
+    const eventData = {
+        eventId: eventId.toString(),
+        userId: userId.toString(),
+        rsvpStats: rsvpStats
+    };
+    
+    await publishEvent("tracking:event:rsvp:deleted", eventData);
     
     return { success: true };
 };
@@ -488,99 +504,13 @@ export const getRSVPList = async (eventId, filters = {}) => {
     return rsvps;
 };
 
-export const addHost = async (eventId, userId, targetUserId) => {
-    const event = await Event.findById(eventId);
-    if (!event) {
-        return { success: false, error: 'EVENT_NOT_FOUND' };
-    }
-    
-    if (event.creator.toString() !== userId.toString()) {
-        return { success: false, error: 'FORBIDDEN' };
-    }
-    
-    if (event.creator.toString() === targetUserId.toString()) {
-        return { success: false, error: 'CANNOT_ADD_CREATOR' };
-    }
-    
-    const existingHost = await EventHost.findOne({ event: eventId, user: targetUserId });
-    if (existingHost) {
-        return { success: false, error: 'ALREADY_HOST' };
-    }
-    
-    const host = await EventHost.create({
-        event: eventId,
-        user: targetUserId,
-        role: 'co_host',
-        added_by: userId
-    });
-    
-    await host.populate("user", "username fullname avatar");
-    await redisClient.del(`event:${eventId}`);
-    await redisClient.del(`events:hosts:${eventId}`);
-    
-    return { success: true, host };
-};
-
-export const removeHost = async (eventId, userId, targetUserId) => {
-    const event = await Event.findById(eventId);
-    if (!event) {
-        return { success: false, error: 'EVENT_NOT_FOUND' };
-    }
-    
-    if (event.creator.toString() !== userId.toString()) {
-        return { success: false, error: 'FORBIDDEN' };
-    }
-    
-    const host = await EventHost.findOneAndDelete({ event: eventId, user: targetUserId });
-    if (!host) {
-        return { success: false, error: 'NOT_FOUND' };
-    }
-    
-    await redisClient.del(`event:${eventId}`);
-    await redisClient.del(`events:hosts:${eventId}`);
-    
-    return { success: true };
-};
-
-export const getHosts = async (eventId) => {
-    const cacheKey = `events:hosts:${eventId}`;
-    const cached = await redisClient.get(cacheKey);
-    if (cached) return JSON.parse(cached);
-    
-    const hosts = await EventHost.find({ event: eventId })
-        .populate("user", "username fullname avatar")
-        .populate("added_by", "username");
-    
-    await redisClient.setEx(cacheKey, 300, JSON.stringify(hosts));
-    return hosts;
-};
-
-export const getEventsByHost = async (userId) => {
-    const cacheKey = `events:host:${userId}`;
-    const cached = await redisClient.get(cacheKey);
-    if (cached) return JSON.parse(cached);
-    
-    const hostEvents = await EventHost.find({ user: userId })
-        .populate({
-            path: "event",
-            populate: { path: "creator", select: "username fullname avatar" }
-        });
-    
-    const events = hostEvents.map(he => he.event).filter(e => e);
-    await redisClient.setEx(cacheKey, 300, JSON.stringify(events));
-    return events;
-};
-
 export const createEventUpdate = async (eventId, userId, payload) => {
     const event = await Event.findById(eventId);
     if (!event) {
         return { success: false, error: 'EVENT_NOT_FOUND' };
     }
     
-    const isCreator = event.creator.toString() === userId.toString();
-    const isCoHost = await EventHost.findOne({ event: eventId, user: userId });
-    
-    if (!isCreator && !isCoHost) {
+    if (event.creator.toString() !== userId.toString()) {
         return { success: false, error: 'FORBIDDEN' };
     }
     
@@ -592,6 +522,35 @@ export const createEventUpdate = async (eventId, userId, payload) => {
     
     await update.populate("author", "username fullname avatar");
     await redisClient.del(`events:updates:${eventId}`);
+    
+    try {
+        await queueService.pushJob({
+            type: "EVENT_UPDATE_CREATED",
+            eventId: eventId.toString(),
+            userId: userId.toString(),
+            updateContent: payload.content || 'Có cập nhật mới về sự kiện',
+            eventTitle: event.title
+        });
+    } catch (queueError) {
+        console.error('Error queueing event update notification job:', queueError);
+    }
+    
+    try {
+        const updateObject = update.toObject ? update.toObject() : JSON.parse(JSON.stringify(update));
+        const eventData = {
+            updateId: update._id.toString(),
+            eventId: eventId.toString(),
+            authorId: userId.toString(),
+            event: {
+                _id: event._id.toString(),
+                title: event.title
+            },
+            update: updateObject
+        };
+        await publishEvent("tracking:event:update:created", eventData);
+    } catch (eventError) {
+        console.error('Error publishing event update created event:', eventError);
+    }
     
     return { success: true, update };
 };
@@ -642,9 +601,8 @@ export const deleteEventUpdate = async (updateId, userId) => {
     const event = await Event.findById(update.event);
     const isAuthor = update.author.toString() === userId.toString();
     const isCreator = event?.creator.toString() === userId.toString();
-    const isCoHost = await EventHost.findOne({ event: update.event, user: userId });
     
-    if (!isAuthor && !isCreator && !isCoHost) {
+    if (!isAuthor && !isCreator) {
         return { success: false, error: 'FORBIDDEN' };
     }
     
@@ -715,5 +673,48 @@ export const getUpcomingRSVPs = async (userId) => {
     const events = rsvps.filter(rsvp => rsvp.event).map(rsvp => rsvp.event);
     await redisClient.setEx(cacheKey, 300, JSON.stringify(events));
     return events;
+};
+
+export const processExpiredEvents = async () => {
+    const now = new Date();
+    
+    const expiredEvents = await Event.find({
+        status: 'published',
+        $or: [
+            { end_date: { $lt: now } },
+            { start_date: { $lt: now }, end_date: null }
+        ]
+    });
+    
+    const results = [];
+    
+    for (const event of expiredEvents) {
+        try {
+            const oldCategory = event.category;
+            
+            event.status = 'completed';
+            await event.save();
+            
+            await invalidateEventCaches(event._id, oldCategory, 'published');
+            await invalidateEventCaches(event._id, oldCategory, 'completed');
+            
+            results.push({
+                eventId: event._id.toString(),
+                success: true,
+                title: event.title
+            });
+            
+            console.log(`[Expired Event] Event ${event._id} (${event.title}) marked as completed`);
+        } catch (error) {
+            console.error(`[Expired Event] Error processing event ${event._id}:`, error);
+            results.push({
+                eventId: event._id.toString(),
+                success: false,
+                error: error.message
+            });
+        }
+    }
+    
+    return results;
 };
 

@@ -8,6 +8,26 @@ import { redisClient } from "../config/redis.js";
 import * as queueService from "./queue.service.js";
 import * as postService from "./post.service.js";
 
+const invalidateEventCaches = async (eventId, category = null, status = null) => {
+    const keys = [
+        `event:${eventId}`,
+        'events:all',
+        'events:pending',
+        'events:upcoming',
+        'events:past'
+    ];
+    
+    if (category) {
+        keys.push(`events:category:${category}`);
+    }
+    
+    if (status) {
+        keys.push(`events:status:${status}`);
+    }
+    
+    await Promise.all(keys.map(key => redisClient.del(key)));
+};
+
 const removeReportedItem = async (reportedType, reportedId, resolutionDetails, adminId = null) => {
     const reportedModelMap = {
         post: Post,
@@ -68,7 +88,25 @@ const removeReportedItem = async (reportedType, reportedId, resolutionDetails, a
             reportedItem.status = 'cancelled';
             reportedItem.cancellation_reason = resolutionDetails || 'Removed due to report';
             reportedItem.cancelled_at = new Date();
+            reportedItem.cancelled_by = adminId;
             await reportedItem.save();
+            
+            try {
+                await invalidateEventCaches(reportedId, reportedItem.category, 'cancelled');
+            } catch (cacheError) {
+                console.error('Error invalidating event cache:', cacheError);
+            }
+            
+            try {
+                await queueService.pushJob({
+                    type: "EVENT_REMOVED",
+                    eventId: reportedId,
+                    adminId: adminId,
+                    resolutionDetails: resolutionDetails
+                });
+            } catch (error) {
+                console.error('Error pushing EVENT_REMOVED job:', error);
+            }
             break;
         case 'user':
             return { success: false, error: 'USER_SHOULD_BE_BANNED_NOT_REMOVED' };
@@ -118,7 +156,6 @@ const warnUser = async (reportedType, reportedId, adminId, resolutionDetails) =>
             return { ...banResult, auto_banned: true };
         }
 
-        // Gửi notification cho user bị cảnh báo (chỉ lần đầu tiên)
         try {
             await queueService.pushJob({
                 type: "USER_WARNED",
@@ -131,7 +168,6 @@ const warnUser = async (reportedType, reportedId, adminId, resolutionDetails) =>
         }
     }
 
-    // TODO: Implement warning storage if needed (e.g., warnings array in User model)
     console.log(`Warning issued to user ${userId} by admin ${adminId}: ${resolutionDetails || 'No details provided'}`);
     
     return { success: true, message: 'User warned successfully' };
@@ -172,8 +208,6 @@ const banUser = async (reportedType, reportedId, adminId, resolutionDetails) => 
     user.banned_by = adminId;
     user.ban_reason = resolutionDetails || 'Banned due to report';
     await user.save();
-
-    // TODO: Gửi email thông báo cho user khi bị ban
 
     return { success: true, message: 'User banned successfully' };
 };

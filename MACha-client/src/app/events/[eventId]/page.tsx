@@ -6,9 +6,13 @@ import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import { eventService, Event, EventRSVP, EventUpdate } from '@/services/event.service';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
-import { Calendar, MapPin, Users, Clock, User, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, User, CheckCircle, XCircle, MoreHorizontal, Edit } from 'lucide-react';
+import { FaFlag } from 'react-icons/fa';
 import Image from 'next/image';
 import Swal from 'sweetalert2';
+import ReportModal from '@/components/shared/ReportModal';
+import { getReportsByItem } from '@/services/report.service';
+import EditEventModal from '@/components/event/EditEventModal';
 
 function EventDetails() {
   const params = useParams();
@@ -23,6 +27,11 @@ function EventDetails() {
   const [loading, setLoading] = useState(true);
   const [rsvpLoading, setRsvpLoading] = useState(false);
   const [updatesLoading, setUpdatesLoading] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [hasReported, setHasReported] = useState(false);
+  const [isCheckingReport, setIsCheckingReport] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     if (eventId) {
@@ -70,6 +79,15 @@ function EventDetails() {
           };
         });
       }
+      
+      // If current user updated their RSVP, update local state
+      if (eventData.rsvp && user) {
+        const currentUserId = String(user._id || user.id || '');
+        const rsvpUserId = String(eventData.rsvp.user?._id || eventData.rsvp.user?.id || '');
+        if (rsvpUserId === currentUserId) {
+          setRSVP(eventData.rsvp);
+        }
+      }
     };
 
     const handleRSVPDeleted = (eventData: any) => {
@@ -95,21 +113,68 @@ function EventDetails() {
       }
       
       // If current user deleted their RSVP, update local state
-      const currentUserId = String(user?._id || user?.id || '');
-      const deletedUserId = String(eventData.userId || '');
-      if (deletedUserId === currentUserId) {
-        setRSVP(null);
+      if (user) {
+        const currentUserId = String(user._id || user.id || '');
+        const deletedUserId = String(eventData.userId || '');
+        if (deletedUserId === currentUserId) {
+          setRSVP(null);
+        }
+      }
+    };
+
+    const handleEventUpdateCreated = (eventData: any) => {
+      const receivedEventId = String(eventData.eventId || '');
+      const currentEventId = String(eventId || '');
+      
+      if (receivedEventId !== currentEventId) {
+        console.log('⚠️ Event ID mismatch for update:', receivedEventId, 'vs', currentEventId);
+        return;
+      }
+      
+      console.log('📢 Real-time event update received:', eventData);
+      
+      // Add new update to the list
+      if (eventData.update) {
+        setUpdates(prev => {
+          // Check if update already exists to avoid duplicates
+          const exists = prev.some(u => String(u._id) === String(eventData.update._id));
+          if (exists) return prev;
+          // Add to beginning of list
+          return [eventData.update, ...prev];
+        });
       }
     };
 
     socket.on('event:rsvp:updated', handleRSVPUpdated);
     socket.on('event:rsvp:deleted', handleRSVPDeleted);
+    socket.on('event:update:created', handleEventUpdateCreated);
 
     return () => {
       socket.off('event:rsvp:updated', handleRSVPUpdated);
       socket.off('event:rsvp:deleted', handleRSVPDeleted);
+      socket.off('event:update:created', handleEventUpdateCreated);
+      socket.emit('leave-room', eventRoom);
+      console.log(`🚪 Left event room: ${eventRoom}`);
     };
-  }, [socket, isConnected, eventId, event, user]);
+  }, [socket, isConnected, eventId, user]);
+
+  // Handle click outside dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (isDropdownOpen && !(target as Element).closest('.dropdown-container')) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
 
   const fetchEvent = async (forceRefresh = false) => {
     try {
@@ -277,7 +342,6 @@ function EventDetails() {
   const isPast = new Date(event.start_date) < new Date();
   const totalAttendees = (event.rsvpStats?.going.count || 0) + (event.rsvpStats?.going.guests || 0);
   const isCreator = user && (user._id === event.creator._id || user.id === event.creator._id);
-  const isHost = event.isHost || false;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -331,6 +395,76 @@ function EventDetails() {
                   </span>
                 </div>
               </div>
+              {user && isCreator && (event.status === 'published' || event.status === 'pending') && (
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="ml-4 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Edit className="w-4 h-4" />
+                  Chỉnh sửa
+                </button>
+              )}
+              {user && !isCreator && (
+                <div className="relative ml-4 dropdown-container">
+                  <button
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="w-10 h-10 flex items-center justify-center bg-gray-200 hover:bg-gray-300 dark:hover:bg-gray-700 rounded-full transition-colors"
+                    aria-label="More options"
+                  >
+                    <MoreHorizontal className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                  </button>
+                  {isDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                      <button
+                        onClick={async () => {
+                          setIsDropdownOpen(false);
+                          
+                          if (hasReported) {
+                            Swal.fire({
+                              icon: 'info',
+                              title: 'Đã báo cáo',
+                              text: 'Bạn đã báo cáo sự kiện này rồi. Vui lòng chờ admin xử lý.',
+                            });
+                            return;
+                          }
+
+                          setIsCheckingReport(true);
+                          try {
+                            const { reports } = await getReportsByItem('event', eventId);
+                            const currentUserId = (user as any)?._id || user?.id;
+                            const userReport = reports.find(
+                              (report) => report.reporter._id === currentUserId
+                            );
+                            
+                            if (userReport) {
+                              setHasReported(true);
+                              Swal.fire({
+                                icon: 'info',
+                                title: 'Đã báo cáo',
+                                text: 'Bạn đã báo cáo sự kiện này rồi. Vui lòng chờ admin xử lý.',
+                              });
+                            } else {
+                              setShowReportModal(true);
+                            }
+                          } catch (error) {
+                            console.error('Error checking report:', error);
+                            setShowReportModal(true);
+                          } finally {
+                            setIsCheckingReport(false);
+                          }
+                        }}
+                        disabled={isCheckingReport || hasReported}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <FaFlag className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                        <span className="text-sm font-medium">
+                          {hasReported ? 'Đã báo cáo' : 'Báo cáo sự kiện'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {event.description && (
@@ -504,6 +638,28 @@ function EventDetails() {
           </div>
         </div>
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        reportedType="event"
+        reportedId={eventId}
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        onSuccess={() => {
+          setHasReported(true);
+        }}
+      />
+
+      {/* Edit Event Modal */}
+      <EditEventModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        event={event}
+        onEventUpdated={() => {
+          fetchEvent(true);
+          setShowEditModal(false);
+        }}
+      />
     </div>
   );
 }

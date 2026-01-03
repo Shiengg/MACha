@@ -4,6 +4,9 @@ import Post from "../models/post.js";
 import Notification from "../models/notification.js";
 import User from "../models/user.js";
 import Campaign from "../models/campaign.js";
+import Event from "../models/event.js";
+import EventRSVP from "../models/eventRSVP.js";
+import mongoose from "mongoose";
 import connectDB from "../config/db.js";
 import * as notificationService from "../services/notification.service.js";
 import * as mailerService from "../utils/mailer.js";
@@ -34,7 +37,6 @@ async function processQueue() {
             const jobQueue = await workerRedisClient.brPop("job_queue", 5);
 
             if (!jobQueue) {
-                // Timeout - không có job, tiếp tục chờ
                 continue;
             }
 
@@ -82,6 +84,12 @@ async function processQueue() {
                 case "USER_WARNED":
                     await handleUserWarned(job);
                     break;
+                case "EVENT_UPDATE_CREATED":
+                    await handleEventUpdateCreated(job);
+                    break;
+                case "EVENT_REMOVED":
+                    await handleEventRemoved(job);
+                    break;
             }
         } catch (error) {
             console.error('Error processing job:', error);
@@ -107,7 +115,6 @@ async function handlePostLiked(job) {
             return;
         }
 
-        // 2. Lấy thông tin người like
         const liker = await User.findById(job.userId).select('username avatar');
 
         if (!liker) {
@@ -115,13 +122,10 @@ async function handlePostLiked(job) {
             return;
         }
 
-        // 3. Không tạo notification nếu tự like bài viết của mình
         if (post.user._id.toString() === job.userId) {
             console.log('User liked their own post, skip notification');
             return;
         }
-
-        // 4. Tạo notification trong database
         const notification = await notificationService.createNotification({
             receiver: post.user._id,
             sender: job.userId,
@@ -218,7 +222,6 @@ async function handleCampaignApproved(job) {
             return;
         }
 
-        // 2. Lấy thông tin creator (người nhận notification + email)
         const creator = await User.findById(job.creatorId)
             .select('username avatar email');
 
@@ -227,7 +230,6 @@ async function handleCampaignApproved(job) {
             return;
         }
 
-        // 3. Lấy thông tin admin (người gửi notification)
         const admin = await User.findById(job.adminId)
             .select('username avatar');
 
@@ -235,8 +237,6 @@ async function handleCampaignApproved(job) {
             console.log('Admin not found');
             return;
         }
-
-        // 4. Tạo notification trong database
         const notification = await notificationService.createNotification({
             receiver: creator._id,
             sender: admin._id,
@@ -288,7 +288,6 @@ async function handleCampaignRejected(job) {
             return;
         }
 
-        // 2. Lấy thông tin creator (người nhận notification + email)
         const creator = await User.findById(job.creatorId)
             .select('username avatar email');
 
@@ -297,7 +296,6 @@ async function handleCampaignRejected(job) {
             return;
         }
 
-        // 3. Lấy thông tin admin (người gửi notification)
         const admin = await User.findById(job.adminId)
             .select('username avatar');
 
@@ -305,8 +303,6 @@ async function handleCampaignRejected(job) {
             console.log('Admin not found');
             return;
         }
-
-        // 4. Tạo notification trong database
         const notification = await notificationService.createNotification({
             receiver: creator._id,
             sender: admin._id,
@@ -446,7 +442,6 @@ async function handlePostRemoved(job) {
             return;
         }
 
-        // Lấy thông tin creator (người nhận notification)
         const creator = post.user;
 
         if (!creator) {
@@ -454,13 +449,11 @@ async function handlePostRemoved(job) {
             return;
         }
 
-        // Lấy thông tin admin (người gửi notification) - có thể là null nếu không có adminId
         let admin = null;
         if (job.adminId) {
             admin = await User.findById(job.adminId).select('username avatar');
         }
 
-        // Tạo notification trong database
         const notification = await notificationService.createNotification({
             receiver: creator._id,
             sender: admin ? admin._id : null,
@@ -470,7 +463,6 @@ async function handlePostRemoved(job) {
             is_read: false
         });
 
-        // Publish notification event
         await notificationPublisher.publish('notification:new', JSON.stringify({
             recipientId: creator._id.toString(),
             notification: {
@@ -505,7 +497,6 @@ async function handleUserWarned(job) {
             return;
         }
 
-        // Lấy thông tin user bị cảnh báo
         const user = await User.findById(userId).select('_id username avatar');
 
         if (!user) {
@@ -513,13 +504,11 @@ async function handleUserWarned(job) {
             return;
         }
 
-        // Lấy thông tin admin (người gửi notification)
         let admin = null;
         if (job.adminId) {
             admin = await User.findById(job.adminId).select('username avatar');
         }
 
-        // Tạo notification trong database
         const notification = await notificationService.createNotification({
             receiver: user._id,
             sender: admin ? admin._id : null,
@@ -529,7 +518,6 @@ async function handleUserWarned(job) {
             is_read: false
         });
 
-        // Publish notification event
         await notificationPublisher.publish('notification:new', JSON.stringify({
             recipientId: user._id.toString(),
             notification: {
@@ -549,6 +537,185 @@ async function handleUserWarned(job) {
 
     } catch (error) {
         console.error('Error processing USER_WARNED job:', error);
+    }
+}
+
+async function handleEventUpdateCreated(job) {
+    try {
+        const { eventId, userId, updateContent, eventTitle } = job;
+
+        if (!eventId || !userId) {
+            console.log('Event ID or User ID not found in job');
+            return;
+        }
+
+        const event = await Event.findById(eventId).select('title');
+        if (!event) {
+            console.log('Event not found');
+            return;
+        }
+
+        const author = await User.findById(userId).select('username avatar');
+        if (!author) {
+            console.log('Author not found');
+            return;
+        }
+
+        const eventObjectId = mongoose.Types.ObjectId.isValid(eventId) 
+            ? new mongoose.Types.ObjectId(eventId) 
+            : eventId;
+        
+        const rsvps = await EventRSVP.find({
+            event: eventObjectId,
+            status: { $in: ['going', 'interested'] }
+        }).select('user').lean();
+        
+        const userIds = rsvps.map(rsvp => rsvp.user.toString()).filter(id => id !== userId.toString());
+        
+        if (userIds.length === 0) {
+            console.log('No RSVP users to notify');
+            return;
+        }
+
+        const notifications = userIds.map(receiverId => ({
+            receiver: receiverId,
+            sender: userId,
+            type: 'event_update',
+            event: eventId,
+            message: `Sự kiện "${event.title}" có cập nhật mới`,
+            content: updateContent || 'Có cập nhật mới về sự kiện',
+            is_read: false
+        }));
+        
+        // Create notifications in database
+        const createdNotifications = await Promise.all(
+            notifications.map(notif => notificationService.createNotification(notif))
+        );
+        
+        // Publish notifications to Redis for real-time delivery
+        for (let i = 0; i < createdNotifications.length; i++) {
+            try {
+                const notification = createdNotifications[i];
+                await notificationPublisher.publish('notification:new', JSON.stringify({
+                    recipientId: userIds[i],
+                    notification: {
+                        _id: notification._id.toString(),
+                        type: 'event_update',
+                        message: notifications[i].message,
+                        sender: {
+                            _id: userId.toString(),
+                            username: author.username,
+                            avatar: author.avatar
+                        },
+                        event: {
+                            _id: eventId.toString(),
+                            title: event.title
+                        },
+                        is_read: false,
+                        createdAt: notification.createdAt
+                    }
+                }));
+            } catch (notifError) {
+                console.error('Error publishing notification:', notifError);
+            }
+        }
+
+        console.log(`✅ Created ${createdNotifications.length} notifications for event update: ${eventId}`);
+    } catch (error) {
+        console.error('Error processing EVENT_UPDATE_CREATED job:', error);
+    }
+}
+
+async function handleEventRemoved(job) {
+    try {
+        const event = await Event.findById(job.eventId)
+            .populate('creator', '_id username avatar')
+            .select('creator title');
+
+        if (!event) {
+            console.log('Event not found');
+            return;
+        }
+
+        const creator = event.creator;
+
+        if (!creator) {
+            console.log('Creator not found');
+            return;
+        }
+
+        let admin = null;
+        if (job.adminId) {
+            admin = await User.findById(job.adminId).select('username avatar');
+        }
+
+        const eventObjectId = mongoose.Types.ObjectId.isValid(job.eventId) 
+            ? new mongoose.Types.ObjectId(job.eventId) 
+            : job.eventId;
+        
+        const rsvps = await EventRSVP.find({
+            event: eventObjectId,
+            status: { $in: ['going', 'interested'] }
+        }).select('user').lean();
+        
+        const userIds = rsvps.map(rsvp => rsvp.user.toString());
+        const creatorId = creator._id.toString();
+        
+        const allUserIds = [...new Set([creatorId, ...userIds])];
+        
+        const notifications = allUserIds.map(receiverId => {
+            const isCreator = receiverId === creatorId;
+            return {
+                receiver: receiverId,
+                sender: admin ? admin._id : null,
+                type: 'event_removed',
+                event: job.eventId,
+                message: isCreator 
+                    ? `Sự kiện "${event.title}" của bạn đã bị hủy do vi phạm Tiêu chuẩn của MACha`
+                    : `Sự kiện "${event.title}" mà bạn đã tham gia/quan tâm đã bị hủy`,
+                content: job.resolutionDetails || (isCreator 
+                    ? 'Sự kiện của bạn đã bị người dùng khác đánh dấu là vi phạm Tiêu chuẩn của MACha'
+                    : 'Sự kiện đã bị hủy do vi phạm Tiêu chuẩn của MACha'),
+                is_read: false
+            };
+        });
+        
+        const createdNotifications = await Promise.all(
+            notifications.map(notif => notificationService.createNotification(notif))
+        );
+        
+        for (let i = 0; i < createdNotifications.length; i++) {
+            try {
+                const notification = createdNotifications[i];
+                const isCreator = allUserIds[i] === creatorId;
+                await notificationPublisher.publish('notification:new', JSON.stringify({
+                    recipientId: allUserIds[i],
+                    notification: {
+                        _id: notification._id.toString(),
+                        type: 'event_removed',
+                        message: notifications[i].message,
+                        content: notifications[i].content,
+                        sender: admin ? {
+                            _id: admin._id,
+                            username: admin.username,
+                            avatar: admin.avatar
+                        } : null,
+                        event: {
+                            _id: event._id.toString(),
+                            title: event.title
+                        },
+                        is_read: false,
+                        createdAt: notification.createdAt
+                    }
+                }));
+            } catch (notifError) {
+                console.error('Error publishing notification:', notifError);
+            }
+        }
+
+        console.log(`✅ Created ${createdNotifications.length} notifications for event removed: ${job.eventId}`);
+    } catch (error) {
+        console.error('Error processing EVENT_REMOVED job:', error);
     }
 }
 

@@ -141,10 +141,6 @@ export const GET_EVENT_RSVP_ROUTE = (eventId: string) => `${EVENT_ROUTE}/${event
 export const DELETE_EVENT_RSVP_ROUTE = (eventId: string) => `${EVENT_ROUTE}/${eventId}/rsvp`;
 export const GET_EVENT_RSVP_STATS_ROUTE = (eventId: string) => `${EVENT_ROUTE}/${eventId}/rsvp/stats`;
 export const GET_EVENT_RSVP_LIST_ROUTE = (eventId: string) => `${EVENT_ROUTE}/${eventId}/rsvp/list`;
-export const ADD_EVENT_HOST_ROUTE = (eventId: string) => `${EVENT_ROUTE}/${eventId}/hosts`;
-export const REMOVE_EVENT_HOST_ROUTE = (eventId: string, userId: string) => `${EVENT_ROUTE}/${eventId}/hosts/${userId}`;
-export const GET_EVENT_HOSTS_ROUTE = (eventId: string) => `${EVENT_ROUTE}/${eventId}/hosts`;
-export const GET_EVENTS_BY_HOST_ROUTE = `${EVENT_ROUTE}/hosts/my-events`;
 export const CREATE_EVENT_UPDATE_ROUTE = (eventId: string) => `${EVENT_ROUTE}/${eventId}/updates`;
 export const GET_EVENT_UPDATES_ROUTE = (eventId: string) => `${EVENT_ROUTE}/${eventId}/updates`;
 export const UPDATE_EVENT_UPDATE_ROUTE = (eventId: string, updateId: string) => `${EVENT_ROUTE}/${eventId}/updates/${updateId}`;

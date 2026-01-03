@@ -19,10 +19,6 @@ import {
   DELETE_EVENT_RSVP_ROUTE,
   GET_EVENT_RSVP_STATS_ROUTE,
   GET_EVENT_RSVP_LIST_ROUTE,
-  ADD_EVENT_HOST_ROUTE,
-  REMOVE_EVENT_HOST_ROUTE,
-  GET_EVENT_HOSTS_ROUTE,
-  GET_EVENTS_BY_HOST_ROUTE,
   CREATE_EVENT_UPDATE_ROUTE,
   GET_EVENT_UPDATES_ROUTE,
   UPDATE_EVENT_UPDATE_ROUTE,
@@ -64,19 +60,12 @@ export interface Event {
   cancelled_at?: string;
   cancelled_by?: string;
   cancellation_reason?: string;
-  hosts?: Array<{
-    _id: string;
-    username: string;
-    fullname?: string;
-    avatar?: string;
-  }>;
   rsvpStats?: {
     going: { count: number; guests: number };
     interested: { count: number; guests: number };
     not_going: { count: number; guests: number };
   };
   userRSVP?: EventRSVP;
-  isHost?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,21 +82,6 @@ export interface EventRSVP {
   status: 'going' | 'interested' | 'not_going';
   guests_count: number;
   notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface EventHost {
-  _id: string;
-  event: string;
-  user: {
-    _id: string;
-    username: string;
-    fullname?: string;
-    avatar?: string;
-  };
-  role: 'creator' | 'co_host';
-  added_by: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -309,25 +283,6 @@ export const eventService = {
       params: filters,
     });
     return response.data.rsvps;
-  },
-
-  async addHost(eventId: string, userId: string): Promise<EventHost> {
-    const response = await apiClient.post(ADD_EVENT_HOST_ROUTE(eventId), { user_id: userId });
-    return response.data.host;
-  },
-
-  async removeHost(eventId: string, userId: string): Promise<void> {
-    await apiClient.delete(REMOVE_EVENT_HOST_ROUTE(eventId, userId));
-  },
-
-  async getHosts(eventId: string): Promise<EventHost[]> {
-    const response = await apiClient.get(GET_EVENT_HOSTS_ROUTE(eventId));
-    return response.data.hosts;
-  },
-
-  async getEventsByHost(): Promise<Event[]> {
-    const response = await apiClient.get(GET_EVENTS_BY_HOST_ROUTE);
-    return response.data.events;
   },
 
   async createEventUpdate(eventId: string, payload: CreateEventUpdatePayload): Promise<EventUpdate> {
