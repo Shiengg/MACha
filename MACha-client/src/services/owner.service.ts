@@ -1,6 +1,7 @@
 import apiClient from "@/lib/api-client";
 import {
   OWNER_DASHBOARD_ROUTE,
+  OWNER_GET_USERS_ROUTE,
   OWNER_GET_ADMINS_ROUTE,
   OWNER_CREATE_ADMIN_ROUTE,
   OWNER_UPDATE_ADMIN_ROUTE,
@@ -82,6 +83,7 @@ export interface FinancialOverview {
   escrow: {
     total_released: number;
     released_count: number;
+    by_month: Array<{ _id: { year: number; month: number }; total: number; count: number }>;
     pending_amount: number;
     pending_count: number;
   };
@@ -166,6 +168,14 @@ export interface GetAdminsResponse {
   };
 }
 
+export interface CreateAdminData {
+  username: string;
+  email: string;
+  password: string;
+  fullname?: string;
+  avatar?: string;
+}
+
 export interface CreateAdminResponse {
   message: string;
   admin: Admin;
@@ -233,6 +243,11 @@ export const ownerService = {
     return response.data;
   },
 
+  async getUsersForAdminCreation(): Promise<any[]> {
+    const response = await apiClient.get(OWNER_GET_USERS_ROUTE, { withCredentials: true });
+    return response.data.users || [];
+  },
+
   async getAdmins(filters: GetAdminsFilters = {}): Promise<GetAdminsResponse> {
     const { page = 1, limit = 10 } = filters;
     const response = await apiClient.get(OWNER_GET_ADMINS_ROUTE, {
@@ -242,10 +257,10 @@ export const ownerService = {
     return response.data;
   },
 
-  async createAdmin(userId: string): Promise<CreateAdminResponse> {
+  async createAdmin(adminData: { username: string; email: string; password: string; fullname?: string; avatar?: string }): Promise<CreateAdminResponse> {
     const response = await apiClient.post(
       OWNER_CREATE_ADMIN_ROUTE,
-      { userId },
+      adminData,
       { withCredentials: true }
     );
     return response.data;

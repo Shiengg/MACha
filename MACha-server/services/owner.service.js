@@ -269,6 +269,14 @@ export const getDashboard = async () => {
     };
 };
 
+export const getUsersForAdminCreation = async () => {
+    const users = await User.find({ role: "user" })
+        .select("_id username email fullname avatar")
+        .sort({ username: 1 });
+    
+    return users;
+};
+
 export const getAdmins = async (page = 1, limit = 10) => {
     const skip = (page - 1) * limit;
 
@@ -330,25 +338,54 @@ export const getAdmins = async (page = 1, limit = 10) => {
     };
 };
 
-export const createAdmin = async (userId) => {
-    const user = await User.findById(userId);
-    
-    if (!user) {
-        return { success: false, error: "USER_NOT_FOUND" };
+export const createAdmin = async (adminData) => {
+    const { username, email, password, fullname, avatar } = adminData;
+
+    // Validate required fields
+    if (!username || !email || !password) {
+        return { success: false, error: "MISSING_REQUIRED_FIELDS" };
     }
 
-    if (user.role === "admin") {
-        return { success: false, error: "ALREADY_ADMIN" };
+    // Validate password length
+    if (password.length < 6) {
+        return { success: false, error: "PASSWORD_TOO_SHORT" };
     }
 
-    if (user.role === "owner") {
-        return { success: false, error: "CANNOT_DEMOTE_OWNER" };
+    // Check if username or email already exists
+    const existingUser = await User.findOne({
+        $or: [
+            { username: username.trim() },
+            { email: email.trim().toLowerCase() }
+        ]
+    });
+
+    if (existingUser) {
+        if (existingUser.username === username.trim()) {
+            return { success: false, error: "USERNAME_EXISTS" };
+        }
+        if (existingUser.email === email.trim().toLowerCase()) {
+            return { success: false, error: "EMAIL_EXISTS" };
+        }
     }
 
-    user.role = "admin";
-    await user.save();
+    // Create new admin user
+    const newAdmin = new User({
+        username: username.trim(),
+        email: email.trim().toLowerCase(),
+        password: password, // Will be hashed by pre-save hook
+        fullname: fullname?.trim() || "",
+        avatar: avatar || "",
+        role: "admin",
+        is_verified: true // Auto-verify admin accounts created by owner
+    });
 
-    return { success: true, admin: user };
+    await newAdmin.save();
+
+    // Return admin without password
+    const adminResponse = newAdmin.toObject();
+    delete adminResponse.password;
+
+    return { success: true, admin: adminResponse };
 };
 
 export const updateAdmin = async (adminId, updates) => {
@@ -469,6 +506,7 @@ export const getFinancialOverview = async (startDate, endDate) => {
         donationsByMonth,
         donationsByDay,
         totalReleased,
+        releasedByMonth,
         pendingEscrows
     ] = await Promise.all([
         Donation.aggregate([
@@ -513,6 +551,20 @@ export const getFinancialOverview = async (startDate, endDate) => {
             { $group: { _id: null, total: { $sum: "$withdrawal_request_amount" }, count: { $sum: 1 } } }
         ]),
         Escrow.aggregate([
+            { $match: escrowReleasedMatch },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: "$released_at" },
+                        month: { $month: "$released_at" }
+                    },
+                    total: { $sum: "$withdrawal_request_amount" },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } }
+        ]),
+        Escrow.aggregate([
             { $match: escrowPendingMatch },
             { $group: { _id: null, total: { $sum: "$withdrawal_request_amount" }, count: { $sum: 1 } } }
         ])
@@ -529,6 +581,7 @@ export const getFinancialOverview = async (startDate, endDate) => {
         escrow: {
             total_released: totalReleased[0]?.total || 0,
             released_count: totalReleased[0]?.count || 0,
+            by_month: releasedByMonth,
             pending_amount: pendingEscrows[0]?.total || 0,
             pending_count: pendingEscrows[0]?.count || 0
         },

@@ -6,7 +6,15 @@ import OwnerHeader from '@/components/owner/OwnerHeader';
 import { ownerService, Admin } from '@/services/owner.service';
 import Swal from 'sweetalert2';
 import { Plus, Search, Edit, Trash2, UserPlus, Ban, Unlock, Eye, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
-import { getAllUsers, User } from '@/services/admin/user.service';
+
+interface User {
+  _id: string;
+  username: string;
+  email: string;
+  fullname?: string;
+  avatar?: string;
+  role: string;
+}
 import { useRouter } from 'next/navigation';
 
 export default function OwnerAdmins() {
@@ -20,8 +28,7 @@ export default function OwnerAdmins() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showBanModal, setShowBanModal] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState('');
+  const [createForm, setCreateForm] = useState({ username: '', email: '', password: '', fullname: '', avatar: '' });
   const [editForm, setEditForm] = useState({ fullname: '', avatar: '', bio: '' });
   const [banReason, setBanReason] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -32,7 +39,6 @@ export default function OwnerAdmins() {
 
   useEffect(() => {
     fetchAdmins();
-    fetchUsers();
   }, [currentPage]);
 
   const fetchAdmins = async () => {
@@ -52,36 +58,41 @@ export default function OwnerAdmins() {
     }
   };
 
-  const fetchUsers = async () => {
-    try {
-      const data = await getAllUsers();
-      setUsers(data.filter(u => u.role === 'user'));
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    }
-  };
-
   const handleCreateAdmin = async () => {
-    if (!selectedUserId) {
+    if (!createForm.username || !createForm.email || !createForm.password) {
       Swal.fire({
         icon: 'warning',
         title: 'Warning',
-        text: 'Please select a user',
+        text: 'Please fill in all required fields (username, email, password)',
+      });
+      return;
+    }
+
+    if (createForm.password.length < 6) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Warning',
+        text: 'Password must be at least 6 characters',
       });
       return;
     }
 
     try {
-      await ownerService.createAdmin(selectedUserId);
+      await ownerService.createAdmin({
+        username: createForm.username,
+        email: createForm.email,
+        password: createForm.password,
+        fullname: createForm.fullname || undefined,
+        avatar: createForm.avatar || undefined,
+      });
       Swal.fire({
         icon: 'success',
         title: 'Success',
         text: 'Admin created successfully',
       });
       setShowCreateModal(false);
-      setSelectedUserId('');
+      setCreateForm({ username: '', email: '', password: '', fullname: '', avatar: '' });
       fetchAdmins();
-      fetchUsers();
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
@@ -133,7 +144,6 @@ export default function OwnerAdmins() {
           text: 'Admin removed successfully',
         });
         fetchAdmins();
-        fetchUsers();
       } catch (error: any) {
         Swal.fire({
           icon: 'error',
@@ -540,34 +550,81 @@ export default function OwnerAdmins() {
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Thêm Admin</h2>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Select User</label>
-              <select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value="">-- Select User --</option>
-                {users.map((user) => (
-                  <option key={user._id} value={user._id}>
-                    {user.username} ({user.email})
-                  </option>
-                ))}
-              </select>
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Tạo Admin Mới</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Username <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={createForm.username}
+                  onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
+                  placeholder="Enter username"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                  placeholder="Enter email"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                  placeholder="Enter password (min 6 characters)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                <input
+                  type="text"
+                  value={createForm.fullname}
+                  onChange={(e) => setCreateForm({ ...createForm, fullname: e.target.value })}
+                  placeholder="Enter full name (optional)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Avatar URL</label>
+                <input
+                  type="text"
+                  value={createForm.avatar}
+                  onChange={(e) => setCreateForm({ ...createForm, avatar: e.target.value })}
+                  placeholder="Enter avatar URL (optional)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 mt-6">
               <button
                 onClick={handleCreateAdmin}
                 className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
               >
-                Create
+                Create Admin
               </button>
               <button
                 onClick={() => {
                   setShowCreateModal(false);
-                  setSelectedUserId('');
+                  setCreateForm({ username: '', email: '', password: '', fullname: '', avatar: '' });
                 }}
                 className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >

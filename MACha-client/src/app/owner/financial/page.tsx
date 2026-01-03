@@ -34,8 +34,12 @@ export default function OwnerFinancial() {
 
   const getMaxValue = () => {
     if (!data) return 1;
-    const maxDonated = Math.max(...(data.donations.by_month || []).map(d => d.total), 0);
-    const maxReleased = Math.max(...(data.escrow.total_released || 0), 0);
+    const maxDonated = (data.donations.by_month || []).length > 0
+      ? Math.max(...(data.donations.by_month || []).map(d => d.total), 0)
+      : 0;
+    const maxReleased = (data.escrow.by_month || []).length > 0
+      ? Math.max(...(data.escrow.by_month || []).map(r => r.total), 0)
+      : 0;
     return Math.max(maxDonated, maxReleased, 1);
   };
 
@@ -194,12 +198,12 @@ export default function OwnerFinancial() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Tiền ra theo tháng (Line Chart)</h3>
               <div className="h-64 relative">
                 <svg viewBox="0 0 400 200" className="w-full h-full">
-                  {(data.donations.by_month || []).map((month, index, array) => {
+                  {(data.escrow.by_month || []).map((month, index, array) => {
                     const x = 50 + (index * (350 / Math.max(array.length - 1, 1)));
-                    const released = data.escrow.total_released / (array.length || 1);
-                    const y = 180 - ((released / maxValue) * 150);
+                    const y = 180 - ((month.total / maxValue) * 150);
                     const nextX = index < array.length - 1 ? 50 + ((index + 1) * (350 / Math.max(array.length - 1, 1))) : x;
-                    const nextY = y;
+                    const nextItem = array[index + 1];
+                    const nextY = nextItem ? 180 - ((nextItem.total / maxValue) * 150) : y;
                     
                     return (
                       <g key={`released-${index}`}>
@@ -233,7 +237,10 @@ export default function OwnerFinancial() {
                   const x = 50 + (index * 60);
                   const barWidth = 25;
                   const donatedHeight = (month.total / maxValue) * 150;
-                  const releasedHeight = ((data.escrow.total_released / (data.donations.by_month?.length || 1)) / maxValue) * 150;
+                  const releasedMonth = data.escrow.by_month?.find(r => 
+                    r._id.year === month._id.year && r._id.month === month._id.month
+                  );
+                  const releasedHeight = releasedMonth ? (releasedMonth.total / maxValue) * 150 : 0;
                   
                   return (
                     <g key={`bar-${index}`}>

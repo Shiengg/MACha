@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
 import { ownerService, DashboardData } from '@/services/owner.service';
-import { Users, Shield, DollarSign, TrendingUp, TrendingDown, CheckCircle, XCircle, ArrowUpRight } from 'lucide-react';
+import { Users, Shield, DollarSign, TrendingUp, TrendingDown, CheckCircle, XCircle, ArrowUpRight, Activity, History } from 'lucide-react';
 import Link from 'next/link';
 
 export default function OwnerDashboard() {

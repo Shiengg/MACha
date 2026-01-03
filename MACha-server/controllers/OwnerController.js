@@ -10,6 +10,15 @@ export const getDashboard = async (req, res) => {
     }
 };
 
+export const getUsersForAdminCreation = async (req, res) => {
+    try {
+        const users = await ownerService.getUsersForAdminCreation();
+        return res.status(HTTP_STATUS.OK).json({ users });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
 export const getAdmins = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -24,44 +33,73 @@ export const getAdmins = async (req, res) => {
 
 export const createAdmin = async (req, res) => {
     try {
-        const { userId } = req.body;
+        const { username, email, password, fullname, avatar } = req.body;
 
-        // Validate input
-        if (!userId) {
+        // Validate required fields
+        if (!username || !email || !password) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({
-                message: "User ID is required"
+                message: "Username, email, and password are required"
             });
         }
 
-        if (typeof userId !== 'string' || userId.trim().length === 0) {
+        // Validate field formats
+        if (typeof username !== 'string' || username.trim().length < 3) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({
-                message: "Invalid user ID format"
+                message: "Username must be at least 3 characters"
             });
         }
 
-        // Prevent owner from creating themselves as admin
-        if (req.user._id.toString() === userId) {
+        if (typeof email !== 'string' || !email.includes('@')) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({
-                message: "Cannot create yourself as admin"
+                message: "Invalid email format"
             });
         }
 
-        const result = await ownerService.createAdmin(userId);
+        if (typeof password !== 'string' || password.length < 6) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Password must be at least 6 characters"
+            });
+        }
+
+        if (fullname && (typeof fullname !== 'string' || fullname.length > 100)) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Fullname must be a string with max 100 characters"
+            });
+        }
+
+        if (avatar && (typeof avatar !== 'string' || avatar.length > 500)) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Avatar URL must be a string with max 500 characters"
+            });
+        }
+
+        const result = await ownerService.createAdmin({
+            username,
+            email,
+            password,
+            fullname,
+            avatar
+        });
 
         if (!result.success) {
-            if (result.error === "USER_NOT_FOUND") {
-                return res.status(HTTP_STATUS.NOT_FOUND).json({
-                    message: "User not found"
-                });
-            }
-            if (result.error === "ALREADY_ADMIN") {
+            if (result.error === "MISSING_REQUIRED_FIELDS") {
                 return res.status(HTTP_STATUS.BAD_REQUEST).json({
-                    message: "User is already an admin"
+                    message: "Username, email, and password are required"
                 });
             }
-            if (result.error === "CANNOT_DEMOTE_OWNER") {
-                return res.status(HTTP_STATUS.FORBIDDEN).json({
-                    message: "Cannot change owner role"
+            if (result.error === "PASSWORD_TOO_SHORT") {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "Password must be at least 6 characters"
+                });
+            }
+            if (result.error === "USERNAME_EXISTS") {
+                return res.status(HTTP_STATUS.CONFLICT).json({
+                    message: "Username already exists"
+                });
+            }
+            if (result.error === "EMAIL_EXISTS") {
+                return res.status(HTTP_STATUS.CONFLICT).json({
+                    message: "Email already exists"
                 });
             }
         }

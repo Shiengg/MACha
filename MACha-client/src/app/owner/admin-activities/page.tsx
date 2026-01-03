@@ -5,7 +5,14 @@ import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
 import { ownerService, AdminActivities } from '@/services/owner.service';
 import { Activity, CheckCircle, XCircle, FileText, DollarSign, Filter, Calendar } from 'lucide-react';
-import { getAllUsers, User } from '@/services/admin/user.service';
+
+
+interface User {
+  _id: string;
+  username: string;
+  email: string;
+  role: string;
+}
 
 export default function OwnerAdminActivities() {
   const [data, setData] = useState<AdminActivities | null>(null);
@@ -27,8 +34,13 @@ export default function OwnerAdminActivities() {
 
   const fetchAdmins = async () => {
     try {
-      const users = await getAllUsers();
-      setAdmins(users.filter(u => u.role === 'admin'));
+      const adminsData = await ownerService.getAdmins({ page: 1, limit: 100 });
+      setAdmins(adminsData.admins.map(a => ({
+        _id: a._id,
+        username: a.username,
+        email: a.email,
+        role: 'admin'
+      })));
     } catch (error) {
       console.error('Error fetching admins:', error);
     }
