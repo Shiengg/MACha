@@ -62,6 +62,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       console.log('🏠 Joined room:', data.room);
     });
 
+    socketInstance.on('event:join-room', (data: { eventId: string; room: string }) => {
+      console.log('📢 Server requested to join event room:', data.room);
+      socketInstance.emit('join-room', data.room);
+    });
+
     socketInstance.on('disconnect', (reason) => {
       console.log('❌ Socket.IO disconnected:', reason);
       setIsConnected(false);

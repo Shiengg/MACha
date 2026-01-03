@@ -4,6 +4,9 @@ import Post from "../models/post.js";
 import Notification from "../models/notification.js";
 import User from "../models/user.js";
 import Campaign from "../models/campaign.js";
+import Event from "../models/event.js";
+import EventRSVP from "../models/eventRSVP.js";
+import mongoose from "mongoose";
 import connectDB from "../config/db.js";
 import * as notificationService from "../services/notification.service.js";
 import * as mailerService from "../utils/mailer.js";
@@ -81,6 +84,9 @@ async function processQueue() {
                     break;
                 case "USER_WARNED":
                     await handleUserWarned(job);
+                    break;
+                case "EVENT_UPDATE_CREATED":
+                    await handleEventUpdateCreated(job);
                     break;
             }
         } catch (error) {
@@ -549,6 +555,96 @@ async function handleUserWarned(job) {
 
     } catch (error) {
         console.error('Error processing USER_WARNED job:', error);
+    }
+}
+
+async function handleEventUpdateCreated(job) {
+    try {
+        const { eventId, userId, updateContent, eventTitle } = job;
+
+        if (!eventId || !userId) {
+            console.log('Event ID or User ID not found in job');
+            return;
+        }
+
+        // Lấy thông tin event
+        const event = await Event.findById(eventId).select('title');
+        if (!event) {
+            console.log('Event not found');
+            return;
+        }
+
+        // Lấy thông tin author (người tạo update)
+        const author = await User.findById(userId).select('username avatar');
+        if (!author) {
+            console.log('Author not found');
+            return;
+        }
+
+        // Get all users who RSVP'd (going or interested) to this event
+        const eventObjectId = mongoose.Types.ObjectId.isValid(eventId) 
+            ? new mongoose.Types.ObjectId(eventId) 
+            : eventId;
+        
+        const rsvps = await EventRSVP.find({
+            event: eventObjectId,
+            status: { $in: ['going', 'interested'] }
+        }).select('user').lean();
+        
+        const userIds = rsvps.map(rsvp => rsvp.user.toString()).filter(id => id !== userId.toString());
+        
+        // Create notifications for all RSVP users (except the creator)
+        if (userIds.length === 0) {
+            console.log('No RSVP users to notify');
+            return;
+        }
+
+        const notifications = userIds.map(receiverId => ({
+            receiver: receiverId,
+            sender: userId,
+            type: 'event_update',
+            event: eventId,
+            message: `Sự kiện "${event.title}" có cập nhật mới`,
+            content: updateContent || 'Có cập nhật mới về sự kiện',
+            is_read: false
+        }));
+        
+        // Create notifications in database
+        const createdNotifications = await Promise.all(
+            notifications.map(notif => notificationService.createNotification(notif))
+        );
+        
+        // Publish notifications to Redis for real-time delivery
+        for (let i = 0; i < createdNotifications.length; i++) {
+            try {
+                const notification = createdNotifications[i];
+                await notificationPublisher.publish('notification:new', JSON.stringify({
+                    recipientId: userIds[i],
+                    notification: {
+                        _id: notification._id.toString(),
+                        type: 'event_update',
+                        message: notifications[i].message,
+                        sender: {
+                            _id: userId.toString(),
+                            username: author.username,
+                            avatar: author.avatar
+                        },
+                        event: {
+                            _id: eventId.toString(),
+                            title: event.title
+                        },
+                        is_read: false,
+                        createdAt: notification.createdAt
+                    }
+                }));
+            } catch (notifError) {
+                console.error('Error publishing notification:', notifError);
+            }
+        }
+
+        console.log(`✅ Created ${createdNotifications.length} notifications for event update: ${eventId}`);
+    } catch (error) {
+        console.error('Error processing EVENT_UPDATE_CREATED job:', error);
     }
 }
 

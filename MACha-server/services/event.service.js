@@ -4,6 +4,7 @@ import EventRSVP from "../models/eventRSVP.js";
 import EventUpdate from "../models/eventUpdate.js";
 import { redisClient } from "../config/redis.js";
 import { publishEvent } from "./tracking.service.js";
+import * as queueService from "./queue.service.js";
 
 const invalidateEventCaches = async (eventId, category = null, status = null) => {
     const keys = [
@@ -529,6 +530,37 @@ export const createEventUpdate = async (eventId, userId, payload) => {
     
     await update.populate("author", "username fullname avatar");
     await redisClient.del(`events:updates:${eventId}`);
+    
+    // Queue job to create notifications for RSVP users (non-blocking)
+    try {
+        await queueService.pushJob({
+            type: "EVENT_UPDATE_CREATED",
+            eventId: eventId.toString(),
+            userId: userId.toString(),
+            updateContent: payload.content || 'Có cập nhật mới về sự kiện',
+            eventTitle: event.title
+        });
+    } catch (queueError) {
+        console.error('Error queueing event update notification job:', queueError);
+    }
+    
+    // Publish event update to Redis for real-time updates
+    try {
+        const updateObject = update.toObject ? update.toObject() : JSON.parse(JSON.stringify(update));
+        const eventData = {
+            updateId: update._id.toString(),
+            eventId: eventId.toString(),
+            authorId: userId.toString(),
+            event: {
+                _id: event._id.toString(),
+                title: event.title
+            },
+            update: updateObject
+        };
+        await publishEvent("tracking:event:update:created", eventData);
+    } catch (eventError) {
+        console.error('Error publishing event update created event:', eventError);
+    }
     
     return { success: true, update };
 };

@@ -113,12 +113,37 @@ function EventDetails() {
       }
     };
 
+    const handleEventUpdateCreated = (eventData: any) => {
+      const receivedEventId = String(eventData.eventId || '');
+      const currentEventId = String(eventId || '');
+      
+      if (receivedEventId !== currentEventId) {
+        console.log('⚠️ Event ID mismatch for update:', receivedEventId, 'vs', currentEventId);
+        return;
+      }
+      
+      console.log('📢 Real-time event update received:', eventData);
+      
+      // Add new update to the list
+      if (eventData.update) {
+        setUpdates(prev => {
+          // Check if update already exists to avoid duplicates
+          const exists = prev.some(u => String(u._id) === String(eventData.update._id));
+          if (exists) return prev;
+          // Add to beginning of list
+          return [eventData.update, ...prev];
+        });
+      }
+    };
+
     socket.on('event:rsvp:updated', handleRSVPUpdated);
     socket.on('event:rsvp:deleted', handleRSVPDeleted);
+    socket.on('event:update:created', handleEventUpdateCreated);
 
     return () => {
       socket.off('event:rsvp:updated', handleRSVPUpdated);
       socket.off('event:rsvp:deleted', handleRSVPDeleted);
+      socket.off('event:update:created', handleEventUpdateCreated);
       socket.emit('leave-room', eventRoom);
       console.log(`🚪 Left event room: ${eventRoom}`);
     };
