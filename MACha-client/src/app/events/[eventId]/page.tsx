@@ -6,12 +6,13 @@ import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import { eventService, Event, EventRSVP, EventUpdate } from '@/services/event.service';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
-import { Calendar, MapPin, Users, Clock, User, CheckCircle, XCircle, MoreHorizontal } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, User, CheckCircle, XCircle, MoreHorizontal, Edit } from 'lucide-react';
 import { FaFlag } from 'react-icons/fa';
 import Image from 'next/image';
 import Swal from 'sweetalert2';
 import ReportModal from '@/components/shared/ReportModal';
 import { getReportsByItem } from '@/services/report.service';
+import EditEventModal from '@/components/event/EditEventModal';
 
 function EventDetails() {
   const params = useParams();
@@ -30,6 +31,7 @@ function EventDetails() {
   const [hasReported, setHasReported] = useState(false);
   const [isCheckingReport, setIsCheckingReport] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     if (eventId) {
@@ -393,6 +395,15 @@ function EventDetails() {
                   </span>
                 </div>
               </div>
+              {user && isCreator && (event.status === 'published' || event.status === 'pending') && (
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="ml-4 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Edit className="w-4 h-4" />
+                  Chỉnh sửa
+                </button>
+              )}
               {user && !isCreator && (
                 <div className="relative ml-4 dropdown-container">
                   <button
@@ -636,6 +647,17 @@ function EventDetails() {
         onClose={() => setShowReportModal(false)}
         onSuccess={() => {
           setHasReported(true);
+        }}
+      />
+
+      {/* Edit Event Modal */}
+      <EditEventModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        event={event}
+        onEventUpdated={() => {
+          fetchEvent(true);
+          setShowEditModal(false);
         }}
       />
     </div>

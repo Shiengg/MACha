@@ -675,3 +675,46 @@ export const getUpcomingRSVPs = async (userId) => {
     return events;
 };
 
+export const processExpiredEvents = async () => {
+    const now = new Date();
+    
+    const expiredEvents = await Event.find({
+        status: 'published',
+        $or: [
+            { end_date: { $lt: now } },
+            { start_date: { $lt: now }, end_date: null }
+        ]
+    });
+    
+    const results = [];
+    
+    for (const event of expiredEvents) {
+        try {
+            const oldCategory = event.category;
+            
+            event.status = 'completed';
+            await event.save();
+            
+            await invalidateEventCaches(event._id, oldCategory, 'published');
+            await invalidateEventCaches(event._id, oldCategory, 'completed');
+            
+            results.push({
+                eventId: event._id.toString(),
+                success: true,
+                title: event.title
+            });
+            
+            console.log(`[Expired Event] Event ${event._id} (${event.title}) marked as completed`);
+        } catch (error) {
+            console.error(`[Expired Event] Error processing event ${event._id}:`, error);
+            results.push({
+                eventId: event._id.toString(),
+                success: false,
+                error: error.message
+            });
+        }
+    }
+    
+    return results;
+};
+

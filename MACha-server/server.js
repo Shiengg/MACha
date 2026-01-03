@@ -12,6 +12,7 @@ import * as routes from './routes/index.js';
 import './jobs/cleanupUnverifiedUsers.job.js';
 import './jobs/finalizeVotingPeriods.job.js';
 import './jobs/processExpiredCampaigns.job.js';
+import './jobs/processExpiredEvents.job.js';
 
 import { initSubscribers } from './subscribers/initSubscriber.js';
 import User from './models/user.js';
