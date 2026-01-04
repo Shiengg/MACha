@@ -53,6 +53,7 @@ export default function OwnerSidebar() {
       title: 'QUẢN LÝ HỆ THỐNG',
       items: [
         { icon: ShieldCheck, label: 'Quản lý Admin', href: '/owner/admins', badge: undefined },
+        { icon: Users, label: 'Quản lý Users', href: '/owner/users', badge: undefined },
         { icon: Wallet, label: 'Tài chính tổng quan', href: '/owner/financial' },
         { icon: ChartLine, label: 'Tài chính Campaign', href: '/owner/financial/campaigns' },
         { icon: Activity, label: 'Hoạt động Admin', href: '/owner/admin-activities' },

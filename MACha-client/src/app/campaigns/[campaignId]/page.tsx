@@ -19,6 +19,8 @@ import CreatePostModal from '@/components/shared/CreatePostModal';
 import ReportModal from '@/components/shared/ReportModal';
 import { getReportsByItem } from '@/services/report.service';
 import { FaFlag } from 'react-icons/fa';
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 function CampaignDetails() {
     const params = useParams();
@@ -987,6 +989,15 @@ function CampaignDetails() {
 
                     {/* Hero Content */}
                     <div className="relative max-w-6xl mx-auto px-4 pt-12">
+                        {user?.role === 'owner' && (
+                            <Link
+                                href="/owner/financial/campaigns"
+                                className="inline-flex items-center gap-2 text-white/90 hover:text-white mb-4 transition-colors"
+                            >
+                                <ArrowLeft className="w-5 h-5" />
+                                <span className="text-sm font-medium">Quay lại Tài chính Campaign</span>
+                            </Link>
+                        )}
                         <h1 className="text-4xl md:text-5xl font-bold text-white mb-3 drop-shadow-lg">
                             {campaign.title}
                         </h1>

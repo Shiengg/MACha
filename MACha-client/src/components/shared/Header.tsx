@@ -88,6 +88,11 @@ export default function Header() {
                         {/* Logo */}
                         <button
                             onClick={() => {
+                                if (user?.role === 'owner') {
+                                    router.push('/owner/dashboard');
+                                    return;
+                                }
+                                
                                 if (pathname === '/') {
                                     window.scrollTo({ top: 0, behavior: 'smooth' });
                                     window.dispatchEvent(new CustomEvent('refreshPosts'));

@@ -36,7 +36,7 @@ export default function OwnerCampaignFinancials() {
       ['Campaign Name', 'Creator', 'Goal Amount', 'Current Amount', 'Total Donated', 'Total Released', 'Pending', 'Remaining', 'Percentage Completed'].join(','),
       ...campaigns.map(c => [
         c.campaign.title,
-        c.campaign.creator.username,
+        c.campaign.creator?.username || c.campaign.creator?.fullname || 'Unknown User',
         c.campaign.goal_amount,
         c.campaign.current_amount,
         c.financials.total_donated,
@@ -56,10 +56,12 @@ export default function OwnerCampaignFinancials() {
   };
 
   const filteredCampaigns = campaigns.filter((item) => {
+    if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
+    const creatorName = item.campaign.creator?.username || item.campaign.creator?.fullname || '';
     return (
       item.campaign.title.toLowerCase().includes(query) ||
-      item.campaign.creator.username.toLowerCase().includes(query)
+      creatorName.toLowerCase().includes(query)
     );
   });
 
@@ -119,7 +121,9 @@ export default function OwnerCampaignFinancials() {
                             <ArrowUpRight className="w-4 h-4" />
                           </Link>
                         </div>
-                        <p className="text-sm text-gray-500">by {item.campaign.creator.username}</p>
+                        <p className="text-sm text-gray-500">
+                          by {item.campaign.creator?.username || item.campaign.creator?.fullname || 'Unknown User'}
+                        </p>
                         <div className="mt-2">
                           <div className="flex items-center justify-between text-sm mb-1">
                             <span className="text-gray-600">Progress</span>
