@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import ProtectedRoute from "@/components/guards/ProtectedRoute";
 import CampaignCard from "@/components/campaign/CampaignCard";
 import { campaignService, Campaign, CategoryWithCount } from "@/services/campaign.service";
 import { useSocket } from "@/contexts/SocketContext";
-import { Heart, Home, Leaf, AlertCircle, Users, PawPrint, Stethoscope, GraduationCap, Baby, UserCircle, Trees } from 'lucide-react';
+import { Heart, Home, Leaf, AlertCircle, Users, PawPrint, Stethoscope, GraduationCap, Baby, UserCircle, Trees, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const categoryConfig: Record<string, { label: string; icon: any }> = {
   'children': { label: 'Trẻ em', icon: Baby },
@@ -21,40 +21,89 @@ const categoryConfig: Record<string, { label: string; icon: any }> = {
   'other': { label: 'Khác', icon: Heart },
 };
 
+// Helper function to check if campaign is still valid (active and not expired)
+const isCampaignValid = (campaign: Campaign): boolean => {
+  // Must be active
+  if (campaign.status !== 'active') return false;
+  
+  // If no end_date, consider it as unlimited (still valid)
+  if (!campaign.end_date) return true;
+  
+  // Check if end_date is in the future
+  const endDate = new Date(campaign.end_date);
+  const now = new Date();
+  return endDate > now;
+};
+
 function DiscoverContent() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [filteredCampaigns, setFilteredCampaigns] = useState<Campaign[]>([]);
   const [categories, setCategories] = useState<Array<{ id: string; label: string; icon: any; count: number }>>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1); // 1-based for UI
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const { socket, isConnected } = useSocket();
+  const limit = 20;
 
-  // Helper function to check if campaign is still valid (active and not expired)
-  const isCampaignValid = (campaign: Campaign): boolean => {
-    // Must be active
-    if (campaign.status !== 'active') return false;
-    
-    // If no end_date, consider it as unlimited (still valid)
-    if (!campaign.end_date) return true;
-    
-    // Check if end_date is in the future
-    const endDate = new Date(campaign.end_date);
-    const now = new Date();
-    return endDate > now;
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    if (selectedCategory === 'all') {
-      setFilteredCampaigns(campaigns);
-    } else {
-      const filtered = campaigns.filter(c => c.category === selectedCategory);
-      setFilteredCampaigns(filtered);
+  const loadData = useCallback(async (page: number = 1) => {
+    try {
+      setLoading(true);
+      
+      // Convert to 0-based for API (page 1 -> page 0)
+      const apiPage = page - 1;
+      
+      // Load campaigns with pagination
+      const result = await campaignService.getAllCampaigns(apiPage, limit);
+      
+      // Only show active campaigns that haven't expired
+      const validCampaigns = result.campaigns.filter(c => isCampaignValid(c));
+      
+      setCampaigns(validCampaigns);
+      setTotal(result.total);
+      setTotalPages(result.totalPages);
+      setCurrentPage(page);
+      
+      // Load categories only on initial load (when page is 1)
+      if (page === 1) {
+        const categoriesData = await campaignService.getActiveCategories();
+        
+        // Map categories with config - use count from server
+        const mappedCategories = [
+          { id: 'all', label: 'Tất cả', icon: Heart, count: result.total },
+          ...categoriesData.map((cat: CategoryWithCount) => {
+            return {
+              id: cat.category,
+              label: categoryConfig[cat.category]?.label || cat.category,
+              icon: categoryConfig[cat.category]?.icon || Heart,
+              count: cat.count
+            };
+          })
+        ];
+        
+        setCategories(mappedCategories);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [selectedCategory, campaigns]);
+  }, [limit]);
+
+  useEffect(() => {
+    loadData(1);
+  }, [loadData]);
+
+  useEffect(() => {
+    // Reset pagination when category changes
+    setCurrentPage(1);
+    loadData(1);
+  }, [selectedCategory, loadData]);
+
+  // Filter campaigns by category (client-side filtering for now)
+  const filteredCampaigns = selectedCategory === 'all' 
+    ? campaigns 
+    : campaigns.filter(c => c.category === selectedCategory);
 
   // Listen for campaign updates via Socket.IO
   useEffect(() => {
@@ -150,41 +199,35 @@ function DiscoverContent() {
     };
   }, [socket, isConnected]);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      
-      // Load campaigns and categories in parallel
-      const [campaignsData, categoriesData] = await Promise.all([
-        campaignService.getAllCampaigns(),
-        campaignService.getActiveCategories()
-      ]);
-      
-      // Only show active campaigns that haven't expired
-      const validCampaigns = campaignsData.filter(c => isCampaignValid(c));
-      setCampaigns(validCampaigns);
-      setFilteredCampaigns(validCampaigns);
-      
-      // Map categories with config - count only valid campaigns per category
-      const mappedCategories = [
-        { id: 'all', label: 'Tất cả', icon: Heart, count: validCampaigns.length },
-        ...categoriesData.map((cat: CategoryWithCount) => {
-          const categoryCampaigns = validCampaigns.filter(c => c.category === cat.category);
-          return {
-            id: cat.category,
-            label: categoryConfig[cat.category]?.label || cat.category,
-            icon: categoryConfig[cat.category]?.icon || Heart,
-            count: categoryCampaigns.length
-          };
-        })
-      ];
-      
-      setCategories(mappedCategories);
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    const maxVisiblePages = 5;
+    
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        pages.push(currentPage - 1);
+        pages.push(currentPage);
+        pages.push(currentPage + 1);
+        pages.push('...');
+        pages.push(totalPages);
+      }
     }
+    
+    return pages;
   };
 
   return (
@@ -265,13 +308,94 @@ function DiscoverContent() {
         ) : (
           <>
             <div className="mb-6 text-gray-600">
-              Tìm thấy <span className="font-bold text-gray-800">{filteredCampaigns.length}</span> chiến dịch
+              {selectedCategory === 'all' ? (
+                <>Tìm thấy <span className="font-bold text-gray-800">{total}</span> chiến dịch</>
+              ) : (
+                <>Tìm thấy <span className="font-bold text-gray-800">{filteredCampaigns.length}</span> chiến dịch trong danh mục này</>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCampaigns.map((campaign) => (
                 <CampaignCard key={campaign._id} campaign={campaign} showCreator={true} />
               ))}
             </div>
+            {totalPages > 1 && selectedCategory === 'all' && (
+              <div className="flex justify-center items-center gap-2 mt-8">
+                {/* Current Page / Total Pages */}
+                <div className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium">
+                  {currentPage}/{totalPages}
+                </div>
+                
+                {/* Previous Button */}
+                <button
+                  onClick={() => {
+                    if (currentPage > 1) {
+                      loadData(currentPage - 1);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }}
+                  disabled={currentPage === 1 || loading}
+                  className={`px-4 py-2 rounded-lg border border-gray-300 font-medium transition-all flex items-center gap-1 ${
+                    currentPage === 1 || loading
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 hover:border-orange-500 hover:text-orange-500'
+                  }`}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Trang trước</span>
+                </button>
+                
+                {/* Page Numbers */}
+                {getPageNumbers().map((pageNum, index) => (
+                  pageNum === '...' ? (
+                    <button
+                      key={`ellipsis-${index}`}
+                      disabled
+                      className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-400 cursor-default"
+                    >
+                      ...
+                    </button>
+                  ) : (
+                    <button
+                      key={pageNum}
+                      onClick={() => {
+                        if (typeof pageNum === 'number') {
+                          loadData(pageNum);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
+                      }}
+                      disabled={loading}
+                      className={`px-4 py-2 rounded-lg border font-medium transition-all ${
+                        pageNum === currentPage
+                          ? 'bg-orange-500 text-white border-orange-500 shadow-lg'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-orange-500 hover:text-orange-500'
+                      } ${loading ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                ))}
+                
+                {/* Next Button */}
+                <button
+                  onClick={() => {
+                    if (currentPage < totalPages) {
+                      loadData(currentPage + 1);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }}
+                  disabled={currentPage === totalPages || loading}
+                  className={`px-4 py-2 rounded-lg border border-gray-300 font-medium transition-all flex items-center gap-1 ${
+                    currentPage === totalPages || loading
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 hover:border-orange-500 hover:text-orange-500'
+                  }`}
+                >
+                  <span>Trang sau</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

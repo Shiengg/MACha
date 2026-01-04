@@ -2,24 +2,43 @@ import Campaign from "../models/campaign.js";
 import Hashtag from "../models/Hashtag.js";
 import { redisClient } from "../config/redis.js";
 
-export const getCampaigns = async () => {
-    const campaignKey = 'campaigns:all';
+export const getCampaigns = async (page = 0, limit = 20) => {
+    const campaignKey = `campaigns:all:page:${page}:limit:${limit}`;
+    const totalKey = `campaigns:all:total`;
 
     // 1. Check cache first
     const cached = await redisClient.get(campaignKey);
-    if (cached) {
-        return JSON.parse(cached);
+    const cachedTotal = await redisClient.get(totalKey);
+    
+    if (cached && cachedTotal) {
+        return {
+            campaigns: JSON.parse(cached),
+            total: parseInt(cachedTotal)
+        };
     }
 
     // 2. Cache miss - Query database
-    const campaigns = await Campaign.find()
-        .populate("creator", "username fullname avatar")
-        .populate("hashtag", "name");
+    const [campaigns, total] = await Promise.all([
+        Campaign.find()
+            .populate("creator", "username fullname avatar")
+            .populate("hashtag", "name")
+            .sort({ createdAt: -1 })
+            .skip(page * limit)
+            .limit(limit),
+        Campaign.countDocuments()
+    ]);
 
-    // 3. Cache for 1 hour
-    await redisClient.setEx(campaignKey, 3600, JSON.stringify(campaigns));
+    // 3. Cache for 5 minutes (300 seconds) - same as message
+    await redisClient.setEx(campaignKey, 300, JSON.stringify(campaigns));
+    await redisClient.setEx(totalKey, 300, total.toString());
 
-    return campaigns;
+    // 4. Add key to set for cache invalidation
+    await redisClient.sAdd('campaigns:all:keys', campaignKey);
+
+    return {
+        campaigns,
+        total
+    };
 }
 
 export const getCampaignById = async (campaignId) => {
@@ -87,10 +106,16 @@ export const createCampaign = async (payload) => {
         }
     }
 
-    await Promise.all([
-        redisClient.del('campaigns:all'),
-        redisClient.del('campaigns:pending'),
-    ]);
+    // Invalidate all campaign cache keys
+    const keySet = 'campaigns:all:keys';
+    const keys = await redisClient.sMembers(keySet);
+    if (keys.length > 0) {
+        await redisClient.del(...keys);
+    }
+    await redisClient.del(keySet);
+    await redisClient.del('campaigns:all:total');
+    
+    await redisClient.del('campaigns:pending');
 
     // Populate hashtag before returning
     await campaign.populate('hashtag', 'name');
@@ -231,11 +256,18 @@ export const updateCampaign = async (campaignId, userId, payload) => {
             { new: true, runValidators: true }
         );
 
+        // Invalidate all campaign cache keys
+        const keySet = 'campaigns:all:keys';
+        const keys = await redisClient.sMembers(keySet);
         const cachesToInvalidate = [
             redisClient.del(`campaign:${campaignId}`),
-            redisClient.del('campaigns:all'),
             redisClient.del(`campaigns:category:${oldCategory}`)
         ];
+        if (keys.length > 0) {
+            cachesToInvalidate.push(redisClient.del(...keys));
+        }
+        cachesToInvalidate.push(redisClient.del(keySet));
+        cachesToInvalidate.push(redisClient.del('campaigns:all:total'));
 
         if (oldStatus === 'pending') {
             cachesToInvalidate.push(redisClient.del('campaigns:pending'));
@@ -252,11 +284,17 @@ export const updateCampaign = async (campaignId, userId, payload) => {
         { new: true, runValidators: true }
     );
 
+    // Invalidate all campaign cache keys
+    const keySet = 'campaigns:all:keys';
+    const keys = await redisClient.sMembers(keySet);
     const cachesToInvalidate = [
         redisClient.del(`campaign:${campaignId}`),
-        redisClient.del('campaigns:all'),
         redisClient.del(`campaigns:category:${oldCategory}`)
     ];
+    if (keys.length > 0) {
+        cachesToInvalidate.push(redisClient.del(...keys));
+    }
+    cachesToInvalidate.push(redisClient.del(keySet));
 
     if (payload.category && payload.category !== oldCategory) {
         cachesToInvalidate.push(redisClient.del(`campaigns:category:${payload.category}`));
@@ -302,11 +340,17 @@ export const deleteCampaign = async (campaignId, userId) => {
 
     await Campaign.findByIdAndDelete(campaignId);
 
+    // Invalidate all campaign cache keys
+    const keySet = 'campaigns:all:keys';
+    const keys = await redisClient.sMembers(keySet);
     const cachesToInvalidate = [
         redisClient.del(`campaign:${campaignId}`),
-        redisClient.del('campaigns:all'),
         redisClient.del(`campaigns:category:${category}`)
     ];
+    if (keys.length > 0) {
+        cachesToInvalidate.push(redisClient.del(...keys));
+    }
+    cachesToInvalidate.push(redisClient.del(keySet));
 
     if (status === 'pending') {
         cachesToInvalidate.push(redisClient.del('campaigns:pending'));
@@ -341,11 +385,20 @@ export const cancelCampaign = async (campaignId, userId, reason) => {
     campaign.cancelled_at = new Date();
     await campaign.save();
 
-    await Promise.all([
+    // Invalidate all campaign cache keys
+    const keySet = 'campaigns:all:keys';
+    const keys = await redisClient.sMembers(keySet);
+    const cachesToInvalidate = [
         redisClient.del(`campaign:${campaignId}`),
-        redisClient.del('campaigns:all'),
-        redisClient.del(`campaigns:category:${campaign.category}`),
-    ]);
+        redisClient.del(`campaigns:category:${campaign.category}`)
+    ];
+    if (keys.length > 0) {
+        cachesToInvalidate.push(redisClient.del(...keys));
+    }
+        cachesToInvalidate.push(redisClient.del(keySet));
+        cachesToInvalidate.push(redisClient.del('campaigns:all:total'));
+        
+        await Promise.all(cachesToInvalidate);
 
     return { success: true, campaign };
 }
@@ -387,12 +440,21 @@ export const approveCampaign = async (campaignId, adminId) => {
     campaign.approved_by = adminId;
     await campaign.save();
 
-    await Promise.all([
+    // Invalidate all campaign cache keys
+    const keySet = 'campaigns:all:keys';
+    const keys = await redisClient.sMembers(keySet);
+    const cachesToInvalidate = [
         redisClient.del(`campaign:${campaignId}`),
-        redisClient.del('campaigns:all'),
         redisClient.del('campaigns:pending'),
-        redisClient.del(`campaigns:category:${campaign.category}`),
-    ]);
+        redisClient.del(`campaigns:category:${campaign.category}`)
+    ];
+    if (keys.length > 0) {
+        cachesToInvalidate.push(redisClient.del(...keys));
+    }
+        cachesToInvalidate.push(redisClient.del(keySet));
+        cachesToInvalidate.push(redisClient.del('campaigns:all:total'));
+        
+        await Promise.all(cachesToInvalidate);
 
     return { success: true, campaign };
 }
@@ -426,12 +488,21 @@ export const rejectCampaign = async (campaignId, adminId, reason) => {
     campaign.rejected_by = adminId;
     await campaign.save();
 
-    await Promise.all([
+    // Invalidate all campaign cache keys
+    const keySet = 'campaigns:all:keys';
+    const keys = await redisClient.sMembers(keySet);
+    const cachesToInvalidate = [
         redisClient.del(`campaign:${campaignId}`),
-        redisClient.del('campaigns:all'),
         redisClient.del('campaigns:pending'),
-        redisClient.del(`campaigns:category:${campaign.category}`),
-    ]);
+        redisClient.del(`campaigns:category:${campaign.category}`)
+    ];
+    if (keys.length > 0) {
+        cachesToInvalidate.push(redisClient.del(...keys));
+    }
+        cachesToInvalidate.push(redisClient.del(keySet));
+        cachesToInvalidate.push(redisClient.del('campaigns:all:total'));
+        
+        await Promise.all(cachesToInvalidate);
 
     return { success: true, campaign };
 }

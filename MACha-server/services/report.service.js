@@ -82,6 +82,17 @@ const removeReportedItem = async (reportedType, reportedId, resolutionDetails, a
             reportedItem.cancellation_reason = resolutionDetails || 'Removed due to report';
             reportedItem.cancelled_at = new Date();
             await reportedItem.save();
+            
+            try {
+                await queueService.pushJob({
+                    type: "CAMPAIGN_REMOVED",
+                    campaignId: reportedId,
+                    adminId: adminId,
+                    resolutionDetails: resolutionDetails
+                });
+            } catch (error) {
+                console.error('Error pushing CAMPAIGN_REMOVED job:', error);
+            }
             break;
         case 'event':
             creatorId = reportedItem.creator;

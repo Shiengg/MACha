@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
 import { ownerService, AdminActivities } from '@/services/owner.service';
@@ -14,7 +15,8 @@ interface User {
   role: string;
 }
 
-export default function OwnerAdminActivities() {
+function OwnerAdminActivitiesContent() {
+  const searchParams = useSearchParams();
   const [data, setData] = useState<AdminActivities | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedAdminId, setSelectedAdminId] = useState<string>('');
@@ -22,7 +24,12 @@ export default function OwnerAdminActivities() {
 
   useEffect(() => {
     fetchAdmins();
-  }, []);
+    // Read adminId from URL query parameter if present
+    const adminIdFromUrl = searchParams.get('adminId');
+    if (adminIdFromUrl) {
+      setSelectedAdminId(adminIdFromUrl);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchData();
@@ -226,5 +233,24 @@ export default function OwnerAdminActivities() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OwnerAdminActivities() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50">
+        <OwnerSidebar />
+        <OwnerHeader />
+        <div className="ml-64 pt-16 flex items-center justify-center h-screen">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <OwnerAdminActivitiesContent />
+    </Suspense>
   );
 }

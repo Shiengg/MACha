@@ -89,5 +89,41 @@ OwnerRoutes.get(
     ownerController.getApprovalHistory
 );
 
+// User Management Routes
+OwnerRoutes.get(
+    "/users",
+    authMiddleware,
+    checkOwner,
+    ownerController.getAllUsers
+);
+
+OwnerRoutes.post(
+    "/users/:id/ban",
+    authMiddleware,
+    checkOwner,
+    ownerController.banUser
+);
+
+OwnerRoutes.post(
+    "/users/:id/unban",
+    authMiddleware,
+    checkOwner,
+    ownerController.unbanUser
+);
+
+OwnerRoutes.post(
+    "/users/:id/reset-kyc",
+    authMiddleware,
+    checkOwner,
+    ownerController.resetUserKYC
+);
+
+OwnerRoutes.get(
+    "/users/:id/history",
+    authMiddleware,
+    checkOwner,
+    ownerController.getUserHistory
+);
+
 export default OwnerRoutes;
 

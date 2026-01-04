@@ -16,6 +16,11 @@ import WithdrawalRequestCard from '@/components/escrow/WithdrawalRequestCard';
 import WithdrawalRequestModal from '@/components/escrow/WithdrawalRequestModal';
 import VotingSection from '@/components/escrow/VotingSection';
 import CreatePostModal from '@/components/shared/CreatePostModal';
+import ReportModal from '@/components/shared/ReportModal';
+import { getReportsByItem } from '@/services/report.service';
+import { FaFlag } from 'react-icons/fa';
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 function CampaignDetails() {
     const params = useParams();
@@ -49,6 +54,9 @@ function CampaignDetails() {
     const [withdrawalRequestsLoading, setWithdrawalRequestsLoading] = useState(false);
     const [isVoting, setIsVoting] = useState(false);
     const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [hasReported, setHasReported] = useState(false);
+    const [isCheckingReport, setIsCheckingReport] = useState(false);
 
     const handleDonate = () => {
         router.push(`/campaigns/${campaignId}/donate`);
@@ -86,7 +94,14 @@ function CampaignDetails() {
     const handleStickyTabClick = (tab: 'story' | 'updates' | 'supporters' | 'withdrawals') => {
         setActiveTab(tab);
         if (tabsRef.current) {
-            tabsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Calculate offset for sticky bar (64px header + sticky bar height ~50px)
+            const offset = 114;
+            const elementPosition = tabsRef.current.getBoundingClientRect().top + window.pageYOffset;
+            const offsetPosition = elementPosition - offset;
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            });
         }
     };
 
@@ -965,7 +980,7 @@ function CampaignDetails() {
                 )}
 
                 {/* Hero Section with Background */}
-                <div className="relative h-[200px]">
+                <div className="relative min-h-[200px] mb-0">
                     {/* Background Image with Blur */}
                     <div className="absolute inset-0 overflow-hidden">
                         <div 
@@ -980,18 +995,29 @@ function CampaignDetails() {
                     </div>
 
                     {/* Hero Content */}
-                    <div className="relative max-w-6xl mx-auto px-4 pt-12">
-                        <h1 className="text-4xl md:text-5xl font-bold text-white mb-3 drop-shadow-lg">
+                    <div className="relative max-w-6xl mx-auto px-4 py-12">
+                        {user?.role === 'owner' && (
+                            <Link
+                                href="/owner/financial/campaigns"
+                                className="inline-flex items-center gap-2 text-white/90 hover:text-white mb-4 transition-colors"
+                            >
+                                <ArrowLeft className="w-5 h-5" />
+                                <span className="text-sm font-medium">Quay lại Tài chính Campaign</span>
+                            </Link>
+                        )}
+                        <h1 className="text-4xl md:text-5xl font-bold text-white mb-3 drop-shadow-lg break-words">
                             {campaign.title}
                         </h1>
                         <p className="text-white/80 text-sm">
-                            Tổ chức bởi <span className="text-orange-400 font-medium">{campaign.contact_info?.fullname || campaign.creator?.fullname}</span>
+                            Tổ chức bởi <span className="text-orange-300 font-bold">{campaign.contact_info?.fullname || campaign.creator?.fullname}</span>
                         </p>
                     </div>
                 </div>
 
                 {/* Main Content */}
-                <div className="max-w-6xl mx-auto px-4 -mt-8 relative z-10 pb-12">
+                <div className={`max-w-6xl mx-auto px-4 relative z-10 pb-12 transition-all ${
+                    showStickyBar ? 'pt-20' : 'pt-0'
+                }`}>
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Left Column - Main Content */}
                         <div className="lg:col-span-2 space-y-6">
@@ -1158,7 +1184,7 @@ function CampaignDetails() {
                             </div>
 
                             {/* Tabs */}
-                            <div ref={tabsRef} className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                            <div ref={tabsRef} className="bg-white rounded-2xl shadow-lg overflow-hidden scroll-mt-20">
                                 <div className="flex border-b">
                                     <button
                                         onClick={() => setActiveTab('story')}
@@ -1932,6 +1958,54 @@ function CampaignDetails() {
                                     </button>
                                 </div>
                             </div>
+
+                            {/* Report */}
+                            {user && campaign && campaign.creator && (user._id !== campaign.creator._id && user.id !== campaign.creator._id) && (
+                                <div className="bg-white rounded-2xl shadow-lg p-6">
+                                    <button
+                                        onClick={async () => {
+                                            if (hasReported) {
+                                                Swal.fire({
+                                                    icon: 'info',
+                                                    title: 'Đã báo cáo',
+                                                    text: 'Bạn đã báo cáo chiến dịch này rồi. Vui lòng chờ admin xử lý.',
+                                                });
+                                                return;
+                                            }
+
+                                            setIsCheckingReport(true);
+                                            try {
+                                                const { reports } = await getReportsByItem('campaign', campaignId);
+                                                const currentUserId = (user as any)?._id || user?.id;
+                                                const userReport = reports.find(
+                                                    (report) => report.reporter._id === currentUserId
+                                                );
+                                                
+                                                if (userReport) {
+                                                    setHasReported(true);
+                                                    Swal.fire({
+                                                        icon: 'info',
+                                                        title: 'Đã báo cáo',
+                                                        text: 'Bạn đã báo cáo chiến dịch này rồi. Vui lòng chờ admin xử lý.',
+                                                    });
+                                                } else {
+                                                    setShowReportModal(true);
+                                                }
+                                            } catch (error) {
+                                                console.error('Error checking report:', error);
+                                                setShowReportModal(true);
+                                            } finally {
+                                                setIsCheckingReport(false);
+                                            }
+                                        }}
+                                        disabled={isCheckingReport || hasReported}
+                                        className="w-full py-3 px-4 border-2 border-red-300 text-red-600 font-medium rounded-xl hover:bg-red-50 hover:border-red-400 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <FaFlag className="w-4 h-4" />
+                                        {hasReported ? 'Đã báo cáo' : 'Báo cáo chiến dịch'}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1967,6 +2041,17 @@ function CampaignDetails() {
                             timer: 2000,
                             showConfirmButton: false
                         });
+                    }}
+                />
+
+                {/* Report Modal */}
+                <ReportModal
+                    reportedType="campaign"
+                    reportedId={campaignId}
+                    isOpen={showReportModal}
+                    onClose={() => setShowReportModal(false)}
+                    onSuccess={() => {
+                        setHasReported(true);
                     }}
                 />
             </div>

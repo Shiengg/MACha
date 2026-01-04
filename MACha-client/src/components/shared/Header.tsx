@@ -88,6 +88,11 @@ export default function Header() {
                         {/* Logo */}
                         <button
                             onClick={() => {
+                                if (user?.role === 'owner') {
+                                    router.push('/owner/dashboard');
+                                    return;
+                                }
+                                
                                 if (pathname === '/') {
                                     window.scrollTo({ top: 0, behavior: 'smooth' });
                                     window.dispatchEvent(new CustomEvent('refreshPosts'));
@@ -100,12 +105,14 @@ export default function Header() {
                             }}
                             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                         >
-                            <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-lg flex items-center justify-center">
-                                <span className="text-white font-bold text-xl">M</span>
-                            </div>
-                            <span className="text-xl font-bold text-gray-800 hidden sm:block">
-                                MACha
-                            </span>
+                            <Image
+                                src="/logo/MACha_Logo_header.svg"
+                                alt="MACha Logo"
+                                width={222}
+                                height={47}
+                                className="h-8 w-auto"
+                                priority
+                            />
                         </button>
 
                         {/* Search Bar */}

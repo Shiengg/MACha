@@ -6,8 +6,16 @@ import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 
 export const getAllCampaigns = async (req, res) => {
     try {
-        const campaigns = await campaignService.getCampaigns();
-        res.status(HTTP_STATUS.OK).json({ campaigns });
+        const page = parseInt(req.query.page) || 0;
+        const limit = parseInt(req.query.limit) || 20;
+        const result = await campaignService.getCampaigns(page, limit);
+        res.status(HTTP_STATUS.OK).json({ 
+            campaigns: result.campaigns,
+            total: result.total,
+            page,
+            limit,
+            totalPages: Math.ceil(result.total / limit)
+        });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
     }

@@ -6,6 +6,7 @@ import User from "../models/user.js";
 import Campaign from "../models/campaign.js";
 import Event from "../models/event.js";
 import EventRSVP from "../models/eventRSVP.js";
+import Donation from "../models/donation.js";
 import mongoose from "mongoose";
 import connectDB from "../config/db.js";
 import * as notificationService from "../services/notification.service.js";
@@ -89,6 +90,9 @@ async function processQueue() {
                     break;
                 case "EVENT_REMOVED":
                     await handleEventRemoved(job);
+                    break;
+                case "CAMPAIGN_REMOVED":
+                    await handleCampaignRemoved(job);
                     break;
             }
         } catch (error) {
@@ -716,6 +720,112 @@ async function handleEventRemoved(job) {
         console.log(`✅ Created ${createdNotifications.length} notifications for event removed: ${job.eventId}`);
     } catch (error) {
         console.error('Error processing EVENT_REMOVED job:', error);
+    }
+}
+
+async function handleCampaignRemoved(job) {
+    try {
+        const campaign = await Campaign.findById(job.campaignId)
+            .populate('creator', '_id username avatar email')
+            .select('creator title');
+
+        if (!campaign) {
+            console.log('Campaign not found');
+            return;
+        }
+
+        const creator = campaign.creator;
+
+        if (!creator) {
+            console.log('Creator not found');
+            return;
+        }
+
+        let admin = null;
+        if (job.adminId) {
+            admin = await User.findById(job.adminId).select('username avatar');
+        }
+
+        const campaignObjectId = mongoose.Types.ObjectId.isValid(job.campaignId) 
+            ? new mongoose.Types.ObjectId(job.campaignId) 
+            : job.campaignId;
+        
+        // Get all donors who have completed donations
+        const donations = await Donation.find({
+            campaign: campaignObjectId,
+            payment_status: 'completed'
+        }).select('donor').lean();
+        
+        const donorIds = [...new Set(donations.map(donation => donation.donor.toString()))];
+        const creatorId = creator._id.toString();
+        
+        // Remove creator from donor list (creator will receive email, not notification)
+        const donorIdsOnly = donorIds.filter(id => id !== creatorId);
+        
+        // Create notifications for all donors (excluding creator)
+        const notifications = donorIdsOnly.map(donorId => ({
+            receiver: donorId,
+            sender: admin ? admin._id : null,
+            type: 'campaign_removed',
+            campaign: job.campaignId,
+            message: `Chiến dịch "${campaign.title}" mà bạn đã ủng hộ đã bị hủy`,
+            content: job.resolutionDetails || 'Chiến dịch đã bị hủy do vi phạm Tiêu chuẩn của MACha',
+            is_read: false
+        }));
+        
+        const createdNotifications = await Promise.all(
+            notifications.map(notif => notificationService.createNotification(notif))
+        );
+        
+        // Publish notifications to Redis for real-time updates
+        for (let i = 0; i < createdNotifications.length; i++) {
+            try {
+                const notification = createdNotifications[i];
+                await notificationPublisher.publish('notification:new', JSON.stringify({
+                    recipientId: donorIdsOnly[i],
+                    notification: {
+                        _id: notification._id.toString(),
+                        type: 'campaign_removed',
+                        message: notifications[i].message,
+                        content: notifications[i].content,
+                        sender: admin ? {
+                            _id: admin._id,
+                            username: admin.username,
+                            avatar: admin.avatar
+                        } : null,
+                        campaign: {
+                            _id: campaign._id.toString(),
+                            title: campaign.title
+                        },
+                        is_read: false,
+                        createdAt: notification.createdAt
+                    }
+                }));
+            } catch (notifError) {
+                console.error('Error publishing notification:', notifError);
+            }
+        }
+
+        // Send email to creator
+        if (creator.email) {
+            try {
+                await mailerService.sendCampaignRemovedEmail(creator.email, {
+                    username: creator.username || 'Bạn',
+                    campaignTitle: campaign.title,
+                    campaignId: job.campaignId,
+                    resolutionDetails: job.resolutionDetails || 'Chiến dịch của bạn đã bị người dùng khác đánh dấu là vi phạm Tiêu chuẩn của MACha'
+                });
+                console.log(`✅ Sent campaign removed email to creator: ${creator.email}`);
+            } catch (emailError) {
+                console.error('Error sending email to creator:', emailError);
+            }
+        } else {
+            console.log('Creator does not have email address');
+        }
+
+        console.log(`✅ Created ${createdNotifications.length} notifications for campaign removed: ${job.campaignId}`);
+    } catch (error) {
+        console.error('Error processing CAMPAIGN_REMOVED job:', error);
     }
 }
 

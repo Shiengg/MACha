@@ -12,6 +12,11 @@ import {
   OWNER_CAMPAIGN_FINANCIALS_ROUTE,
   OWNER_ADMIN_ACTIVITIES_ROUTE,
   OWNER_APPROVAL_HISTORY_ROUTE,
+  OWNER_GET_ALL_USERS_ROUTE,
+  OWNER_BAN_USER_ROUTE,
+  OWNER_UNBAN_USER_ROUTE,
+  OWNER_RESET_USER_KYC_ROUTE,
+  OWNER_GET_USER_HISTORY_ROUTE,
 } from "@/constants/api";
 
 export interface Admin {
@@ -243,6 +248,89 @@ export interface GetApprovalHistoryResponse {
   };
 }
 
+// User Management Interfaces
+export interface User {
+  _id: string;
+  username: string;
+  email: string;
+  fullname?: string;
+  avatar?: string;
+  role: string;
+  is_verified: boolean;
+  kyc_status: string;
+  is_banned: boolean;
+  banned_at?: string;
+  banned_by?: {
+    _id: string;
+    username: string;
+    fullname?: string;
+  };
+  ban_reason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetAllUsersFilters {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: string;
+  is_banned?: boolean | string;
+  kyc_status?: string;
+}
+
+export interface GetAllUsersResponse {
+  users: User[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export interface UserHistoryItem {
+  type: 'login' | 'donate' | 'post' | 'report';
+  action: string;
+  timestamp: string;
+  amount?: number;
+  currency?: string;
+  campaign?: any;
+  payment_status?: string;
+  donation_method?: string;
+  post_id?: string;
+  content_preview?: string;
+  event?: any;
+  is_hidden?: boolean;
+  report_id?: string;
+  reported_type?: string;
+  reported_reason?: string;
+  status?: string;
+  resolution?: string;
+  details?: string;
+}
+
+export interface GetUserHistoryResponse {
+  success: boolean;
+  user: {
+    _id: string;
+    username: string;
+    email: string;
+  };
+  history: UserHistoryItem[];
+  statistics: {
+    total_donations: number;
+    total_posts: number;
+    total_reports: number;
+  };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
 export const ownerService = {
   async getOwnerDashboard(): Promise<DashboardData> {
     const response = await apiClient.get(OWNER_DASHBOARD_ROUTE, { withCredentials: true });
@@ -346,6 +434,57 @@ export const ownerService = {
     
     const response = await apiClient.get(OWNER_APPROVAL_HISTORY_ROUTE, {
       params,
+      withCredentials: true,
+    });
+    return response.data;
+  },
+
+  // User Management
+  async getAllUsers(filters: GetAllUsersFilters = {}): Promise<GetAllUsersResponse> {
+    const { page = 1, limit = 20, search, role, is_banned, kyc_status } = filters;
+    const params: any = { page, limit };
+    if (search) params.search = search;
+    if (role) params.role = role;
+    if (is_banned !== undefined) params.is_banned = is_banned;
+    if (kyc_status) params.kyc_status = kyc_status;
+    
+    const response = await apiClient.get(OWNER_GET_ALL_USERS_ROUTE, {
+      params,
+      withCredentials: true,
+    });
+    return response.data;
+  },
+
+  async banUser(userId: string, reason?: string): Promise<{ user: User }> {
+    const response = await apiClient.post(
+      OWNER_BAN_USER_ROUTE(userId),
+      { reason },
+      { withCredentials: true }
+    );
+    return response.data;
+  },
+
+  async unbanUser(userId: string): Promise<{ user: User }> {
+    const response = await apiClient.post(
+      OWNER_UNBAN_USER_ROUTE(userId),
+      {},
+      { withCredentials: true }
+    );
+    return response.data;
+  },
+
+  async resetUserKYC(userId: string): Promise<{ user: User }> {
+    const response = await apiClient.post(
+      OWNER_RESET_USER_KYC_ROUTE(userId),
+      {},
+      { withCredentials: true }
+    );
+    return response.data;
+  },
+
+  async getUserHistory(userId: string, page = 1, limit = 20): Promise<GetUserHistoryResponse> {
+    const response = await apiClient.get(OWNER_GET_USER_HISTORY_ROUTE(userId), {
+      params: { page, limit },
       withCredentials: true,
     });
     return response.data;

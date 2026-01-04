@@ -6,6 +6,7 @@ import Campaign from "../models/campaign.js";
 import Event from "../models/event.js";
 import KYC from "../models/kyc.js";
 import Report from "../models/report.js";
+import Post from "../models/post.js";
 
 export const getDashboard = async () => {
     const now = new Date();
@@ -595,7 +596,11 @@ export const getCampaignFinancials = async (page = 1, limit = 10) => {
 
     const campaigns = await Campaign.find()
         .select("title creator current_amount goal_amount status createdAt")
-        .populate("creator", "username fullname")
+        .populate({
+            path: "creator",
+            select: "username fullname",
+            options: { lean: true }
+        })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit);
@@ -688,7 +693,7 @@ export const getAdminActivities = async (adminId = null, page = 1, limit = 20) =
             };
         }
 
-        const admin = await User.findById(adminId).select("_id username");
+        const admin = await User.findById(adminId).select("_id username role");
         if (!admin || admin.role !== "admin") {
             return {
                 statistics: {
@@ -712,7 +717,8 @@ export const getAdminActivities = async (adminId = null, page = 1, limit = 20) =
                 }
             };
         }
-        adminIds = [adminId];
+        // Use admin._id (ObjectId) instead of adminId (string) for proper MongoDB matching
+        adminIds = [admin._id];
         adminInfo = {
             _id: admin._id,
             username: admin.username
@@ -747,6 +753,14 @@ export const getAdminActivities = async (adminId = null, page = 1, limit = 20) =
         };
     }
 
+    // Ensure adminIds are ObjectIds for proper matching
+    const adminIdsAsObjectIds = adminIds.map(id => {
+        if (id instanceof mongoose.Types.ObjectId) {
+            return id;
+        }
+        return new mongoose.Types.ObjectId(id);
+    });
+    
     const [
         campaignApprovalsCount,
         campaignRejectionsCount,
@@ -758,19 +772,19 @@ export const getAdminActivities = async (adminId = null, page = 1, limit = 20) =
         withdrawalApprovalsCount,
         withdrawalRejectionsCount
     ] = await Promise.all([
-        Campaign.countDocuments({ approved_by: { $in: adminIds } }),
-        Campaign.countDocuments({ rejected_by: { $in: adminIds } }),
-        Event.countDocuments({ approved_by: { $in: adminIds } }),
-        Event.countDocuments({ rejected_by: { $in: adminIds } }),
-        KYC.countDocuments({ verified_by: { $in: adminIds } }),
-        KYC.countDocuments({ rejected_by: { $in: adminIds } }),
-        Report.countDocuments({ reviewed_by: { $in: adminIds } }),
+        Campaign.countDocuments({ approved_by: { $in: adminIdsAsObjectIds } }),
+        Campaign.countDocuments({ rejected_by: { $in: adminIdsAsObjectIds } }),
+        Event.countDocuments({ approved_by: { $in: adminIdsAsObjectIds } }),
+        Event.countDocuments({ rejected_by: { $in: adminIdsAsObjectIds } }),
+        KYC.countDocuments({ verified_by: { $in: adminIdsAsObjectIds } }),
+        KYC.countDocuments({ rejected_by: { $in: adminIdsAsObjectIds } }),
+        Report.countDocuments({ reviewed_by: { $in: adminIdsAsObjectIds } }),
         Escrow.countDocuments({ 
-            admin_reviewed_by: { $in: adminIds },
+            admin_reviewed_by: { $in: adminIdsAsObjectIds },
             request_status: "admin_approved"
         }),
         Escrow.countDocuments({ 
-            admin_reviewed_by: { $in: adminIds },
+            admin_reviewed_by: { $in: adminIdsAsObjectIds },
             request_status: "admin_rejected"
         })
     ]);
@@ -968,6 +982,241 @@ export const getApprovalHistory = async (filters = {}, page = 1, limit = 20) => 
             limit,
             total,
             pages: Math.ceil(total / limit)
+        }
+    };
+};
+
+// ==================== USER MANAGEMENT ====================
+
+export const getAllUsers = async (page = 1, limit = 20, filters = {}) => {
+    const skip = (page - 1) * limit;
+    const { search, role, is_banned, kyc_status } = filters;
+
+    const query = {};
+
+    // Filter by role (exclude owner)
+    if (role) {
+        query.role = role;
+    } else {
+        query.role = { $ne: "owner" };
+    }
+
+    // Filter by ban status
+    if (is_banned !== undefined && is_banned !== null) {
+        query.is_banned = is_banned === true || is_banned === "true";
+    }
+
+    // Filter by KYC status
+    if (kyc_status) {
+        query.kyc_status = kyc_status;
+    }
+
+    // Build final query - if search exists, combine with other filters using $and
+    let finalQuery = query;
+    if (search) {
+        const searchConditions = [
+            { username: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+            { fullname: { $regex: search, $options: "i" } }
+        ];
+        
+        // Use $and to combine search with other filters
+        finalQuery = {
+            $and: [
+                query,
+                { $or: searchConditions }
+            ]
+        };
+    }
+
+    const [users, total] = await Promise.all([
+        User.find(finalQuery)
+            .select("-password")
+            .populate("banned_by", "username fullname")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit),
+        User.countDocuments(finalQuery)
+    ]);
+
+    return {
+        users,
+        pagination: {
+            page,
+            limit,
+            total,
+            pages: Math.ceil(total / limit)
+        }
+    };
+};
+
+export const banUser = async (userId, ownerId, reason) => {
+    const user = await User.findById(userId);
+
+    if (!user) {
+        return { success: false, error: "USER_NOT_FOUND" };
+    }
+
+    // Prevent banning owner
+    if (user.role === "owner") {
+        return { success: false, error: "CANNOT_BAN_OWNER" };
+    }
+
+    // Prevent owner from banning themselves
+    if (userId.toString() === ownerId.toString()) {
+        return { success: false, error: "CANNOT_BAN_SELF" };
+    }
+
+    user.is_banned = true;
+    user.banned_at = new Date();
+    user.banned_by = ownerId;
+    user.ban_reason = reason || "Banned by owner";
+    await user.save();
+
+    return { success: true, user };
+};
+
+export const unbanUser = async (userId) => {
+    const user = await User.findById(userId);
+
+    if (!user) {
+        return { success: false, error: "USER_NOT_FOUND" };
+    }
+
+    user.is_banned = false;
+    user.banned_at = null;
+    user.banned_by = null;
+    user.ban_reason = null;
+    await user.save();
+
+    return { success: true, user };
+};
+
+export const resetUserKYC = async (userId) => {
+    const user = await User.findById(userId);
+
+    if (!user) {
+        return { success: false, error: "USER_NOT_FOUND" };
+    }
+
+    user.kyc_status = "unverified";
+    user.current_kyc_id = null;
+    await user.save();
+
+    return { success: true, user };
+};
+
+export const getUserHistory = async (userId, page = 1, limit = 20) => {
+    const skip = (page - 1) * limit;
+
+    // Verify user exists
+    const user = await User.findById(userId).select("_id username email");
+    if (!user) {
+        return { success: false, error: "USER_NOT_FOUND" };
+    }
+
+    // Get login history (from user creation and recent activity)
+    // Note: If you have a login history model, use it here
+    const loginHistory = [{
+        type: "login",
+        action: "account_created",
+        timestamp: user.createdAt || new Date(),
+        details: "Account created"
+    }];
+
+    // Get donation history
+    const [donations, donationsTotal] = await Promise.all([
+        Donation.find({ donor: userId })
+            .populate("campaign", "title")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit),
+        Donation.countDocuments({ donor: userId })
+    ]);
+
+    const donationHistory = donations.map(d => ({
+        type: "donate",
+        action: "donated",
+        timestamp: d.createdAt,
+        amount: d.amount,
+        currency: d.currency,
+        campaign: d.campaign,
+        payment_status: d.payment_status,
+        donation_method: d.donation_method
+    }));
+
+    // Get post history
+    const [posts, postsTotal] = await Promise.all([
+        Post.find({ user: userId })
+            .populate("campaign_id", "title")
+            .populate("event_id", "title")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit),
+        Post.countDocuments({ user: userId })
+    ]);
+
+    const postHistory = posts.map(p => ({
+        type: "post",
+        action: "created",
+        timestamp: p.createdAt,
+        post_id: p._id,
+        content_preview: p.content_text?.substring(0, 100) || "",
+        campaign: p.campaign_id,
+        event: p.event_id,
+        is_hidden: p.is_hidden
+    }));
+
+    // Get report history (reports made by this user)
+    const [reports, reportsTotal] = await Promise.all([
+        Report.find({ reporter: userId })
+            .populate("reported_id")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit),
+        Report.countDocuments({ reporter: userId })
+    ]);
+
+    const reportHistory = reports.map(r => ({
+        type: "report",
+        action: "reported",
+        timestamp: r.createdAt,
+        report_id: r._id,
+        reported_type: r.reported_type,
+        reported_reason: r.reported_reason,
+        status: r.status,
+        resolution: r.resolution
+    }));
+
+    // Combine all history and sort by timestamp
+    const allHistory = [
+        ...loginHistory,
+        ...donationHistory,
+        ...postHistory,
+        ...reportHistory
+    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    const paginatedHistory = allHistory.slice(skip, skip + limit);
+    const totalHistory = loginHistory.length + donationsTotal + postsTotal + reportsTotal;
+
+    return {
+        success: true,
+        user: {
+            _id: user._id,
+            username: user.username,
+            email: user.email
+        },
+        history: paginatedHistory,
+        statistics: {
+            total_donations: donationsTotal,
+            total_posts: postsTotal,
+            total_reports: reportsTotal
+        },
+        pagination: {
+            page,
+            limit,
+            total: totalHistory,
+            pages: Math.ceil(totalHistory / limit)
         }
     };
 };

@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import * as eventService from '../services/event.service.js';
 
-cron.schedule("0 0 * * *", async () => {
+cron.schedule("*/10 * * * * *", async () => {
     console.log(`[Cron] Checking expired events at ${new Date().toISOString()}`);
     try {
         const results = await eventService.processExpiredEvents();

@@ -371,3 +371,126 @@ export const unbanAdmin = async (req, res) => {
     }
 };
 
+// ==================== USER MANAGEMENT ====================
+
+export const getAllUsers = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const filters = {
+            search: req.query.search || null,
+            role: req.query.role || null,
+            is_banned: req.query.is_banned || null,
+            kyc_status: req.query.kyc_status || null
+        };
+
+        const result = await ownerService.getAllUsers(page, limit, filters);
+        return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const banUser = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const ownerId = req.user._id;
+        const { reason } = req.body;
+
+        const result = await ownerService.banUser(userId, ownerId, reason);
+
+        if (!result.success) {
+            if (result.error === "USER_NOT_FOUND") {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "User not found"
+                });
+            }
+            if (result.error === "CANNOT_BAN_OWNER") {
+                return res.status(HTTP_STATUS.FORBIDDEN).json({
+                    message: "Cannot ban owner account"
+                });
+            }
+            if (result.error === "CANNOT_BAN_SELF") {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "Cannot ban yourself"
+                });
+            }
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: "User banned successfully",
+            user: result.user
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const unbanUser = async (req, res) => {
+    try {
+        const userId = req.params.id;
+
+        const result = await ownerService.unbanUser(userId);
+
+        if (!result.success) {
+            if (result.error === "USER_NOT_FOUND") {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "User not found"
+                });
+            }
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: "User unbanned successfully",
+            user: result.user
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const resetUserKYC = async (req, res) => {
+    try {
+        const userId = req.params.id;
+
+        const result = await ownerService.resetUserKYC(userId);
+
+        if (!result.success) {
+            if (result.error === "USER_NOT_FOUND") {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "User not found"
+                });
+            }
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: "User KYC status reset successfully",
+            user: result.user
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const getUserHistory = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+
+        const result = await ownerService.getUserHistory(userId, page, limit);
+
+        if (!result.success) {
+            if (result.error === "USER_NOT_FOUND") {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "User not found"
+                });
+            }
+        }
+
+        return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
