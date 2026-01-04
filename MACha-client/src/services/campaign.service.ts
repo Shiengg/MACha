@@ -148,9 +148,17 @@ export const campaignService = {
     return response.data.campaign;
   },
 
-  async getAllCampaigns(): Promise<Campaign[]> {
-    const response = await apiClient.get(GET_ALL_CAMPAIGNS_ROUTE);
-    return response.data.campaigns;
+  async getAllCampaigns(page: number = 0, limit: number = 20): Promise<{ campaigns: Campaign[]; total: number; page: number; limit: number; totalPages: number }> {
+    const response = await apiClient.get(GET_ALL_CAMPAIGNS_ROUTE, {
+      params: { page, limit },
+    });
+    return {
+      campaigns: response.data.campaigns,
+      total: response.data.total,
+      page: response.data.page,
+      limit: response.data.limit,
+      totalPages: response.data.totalPages
+    };
   },
 
   async getCampaignById(id: string): Promise<Campaign> {

@@ -18,7 +18,7 @@ function EventsContent() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('published');
+  const [selectedStatus, setSelectedStatus] = useState('ongoing');
   const [selectedCity, setSelectedCity] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -31,7 +31,7 @@ function EventsContent() {
   ];
 
   const statuses = [
-    { value: 'published', label: 'Đã duyệt' },
+    { value: 'ongoing', label: 'Đang diễn ra' },
     { value: 'upcoming', label: 'Sắp diễn ra' },
     { value: 'past', label: 'Đã qua' },
   ];
@@ -42,24 +42,19 @@ function EventsContent() {
 
   useEffect(() => {
     filterEvents();
-  }, [events, searchQuery, selectedCategory, selectedCity]);
+  }, [events, searchQuery, selectedCategory, selectedCity, selectedStatus]);
 
   const loadEvents = async () => {
     try {
       setLoading(true);
-      let data: Event[] = [];
-
-      if (selectedStatus === 'upcoming') {
-        data = await eventService.getUpcomingEvents(30);
-      } else if (selectedStatus === 'past') {
-        data = await eventService.getPastEvents();
-      } else if (selectedStatus === 'published') {
-        data = await eventService.getAllEvents({ status: 'published' });
-      } else {
-        data = await eventService.getAllEvents();
-      }
-
-      setEvents(data);
+      // Load all events, then filter to only show approved ones (published or completed)
+      // Events must be approved by admin (have approved_by) to be visible
+      const allEvents = await eventService.getAllEvents();
+      // Filter to only show events that are approved (published or completed status)
+      const approvedEvents = allEvents.filter(e => 
+        e.status === 'published' || e.status === 'completed'
+      );
+      setEvents(approvedEvents);
     } catch (err: any) {
       console.error('Error loading events:', err);
       Swal.fire({
@@ -74,6 +69,36 @@ function EventsContent() {
 
   const filterEvents = () => {
     let filtered = [...events];
+    const now = new Date();
+
+    // Filter by time status (ongoing, upcoming, past)
+    filtered = filtered.filter(e => {
+      // Only show published or completed events (both are approved by admin)
+      if (e.status !== 'published' && e.status !== 'completed') return false;
+
+      const startDate = new Date(e.start_date);
+      const endDate = e.end_date ? new Date(e.end_date) : null;
+
+      if (selectedStatus === 'ongoing') {
+        // Đang diễn ra: start_date <= now <= end_date (hoặc start_date <= now nếu không có end_date)
+        if (endDate) {
+          return startDate <= now && now <= endDate;
+        } else {
+          return startDate <= now;
+        }
+      } else if (selectedStatus === 'upcoming') {
+        // Sắp diễn ra: start_date > now
+        return startDate > now;
+      } else if (selectedStatus === 'past') {
+        // Đã qua: end_date < now (hoặc start_date < now nếu không có end_date)
+        if (endDate) {
+          return endDate < now;
+        } else {
+          return startDate < now;
+        }
+      }
+      return true;
+    });
 
     // Filter by category
     if (selectedCategory !== 'all') {

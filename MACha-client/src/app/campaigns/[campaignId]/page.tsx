@@ -94,7 +94,14 @@ function CampaignDetails() {
     const handleStickyTabClick = (tab: 'story' | 'updates' | 'supporters' | 'withdrawals') => {
         setActiveTab(tab);
         if (tabsRef.current) {
-            tabsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Calculate offset for sticky bar (64px header + sticky bar height ~50px)
+            const offset = 114;
+            const elementPosition = tabsRef.current.getBoundingClientRect().top + window.pageYOffset;
+            const offsetPosition = elementPosition - offset;
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            });
         }
     };
 
@@ -973,7 +980,7 @@ function CampaignDetails() {
                 )}
 
                 {/* Hero Section with Background */}
-                <div className="relative h-[200px]">
+                <div className="relative min-h-[200px] mb-0">
                     {/* Background Image with Blur */}
                     <div className="absolute inset-0 overflow-hidden">
                         <div 
@@ -988,7 +995,7 @@ function CampaignDetails() {
                     </div>
 
                     {/* Hero Content */}
-                    <div className="relative max-w-6xl mx-auto px-4 pt-12">
+                    <div className="relative max-w-6xl mx-auto px-4 py-12">
                         {user?.role === 'owner' && (
                             <Link
                                 href="/owner/financial/campaigns"
@@ -998,17 +1005,19 @@ function CampaignDetails() {
                                 <span className="text-sm font-medium">Quay lại Tài chính Campaign</span>
                             </Link>
                         )}
-                        <h1 className="text-4xl md:text-5xl font-bold text-white mb-3 drop-shadow-lg">
+                        <h1 className="text-4xl md:text-5xl font-bold text-white mb-3 drop-shadow-lg break-words">
                             {campaign.title}
                         </h1>
                         <p className="text-white/80 text-sm">
-                            Tổ chức bởi <span className="text-orange-400 font-medium">{campaign.contact_info?.fullname || campaign.creator?.fullname}</span>
+                            Tổ chức bởi <span className="text-orange-300 font-bold">{campaign.contact_info?.fullname || campaign.creator?.fullname}</span>
                         </p>
                     </div>
                 </div>
 
                 {/* Main Content */}
-                <div className="max-w-6xl mx-auto px-4 -mt-8 relative z-10 pb-12">
+                <div className={`max-w-6xl mx-auto px-4 relative z-10 pb-12 transition-all ${
+                    showStickyBar ? 'pt-20' : 'pt-0'
+                }`}>
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Left Column - Main Content */}
                         <div className="lg:col-span-2 space-y-6">
@@ -1175,7 +1184,7 @@ function CampaignDetails() {
                             </div>
 
                             {/* Tabs */}
-                            <div ref={tabsRef} className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                            <div ref={tabsRef} className="bg-white rounded-2xl shadow-lg overflow-hidden scroll-mt-20">
                                 <div className="flex border-b">
                                     <button
                                         onClick={() => setActiveTab('story')}
