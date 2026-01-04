@@ -30,8 +30,9 @@ export default function CampaignSelectModal({ isOpen, onClose, onSelect }: Campa
       try {
         setLoading(true);
         setError(null);
-        const data = await campaignService.getAllCampaigns();
-        const activeCampaigns = data.filter(
+        // Load with a large limit to get all campaigns, or load multiple pages
+        const data = await campaignService.getAllCampaigns(0, 1000);
+        const activeCampaigns = data.campaigns.filter(
           (campaign) => ['active', 'approved', 'voting'].includes(campaign.status)
         );
         setCampaigns(activeCampaigns);
@@ -57,9 +58,10 @@ export default function CampaignSelectModal({ isOpen, onClose, onSelect }: Campa
       const fetchAllCampaigns = async () => {
         try {
           setLoading(true);
-          const data = await campaignService.getAllCampaigns();
-          const activeCampaigns = data.filter(
-            (campaign) => ['active', 'approved', 'voting'].includes(campaign.status)
+          // Load with a large limit to get all campaigns
+          const data = await campaignService.getAllCampaigns(0, 1000);
+          const activeCampaigns = data.campaigns.filter(
+            (campaign: Campaign) => ['active', 'approved', 'voting'].includes(campaign.status)
           );
           setCampaigns(activeCampaigns);
         } catch (err: any) {
