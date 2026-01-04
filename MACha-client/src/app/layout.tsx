@@ -23,6 +23,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "MACha",
   description: "MACha is a social media platform for creating and sharing posts with your friends and family.",
+  icons: {
+    icon: "/logo/MACha_logo.svg",
+  },
 };
 
 export default function RootLayout({

@@ -16,6 +16,9 @@ import WithdrawalRequestCard from '@/components/escrow/WithdrawalRequestCard';
 import WithdrawalRequestModal from '@/components/escrow/WithdrawalRequestModal';
 import VotingSection from '@/components/escrow/VotingSection';
 import CreatePostModal from '@/components/shared/CreatePostModal';
+import ReportModal from '@/components/shared/ReportModal';
+import { getReportsByItem } from '@/services/report.service';
+import { FaFlag } from 'react-icons/fa';
 
 function CampaignDetails() {
     const params = useParams();
@@ -49,6 +52,9 @@ function CampaignDetails() {
     const [withdrawalRequestsLoading, setWithdrawalRequestsLoading] = useState(false);
     const [isVoting, setIsVoting] = useState(false);
     const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [hasReported, setHasReported] = useState(false);
+    const [isCheckingReport, setIsCheckingReport] = useState(false);
 
     const handleDonate = () => {
         router.push(`/campaigns/${campaignId}/donate`);
@@ -1932,6 +1938,54 @@ function CampaignDetails() {
                                     </button>
                                 </div>
                             </div>
+
+                            {/* Report */}
+                            {user && campaign && campaign.creator && (user._id !== campaign.creator._id && user.id !== campaign.creator._id) && (
+                                <div className="bg-white rounded-2xl shadow-lg p-6">
+                                    <button
+                                        onClick={async () => {
+                                            if (hasReported) {
+                                                Swal.fire({
+                                                    icon: 'info',
+                                                    title: 'Đã báo cáo',
+                                                    text: 'Bạn đã báo cáo chiến dịch này rồi. Vui lòng chờ admin xử lý.',
+                                                });
+                                                return;
+                                            }
+
+                                            setIsCheckingReport(true);
+                                            try {
+                                                const { reports } = await getReportsByItem('campaign', campaignId);
+                                                const currentUserId = (user as any)?._id || user?.id;
+                                                const userReport = reports.find(
+                                                    (report) => report.reporter._id === currentUserId
+                                                );
+                                                
+                                                if (userReport) {
+                                                    setHasReported(true);
+                                                    Swal.fire({
+                                                        icon: 'info',
+                                                        title: 'Đã báo cáo',
+                                                        text: 'Bạn đã báo cáo chiến dịch này rồi. Vui lòng chờ admin xử lý.',
+                                                    });
+                                                } else {
+                                                    setShowReportModal(true);
+                                                }
+                                            } catch (error) {
+                                                console.error('Error checking report:', error);
+                                                setShowReportModal(true);
+                                            } finally {
+                                                setIsCheckingReport(false);
+                                            }
+                                        }}
+                                        disabled={isCheckingReport || hasReported}
+                                        className="w-full py-3 px-4 border-2 border-red-300 text-red-600 font-medium rounded-xl hover:bg-red-50 hover:border-red-400 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <FaFlag className="w-4 h-4" />
+                                        {hasReported ? 'Đã báo cáo' : 'Báo cáo chiến dịch'}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1967,6 +2021,17 @@ function CampaignDetails() {
                             timer: 2000,
                             showConfirmButton: false
                         });
+                    }}
+                />
+
+                {/* Report Modal */}
+                <ReportModal
+                    reportedType="campaign"
+                    reportedId={campaignId}
+                    isOpen={showReportModal}
+                    onClose={() => setShowReportModal(false)}
+                    onSuccess={() => {
+                        setHasReported(true);
                     }}
                 />
             </div>
