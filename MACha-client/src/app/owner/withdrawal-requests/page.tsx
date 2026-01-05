@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
 import { ownerService } from '@/services/owner.service';
-import { Escrow } from '@/services/escrow.service';
+import { Escrow, Campaign, User } from '@/services/escrow.service';
 import { formatCurrencyVND, formatDateTime, formatWithdrawalStatus } from '@/utils/escrow.utils';
 import Swal from 'sweetalert2';
 import {
@@ -32,6 +32,24 @@ export default function OwnerWithdrawalRequests() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Helper functions to safely access nested properties
+  const getCampaignTitle = (campaign: string | Campaign | undefined): string => {
+    if (!campaign) return 'N/A';
+    return typeof campaign === 'string' ? campaign : campaign.title || 'N/A';
+  };
+
+  const getUserName = (user: string | User | undefined | null): string => {
+    if (!user) return 'N/A';
+    if (typeof user === 'string') return user;
+    return user.fullname || user.username || 'N/A';
+  };
+
+  const getUserEmail = (user: string | User | undefined | null): string => {
+    if (!user) return '';
+    if (typeof user === 'string') return '';
+    return user.email || '';
+  };
 
   useEffect(() => {
     fetchWithdrawalRequests();
@@ -100,15 +118,23 @@ export default function OwnerWithdrawalRequests() {
 
   const handleProcessPayment = async (escrow: Escrow) => {
     setOpenMenuId(null);
-    
+
+    const campaignTitle =
+      typeof escrow.campaign === 'string' ? escrow.campaign : escrow.campaign?.title;
+
+    const requesterName =
+      typeof escrow.requested_by === 'string'
+        ? escrow.requested_by
+        : escrow.requested_by?.fullname || escrow.requested_by?.username;
+
     const result = await Swal.fire({
       title: 'Xác nhận chuyển khoản',
       html: `
         <div class="text-left">
           <p class="mb-2">Bạn sẽ chuyển khoản số tiền:</p>
           <p class="text-2xl font-bold text-green-600 mb-4">${formatCurrencyVND(escrow.withdrawal_request_amount)}</p>
-          <p class="text-sm text-gray-600 mb-2">Campaign: <strong>${escrow.campaign?.title || 'N/A'}</strong></p>
-          <p class="text-sm text-gray-600">Người yêu cầu: <strong>${escrow.requested_by?.fullname || escrow.requested_by?.username || 'N/A'}</strong></p>
+          <p class="text-sm text-gray-600 mb-2">Campaign: <strong>${campaignTitle || 'N/A'}</strong></p>
+          <p class="text-sm text-gray-600">Người yêu cầu: <strong>${requesterName || 'N/A'}</strong></p>
         </div>
       `,
       icon: 'question',
@@ -155,21 +181,35 @@ export default function OwnerWithdrawalRequests() {
   const filteredRequests = withdrawalRequests.filter((request) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
+    
+    const campaignTitle = typeof request.campaign === 'string' 
+      ? request.campaign 
+      : request.campaign?.title;
+    
+    const requesterName = typeof request.requested_by === 'string'
+      ? request.requested_by
+      : request.requested_by?.fullname || request.requested_by?.username;
+    
+    const requesterUsername = typeof request.requested_by === 'string'
+      ? request.requested_by
+      : request.requested_by?.username;
+    
     return (
-      request.campaign?.title?.toLowerCase().includes(query) ||
-      request.requested_by?.fullname?.toLowerCase().includes(query) ||
-      request.requested_by?.username?.toLowerCase().includes(query) ||
+      campaignTitle?.toLowerCase().includes(query) ||
+      requesterName?.toLowerCase().includes(query) ||
+      requesterUsername?.toLowerCase().includes(query) ||
       request.request_reason?.toLowerCase().includes(query)
     );
   });
 
   if (loading) {
     return (
-      <div className="flex h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50">
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50">
         <OwnerSidebar />
-        <div className="flex-1 flex flex-col ml-64">
-          <OwnerHeader />
-          <div className="flex-1 p-8 flex items-center justify-center">
+        <OwnerHeader />
+
+        <div className="ml-64 pt-16">
+          <div className="p-8 flex items-center justify-center">
             <div className="text-center">
               <RefreshCw className="w-12 h-12 text-purple-500 animate-spin mx-auto mb-4" />
               <p className="text-gray-600">Đang tải...</p>
@@ -181,11 +221,12 @@ export default function OwnerWithdrawalRequests() {
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50">
       <OwnerSidebar />
-      <div className="flex-1 flex flex-col ml-64">
-        <OwnerHeader />
-        <div className="flex-1 p-8 overflow-y-auto">
+      <OwnerHeader />
+
+      <div className="ml-64 pt-16">
+        <div className="p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Yêu cầu rút tiền đã duyệt</h1>
@@ -226,10 +267,10 @@ export default function OwnerWithdrawalRequests() {
                             </div>
                             <div>
                               <h3 className="font-semibold text-gray-900 text-lg">
-                                {request.campaign?.title || 'N/A'}
+                                {getCampaignTitle(request.campaign)}
                               </h3>
                               <p className="text-sm text-gray-500">
-                                Yêu cầu bởi: {request.requested_by?.fullname || request.requested_by?.username || 'N/A'}
+                                Yêu cầu bởi: {getUserName(request.requested_by)}
                               </p>
                             </div>
                           </div>
@@ -256,7 +297,7 @@ export default function OwnerWithdrawalRequests() {
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Admin duyệt</p>
                               <p className="text-sm font-medium text-gray-900">
-                                {request.admin_reviewed_by?.fullname || request.admin_reviewed_by?.username || 'N/A'}
+                                {getUserName(request.admin_reviewed_by)}
                               </p>
                             </div>
                           </div>
@@ -275,10 +316,12 @@ export default function OwnerWithdrawalRequests() {
                               <p className="text-xs text-gray-500 mb-2">Kết quả voting</p>
                               <div className="flex items-center gap-4 text-sm">
                                 <span className="text-green-600">
-                                  ✓ Approve: {request.votingResults.approveCount} ({request.votingResults.approvePercentage}%)
+                                  ✓ Approve: {request.votingResults.approveCount} ({request.votingResults.approvePercentage}
+                                  %)
                                 </span>
                                 <span className="text-red-600">
-                                  ✗ Reject: {request.votingResults.rejectCount} ({request.votingResults.rejectPercentage}%)
+                                  ✗ Reject: {request.votingResults.rejectCount} ({request.votingResults.rejectPercentage}
+                                  %)
                                 </span>
                               </div>
                             </div>
@@ -332,15 +375,15 @@ export default function OwnerWithdrawalRequests() {
             <div className="p-6 space-y-6">
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Campaign</h3>
-                <p className="text-lg font-semibold text-gray-900">{selectedRequest.campaign?.title || 'N/A'}</p>
+                <p className="text-lg font-semibold text-gray-900">{getCampaignTitle(selectedRequest.campaign)}</p>
               </div>
 
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Người yêu cầu</h3>
                 <p className="text-lg font-semibold text-gray-900">
-                  {selectedRequest.requested_by?.fullname || selectedRequest.requested_by?.username || 'N/A'}
+                  {getUserName(selectedRequest.requested_by)}
                 </p>
-                <p className="text-sm text-gray-500">{selectedRequest.requested_by?.email || ''}</p>
+                <p className="text-sm text-gray-500">{getUserEmail(selectedRequest.requested_by)}</p>
               </div>
 
               <div>
@@ -375,13 +418,15 @@ export default function OwnerWithdrawalRequests() {
                     <div className="flex justify-between">
                       <span className="text-green-600">Approve:</span>
                       <span className="font-semibold text-green-600">
-                        {selectedRequest.votingResults.approveCount} ({selectedRequest.votingResults.approvePercentage}%)
+                        {selectedRequest.votingResults.approveCount} ({selectedRequest.votingResults.approvePercentage}
+                        %)
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-red-600">Reject:</span>
                       <span className="font-semibold text-red-600">
-                        {selectedRequest.votingResults.rejectCount} ({selectedRequest.votingResults.rejectPercentage}%)
+                        {selectedRequest.votingResults.rejectCount} ({selectedRequest.votingResults.rejectPercentage}
+                        %)
                       </span>
                     </div>
                   </div>
@@ -405,7 +450,7 @@ export default function OwnerWithdrawalRequests() {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Admin đã duyệt</h3>
                   <p className="text-gray-900">
-                    {selectedRequest.admin_reviewed_by?.fullname || selectedRequest.admin_reviewed_by?.username || 'N/A'}
+                    {getUserName(selectedRequest.admin_reviewed_by)}
                   </p>
                 </div>
               )}
