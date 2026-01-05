@@ -139,13 +139,62 @@ export default function AdminKYCApproval() {
     setMenuPosition(null);
     const result = await Swal.fire({
       title: 'Duyệt KYC?',
-      text: 'Người dùng sẽ được xác thực và có thể tạo chiến dịch',
+      html: `
+        <p style="margin-bottom: 20px;">Người dùng sẽ được xác thực và có thể tạo chiến dịch.</p>
+        <div style="text-align: left; margin-bottom: 15px;">
+          <label style="display: flex; align-items: center; cursor: pointer; color: #374151;">
+            <input type="checkbox" id="terms-checkbox" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+            <span>Tôi cam kết chịu trách nhiệm với quyết định của mình</span>
+          </label>
+        </div>
+        <div style="text-align: center; margin-top: 10px;">
+          <a href="/terms" target="_blank" style="color: #2563eb; text-decoration: underline; font-size: 14px;">
+            Xem điều khoản cam kết
+          </a>
+        </div>
+      `,
       icon: 'question',
       showCancelButton: true,
       confirmButtonColor: '#10b981',
       cancelButtonColor: '#6b7280',
       confirmButtonText: 'Duyệt',
       cancelButtonText: 'Hủy',
+      didOpen: () => {
+        const checkbox = document.getElementById('terms-checkbox') as HTMLInputElement;
+        const confirmButton = Swal.getConfirmButton();
+        
+        if (confirmButton) {
+          confirmButton.disabled = true;
+          confirmButton.style.opacity = '0.5';
+          confirmButton.style.cursor = 'not-allowed';
+        }
+        
+        if (checkbox) {
+          checkbox.addEventListener('change', () => {
+            const confirmButton = Swal.getConfirmButton();
+            if (confirmButton) {
+              if (checkbox.checked) {
+                confirmButton.disabled = false;
+                confirmButton.style.opacity = '1';
+                confirmButton.style.cursor = 'pointer';
+              } else {
+                confirmButton.disabled = true;
+                confirmButton.style.opacity = '0.5';
+                confirmButton.style.cursor = 'not-allowed';
+              }
+            }
+          });
+        }
+      },
+      preConfirm: () => {
+        const checkbox = document.getElementById('terms-checkbox') as HTMLInputElement;
+        if (!checkbox || !checkbox.checked) {
+          Swal.showValidationMessage('Vui lòng xác nhận cam kết trước khi duyệt');
+          return false;
+        }
+        return true;
+      },
+      allowOutsideClick: () => !Swal.isLoading(),
     });
 
     if (result.isConfirmed) {
@@ -163,27 +212,99 @@ export default function AdminKYCApproval() {
   const handleReject = async (userId: string) => {
     setOpenMenuId(null);
     setMenuPosition(null);
-    const { value: reason } = await Swal.fire({
+    const result = await Swal.fire({
       title: 'Từ chối KYC',
-      input: 'textarea',
-      inputLabel: 'Lý do từ chối',
-      inputPlaceholder: 'Nhập lý do...',
-      inputAttributes: {
-        'aria-label': 'Nhập lý do từ chối',
-      },
+      html: `
+        <div style="text-align: left; margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">Lý do từ chối</label>
+          <textarea id="rejection-reason" placeholder="Nhập lý do từ chối..." style="width: 100%; min-height: 100px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; resize: vertical;"></textarea>
+          <div id="reason-error" style="color: #dc2626; font-size: 14px; margin-top: 5px; display: none;"></div>
+        </div>
+        <div style="text-align: left; margin-bottom: 15px; margin-top: 20px;">
+          <label style="display: flex; align-items: center; cursor: pointer; color: #374151;">
+            <input type="checkbox" id="terms-checkbox-reject" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+            <span>Tôi cam kết chịu trách nhiệm với quyết định của mình</span>
+          </label>
+        </div>
+        <div style="text-align: center; margin-top: 10px;">
+          <a href="/terms" target="_blank" style="color: #2563eb; text-decoration: underline; font-size: 14px;">
+            Xem điều khoản cam kết
+          </a>
+        </div>
+      `,
       showCancelButton: true,
       confirmButtonColor: '#dc2626',
       cancelButtonColor: '#6b7280',
       confirmButtonText: 'Từ chối',
       cancelButtonText: 'Hủy',
-      inputValidator: (value) => {
-        if (!value) {
-          return 'Bạn cần nhập lý do từ chối!';
+      didOpen: () => {
+        const checkbox = document.getElementById('terms-checkbox-reject') as HTMLInputElement;
+        const reasonInput = document.getElementById('rejection-reason') as HTMLTextAreaElement;
+        const confirmButton = Swal.getConfirmButton();
+        const errorDiv = document.getElementById('reason-error');
+        
+        if (confirmButton) {
+          confirmButton.disabled = true;
+          confirmButton.style.opacity = '0.5';
+          confirmButton.style.cursor = 'not-allowed';
+        }
+        
+        const validateAndUpdateButton = () => {
+          const reason = reasonInput?.value?.trim() || '';
+          const isCheckboxChecked = checkbox?.checked || false;
+          const isValid = reason.length > 0 && isCheckboxChecked;
+          
+          if (confirmButton) {
+            if (isValid) {
+              confirmButton.disabled = false;
+              confirmButton.style.opacity = '1';
+              confirmButton.style.cursor = 'pointer';
+            } else {
+              confirmButton.disabled = true;
+              confirmButton.style.opacity = '0.5';
+              confirmButton.style.cursor = 'not-allowed';
+            }
+          }
+          
+          if (errorDiv) {
+            if (reason.length === 0) {
+              errorDiv.textContent = 'Bạn cần nhập lý do từ chối';
+              errorDiv.style.display = 'block';
+            } else {
+              errorDiv.style.display = 'none';
+            }
+          }
+        };
+        
+        if (checkbox) {
+          checkbox.addEventListener('change', validateAndUpdateButton);
+        }
+        if (reasonInput) {
+          reasonInput.addEventListener('input', validateAndUpdateButton);
         }
       },
+      preConfirm: () => {
+        const checkbox = document.getElementById('terms-checkbox-reject') as HTMLInputElement;
+        const reasonInput = document.getElementById('rejection-reason') as HTMLTextAreaElement;
+        const reason = reasonInput?.value?.trim() || '';
+        
+        if (!checkbox || !checkbox.checked) {
+          Swal.showValidationMessage('Vui lòng xác nhận cam kết trước khi từ chối');
+          return false;
+        }
+        
+        if (!reason) {
+          Swal.showValidationMessage('Vui lòng nhập lý do từ chối');
+          return false;
+        }
+        
+        return reason;
+      },
+      allowOutsideClick: () => !Swal.isLoading(),
     });
 
-    if (reason) {
+    if (result.isConfirmed && result.value) {
+      const reason = result.value;
       try {
         await rejectKYC(userId, reason);
         Swal.fire('Đã từ chối!', 'KYC đã bị từ chối', 'success');
@@ -550,7 +671,11 @@ export default function AdminKYCApproval() {
                     </div>
                     <div>
                       <p className="text-gray-600 text-sm mb-1">Họ tên</p>
-                      <p className="text-gray-900 font-medium">{selectedKYC.user.fullname || '-'}</p>
+                      <p className="text-gray-900 font-medium">
+                        {selectedKYC.kyc_info.extracted_data?.identity_verified_name || 
+                         selectedKYC.kyc_info.identity_verified_name || 
+                         selectedKYC.user.fullname || '-'}
+                      </p>
                     </div>
                     <div>
                       <p className="text-gray-600 text-sm mb-1">Trạng thái</p>
@@ -574,122 +699,163 @@ export default function AdminKYCApproval() {
                   <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <div>
                       <p className="text-gray-600 text-sm mb-1">Tên trên CCCD</p>
-                      <p className="text-gray-900 font-medium">{selectedKYC.kyc_info.identity_verified_name || '-'}</p>
+                      <p className="text-gray-900 font-medium">
+                        {selectedKYC.kyc_info.extracted_data?.identity_verified_name || 
+                         selectedKYC.kyc_info.identity_verified_name || '-'}
+                      </p>
                     </div>
                     <div>
                       <p className="text-gray-600 text-sm mb-1">CCCD (4 số cuối)</p>
-                      <p className="text-gray-900 font-medium">{selectedKYC.kyc_info.identity_card_last4 || '-'}</p>
+                      <p className="text-gray-900 font-medium">
+                        {selectedKYC.kyc_info.extracted_data?.identity_card_last4 || 
+                         selectedKYC.kyc_info.identity_card_last4 || '-'}
+                      </p>
                     </div>
                     <div>
                       <p className="text-gray-600 text-sm mb-1">Mã số thuế</p>
-                      <p className="text-gray-900 font-medium">{selectedKYC.kyc_info.tax_code || '-'}</p>
+                      <p className="text-gray-900 font-medium">
+                        {selectedKYC.kyc_info.extracted_data?.tax_code || 
+                         selectedKYC.kyc_info.tax_code || '-'}
+                      </p>
                     </div>
                     <div>
                       <p className="text-gray-600 text-sm mb-1">Địa chỉ</p>
                       <p className="text-gray-900 font-medium">
-                        {selectedKYC.kyc_info.address?.district && selectedKYC.kyc_info.address?.city
-                          ? `${selectedKYC.kyc_info.address.district}, ${selectedKYC.kyc_info.address.city}`
-                          : '-'
-                        }
+                        {(() => {
+                          const address = selectedKYC.kyc_info.extracted_data?.address || selectedKYC.kyc_info.address;
+                          return address?.district && address?.city
+                            ? `${address.district}, ${address.city}`
+                            : '-';
+                        })()}
                       </p>
                     </div>
                   </div>
                 </div>
 
                 {/* Bank Info */}
-                {selectedKYC.kyc_info.bank_account && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin ngân hàng</h3>
-                    <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div>
-                        <p className="text-gray-600 text-sm mb-1">Ngân hàng</p>
-                        <p className="text-gray-900 font-medium">{selectedKYC.kyc_info.bank_account.bank_name || '-'}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600 text-sm mb-1">STK (4 số cuối)</p>
-                        <p className="text-gray-900 font-medium">{selectedKYC.kyc_info.bank_account.account_number_last4 || '-'}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <p className="text-gray-600 text-sm mb-1">Chủ tài khoản</p>
-                        <p className="text-gray-900 font-medium">{selectedKYC.kyc_info.bank_account.account_holder_name || '-'}</p>
+                {(() => {
+                  const bankAccount = selectedKYC.kyc_info.extracted_data?.bank_account || selectedKYC.kyc_info.bank_account;
+                  return bankAccount && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin ngân hàng</h3>
+                      <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div>
+                          <p className="text-gray-600 text-sm mb-1">Ngân hàng</p>
+                          <p className="text-gray-900 font-medium">{bankAccount.bank_name || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600 text-sm mb-1">STK (4 số cuối)</p>
+                          <p className="text-gray-900 font-medium">{bankAccount.account_number_last4 || '-'}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-gray-600 text-sm mb-1">Chủ tài khoản</p>
+                          <p className="text-gray-900 font-medium">{bankAccount.account_holder_name || '-'}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Documents */}
-                {selectedKYC.kyc_info.kyc_documents && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-4">Tài liệu</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      {selectedKYC.kyc_info.kyc_documents.identity_front_url && (
-                        <div>
-                          <p className="text-gray-600 text-sm mb-2">CCCD mặt trước</p>
-                          <a
-                            href={selectedKYC.kyc_info.kyc_documents.identity_front_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block bg-gray-50 border border-gray-200 p-3 rounded-lg hover:bg-gray-100 transition-all text-blue-600 hover:text-blue-700"
-                          >
-                            Xem tài liệu →
-                          </a>
-                        </div>
-                      )}
-                      {selectedKYC.kyc_info.kyc_documents.identity_back_url && (
-                        <div>
-                          <p className="text-gray-600 text-sm mb-2">CCCD mặt sau</p>
-                          <a
-                            href={selectedKYC.kyc_info.kyc_documents.identity_back_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block bg-gray-50 border border-gray-200 p-3 rounded-lg hover:bg-gray-100 transition-all text-blue-600 hover:text-blue-700"
-                          >
-                            Xem tài liệu →
-                          </a>
-                        </div>
-                      )}
-                      {selectedKYC.kyc_info.kyc_documents.selfie_url && (
-                        <div>
-                          <p className="text-gray-600 text-sm mb-2">Ảnh selfie với CCCD</p>
-                          <a
-                            href={selectedKYC.kyc_info.kyc_documents.selfie_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block bg-gray-50 border border-gray-200 p-3 rounded-lg hover:bg-gray-100 transition-all text-blue-600 hover:text-blue-700"
-                          >
-                            Xem tài liệu →
-                          </a>
-                        </div>
-                      )}
-                      {selectedKYC.kyc_info.kyc_documents.tax_document_url && (
-                        <div>
-                          <p className="text-gray-600 text-sm mb-2">Giấy tờ thuế</p>
-                          <a
-                            href={selectedKYC.kyc_info.kyc_documents.tax_document_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block bg-gray-50 border border-gray-200 p-3 rounded-lg hover:bg-gray-100 transition-all text-blue-600 hover:text-blue-700"
-                          >
-                            Xem tài liệu →
-                          </a>
-                        </div>
-                      )}
-                      {selectedKYC.kyc_info.kyc_documents.bank_statement_url && (
-                        <div>
-                          <p className="text-gray-600 text-sm mb-2">Sao kê ngân hàng</p>
-                          <a
-                            href={selectedKYC.kyc_info.kyc_documents.bank_statement_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block bg-gray-50 border border-gray-200 p-3 rounded-lg hover:bg-gray-100 transition-all text-blue-600 hover:text-blue-700"
-                          >
-                            Xem tài liệu →
-                          </a>
-                        </div>
-                      )}
+                {(() => {
+                  const documents = selectedKYC.kyc_info.documents || selectedKYC.kyc_info.kyc_documents;
+                  return documents && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Tài liệu</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        {documents.identity_front_url && (
+                          <div>
+                            <p className="text-gray-600 text-sm mb-2">CCCD mặt trước</p>
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+                              <img
+                                src={documents.identity_front_url}
+                                alt="CCCD mặt trước"
+                                className="w-full h-auto max-h-64 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => window.open(documents.identity_front_url, '_blank')}
+                              />
+                            </div>
+                            <a
+                              href={documents.identity_front_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 block text-sm text-blue-600 hover:text-blue-700 text-center"
+                            >
+                              Mở trong tab mới →
+                            </a>
+                          </div>
+                        )}
+                        {documents.identity_back_url && (
+                          <div>
+                            <p className="text-gray-600 text-sm mb-2">CCCD mặt sau</p>
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+                              <img
+                                src={documents.identity_back_url}
+                                alt="CCCD mặt sau"
+                                className="w-full h-auto max-h-64 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => window.open(documents.identity_back_url, '_blank')}
+                              />
+                            </div>
+                            <a
+                              href={documents.identity_back_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 block text-sm text-blue-600 hover:text-blue-700 text-center"
+                            >
+                              Mở trong tab mới →
+                            </a>
+                          </div>
+                        )}
+                        {documents.selfie_url && (
+                          <div className="col-span-2">
+                            <p className="text-gray-600 text-sm mb-2">Ảnh selfie với CCCD</p>
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+                              <img
+                                src={documents.selfie_url}
+                                alt="Ảnh selfie với CCCD"
+                                className="w-full h-auto max-h-96 object-contain cursor-pointer hover:opacity-90 transition-opacity mx-auto"
+                                onClick={() => window.open(documents.selfie_url, '_blank')}
+                              />
+                            </div>
+                            <a
+                              href={documents.selfie_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 block text-sm text-blue-600 hover:text-blue-700 text-center"
+                            >
+                              Mở trong tab mới →
+                            </a>
+                          </div>
+                        )}
+                        {documents.tax_document_url && (
+                          <div>
+                            <p className="text-gray-600 text-sm mb-2">Giấy tờ thuế</p>
+                            <a
+                              href={documents.tax_document_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block bg-gray-50 border border-gray-200 p-3 rounded-lg hover:bg-gray-100 transition-all text-blue-600 hover:text-blue-700"
+                            >
+                              Xem tài liệu →
+                            </a>
+                          </div>
+                        )}
+                        {documents.bank_statement_url && (
+                          <div>
+                            <p className="text-gray-600 text-sm mb-2">Sao kê ngân hàng</p>
+                            <a
+                              href={documents.bank_statement_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block bg-gray-50 border border-gray-200 p-3 rounded-lg hover:bg-gray-100 transition-all text-blue-600 hover:text-blue-700"
+                            >
+                              Xem tài liệu →
+                            </a>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Timeline */}
                 <div>

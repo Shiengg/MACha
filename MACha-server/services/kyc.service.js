@@ -68,17 +68,20 @@ export const submitKYC = async (userId, kycData) => {
     }
     
     // Validate required fields
-    const requiredFields = ['identity_verified_name', 'identity_card_last4'];
-    const missingFields = requiredFields.filter(field => {
-        const extractedData = kycData.extracted_data || kycData;
-        return !extractedData[field] && !kycData[field];
-    });
+    const dataForValidation = kycData.extracted_data || kycData;
+    const hasIdentityCard = dataForValidation.identity_card_number || kycData.identity_card_number || 
+                           dataForValidation.identity_card_last4 || kycData.identity_card_last4;
+    const hasIdentityName = dataForValidation.identity_verified_name || kycData.identity_verified_name;
     
-    if (missingFields.length > 0) {
+    if (!hasIdentityName || !hasIdentityCard) {
+        const missingFields = [];
+        if (!hasIdentityName) missingFields.push('identity_verified_name');
+        if (!hasIdentityCard) missingFields.push('identity_card_number');
+        
         return { 
             success: false, 
             error: 'MISSING_REQUIRED_FIELDS',
-            message: 'Missing required fields',
+            message: 'Missing required fields: ' + missingFields.join(', '),
             missingFields 
         };
     }
@@ -95,13 +98,17 @@ export const submitKYC = async (userId, kycData) => {
         }
     }
     
-    // Prepare extracted data
+    // Prepare extracted data (will be encrypted by pre-save hook)
     const extractedData = {
         identity_verified_name: kycData.identity_verified_name || kycData.extracted_data?.identity_verified_name,
+        identity_card_number: kycData.identity_card_number || kycData.extracted_data?.identity_card_number,
         identity_card_last4: kycData.identity_card_last4 || kycData.extracted_data?.identity_card_last4,
         tax_code: kycData.tax_code || kycData.extracted_data?.tax_code,
         address: kycData.address || kycData.extracted_data?.address || {},
-        bank_account: kycData.bank_account || kycData.extracted_data?.bank_account || {}
+        bank_account: {
+            ...(kycData.bank_account || kycData.extracted_data?.bank_account || {}),
+            account_number: kycData.bank_account?.account_number || kycData.extracted_data?.bank_account?.account_number
+        }
     };
     
     // Create new KYC submission

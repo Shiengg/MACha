@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import apiClient from '@/lib/api-client';
 import Swal from 'sweetalert2';
 import { SUBMIT_KYC_ROUTE } from '@/constants/api';
+import { cloudinaryService } from '@/services/cloudinary.service';
 
 function KYCSubmissionContent() {
   const router = useRouter();
@@ -15,9 +16,25 @@ function KYCSubmissionContent() {
   const [currentStep, setCurrentStep] = useState(1);
   const [checkingStatus, setCheckingStatus] = useState(true);
   
+  // File upload states
+  const [identityFrontFile, setIdentityFrontFile] = useState<File | null>(null);
+  const [identityBackFile, setIdentityBackFile] = useState<File | null>(null);
+  const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [identityFrontPreview, setIdentityFrontPreview] = useState<string | null>(null);
+  const [identityBackPreview, setIdentityBackPreview] = useState<string | null>(null);
+  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  
+  // Camera states
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
   const [formData, setFormData] = useState({
     identity_verified_name: '',
-    identity_card_last4: '',
+    identity_card_number: '', // Lưu full số CCCD (sẽ được mã hóa ở server)
+    identity_card_last4: '', // Tự động tạo từ full number
     tax_code: '',
     address: {
       city: '',
@@ -25,7 +42,8 @@ function KYCSubmissionContent() {
     },
     bank_account: {
       bank_name: '',
-      account_number_last4: '',
+      account_number: '', // Lưu full số tài khoản (sẽ được mã hóa ở server)
+      account_number_last4: '', // Tự động tạo từ full number
       account_holder_name: '',
     },
     kyc_documents: {
@@ -87,9 +105,16 @@ function KYCSubmissionContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     
-    // Validate required fields
-    if (!formData.identity_verified_name || !formData.identity_card_last4) {
+    // Only allow submission on step 3
+    if (currentStep !== 3) {
+      nextStep();
+      return;
+    }
+    
+    // Validate required fields (only for step 3)
+    if (!formData.identity_verified_name || !formData.identity_card_number) {
       Swal.fire({
         icon: 'error',
         title: 'Thiếu thông tin',
@@ -98,10 +123,45 @@ function KYCSubmissionContent() {
       return;
     }
 
+    // Validate required images
+    if (!identityFrontFile || !identityBackFile || !selfieFile) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Thiếu ảnh',
+        text: 'Vui lòng upload đầy đủ ảnh CCCD mặt trước, mặt sau và ảnh selfie',
+      });
+      return;
+    }
+
     try {
       setLoading(true);
+
+      Swal.fire({
+        title: 'Đang xử lý...',
+        html: 'Đang upload ảnh và gửi yêu cầu',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
+      // Upload images first
+      const uploadedUrls = await uploadImages();
       
-      const response = await apiClient.post(SUBMIT_KYC_ROUTE, formData);
+      // Update formData with uploaded URLs
+      const finalFormData = {
+        identity_verified_name: formData.identity_verified_name,
+        identity_card_number: formData.identity_card_number,
+        tax_code: formData.tax_code,
+        address: formData.address,
+        bank_account: formData.bank_account,
+        kyc_documents: {
+          ...formData.kyc_documents,
+          ...uploadedUrls,
+        },
+      };
+
+      const response = await apiClient.post(SUBMIT_KYC_ROUTE, finalFormData);
 
       Swal.fire({
         icon: 'success',
@@ -142,8 +202,254 @@ function KYCSubmissionContent() {
     if (currentStep < 3) setCurrentStep(currentStep + 1);
   };
 
+  const handleNextStep = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    nextStep();
+  };
+
   const prevStep = () => {
     if (currentStep > 1) setCurrentStep(currentStep - 1);
+  };
+
+  // File upload handlers
+  const handleIdentityFrontChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      Swal.fire('Lỗi', 'Chỉ chấp nhận file ảnh', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      Swal.fire('Lỗi', 'File quá lớn (max 5MB)', 'error');
+      return;
+    }
+
+    if (identityFrontPreview) {
+      URL.revokeObjectURL(identityFrontPreview);
+    }
+
+    setIdentityFrontFile(file);
+    setIdentityFrontPreview(URL.createObjectURL(file));
+  };
+
+  const handleIdentityBackChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      Swal.fire('Lỗi', 'Chỉ chấp nhận file ảnh', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      Swal.fire('Lỗi', 'File quá lớn (max 5MB)', 'error');
+      return;
+    }
+
+    if (identityBackPreview) {
+      URL.revokeObjectURL(identityBackPreview);
+    }
+
+    setIdentityBackFile(file);
+    setIdentityBackPreview(URL.createObjectURL(file));
+  };
+
+  const removeIdentityFront = () => {
+    if (identityFrontPreview) {
+      URL.revokeObjectURL(identityFrontPreview);
+    }
+    setIdentityFrontFile(null);
+    setIdentityFrontPreview(null);
+    setFormData(prev => ({
+      ...prev,
+      kyc_documents: {
+        ...prev.kyc_documents,
+        identity_front_url: '',
+      },
+    }));
+  };
+
+  const removeIdentityBack = () => {
+    if (identityBackPreview) {
+      URL.revokeObjectURL(identityBackPreview);
+    }
+    setIdentityBackFile(null);
+    setIdentityBackPreview(null);
+    setFormData(prev => ({
+      ...prev,
+      kyc_documents: {
+        ...prev.kyc_documents,
+        identity_back_url: '',
+      },
+    }));
+  };
+
+  const removeSelfie = () => {
+    if (selfiePreview) {
+      URL.revokeObjectURL(selfiePreview);
+    }
+    setSelfieFile(null);
+    setSelfiePreview(null);
+    setFormData(prev => ({
+      ...prev,
+      kyc_documents: {
+        ...prev.kyc_documents,
+        selfie_url: '',
+      },
+    }));
+  };
+
+  // Camera handlers
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'user', // Front camera
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
+      });
+      setCameraStream(stream);
+      setShowCamera(true);
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Không thể truy cập camera. Vui lòng kiểm tra quyền truy cập camera.',
+      });
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setShowCamera(false);
+  };
+
+  const captureSelfie = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+
+    if (!context) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Flip horizontally to match mirror effect of video preview
+    context.translate(canvas.width, 0);
+    context.scale(-1, 1);
+    context.drawImage(video, 0, 0);
+    context.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+
+      const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
+      
+      if (selfiePreview) {
+        URL.revokeObjectURL(selfiePreview);
+      }
+
+      setSelfieFile(file);
+      setSelfiePreview(URL.createObjectURL(blob));
+      stopCamera();
+    }, 'image/jpeg', 0.9);
+  };
+
+  // Set video srcObject when camera stream is available
+  useEffect(() => {
+    if (showCamera && cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.play().catch(err => {
+        console.error('Error playing video:', err);
+      });
+    }
+  }, [showCamera, cameraStream]);
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+      if (identityFrontPreview) URL.revokeObjectURL(identityFrontPreview);
+      if (identityBackPreview) URL.revokeObjectURL(identityBackPreview);
+      if (selfiePreview) URL.revokeObjectURL(selfiePreview);
+    };
+  }, [cameraStream, identityFrontPreview, identityBackPreview, selfiePreview]);
+
+  // Upload images to Cloudinary
+  const uploadImages = async (): Promise<{
+    identity_front_url?: string;
+    identity_back_url?: string;
+    selfie_url?: string;
+  }> => {
+    setUploading(true);
+    try {
+      const uploadPromises: Promise<{ type: string; url: string }>[] = [];
+
+      if (identityFrontFile) {
+        uploadPromises.push(
+          cloudinaryService.uploadImage(identityFrontFile, 'kyc').then(result => ({
+            type: 'identity_front',
+            url: result.secure_url,
+          }))
+        );
+      }
+
+      if (identityBackFile) {
+        uploadPromises.push(
+          cloudinaryService.uploadImage(identityBackFile, 'kyc').then(result => ({
+            type: 'identity_back',
+            url: result.secure_url,
+          }))
+        );
+      }
+
+      if (selfieFile) {
+        uploadPromises.push(
+          cloudinaryService.uploadImage(selfieFile, 'kyc').then(result => ({
+            type: 'selfie',
+            url: result.secure_url,
+          }))
+        );
+      }
+
+      const results = await Promise.all(uploadPromises);
+      
+      const uploadedUrls: {
+        identity_front_url?: string;
+        identity_back_url?: string;
+        selfie_url?: string;
+      } = {};
+
+      results.forEach(result => {
+        if (result.type === 'identity_front') {
+          uploadedUrls.identity_front_url = result.url;
+        } else if (result.type === 'identity_back') {
+          uploadedUrls.identity_back_url = result.url;
+        } else if (result.type === 'selfie') {
+          uploadedUrls.selfie_url = result.url;
+        }
+      });
+
+      return uploadedUrls;
+    } catch (error: any) {
+      console.error('Error uploading images:', error);
+      throw new Error('Không thể tải lên hình ảnh. Vui lòng thử lại.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   if (checkingStatus) {
@@ -230,20 +536,21 @@ function KYCSubmissionContent() {
 
                 <div>
                   <label className="block text-gray-300 mb-2">
-                    Số CCCD (4 số cuối) <span className="text-red-500">*</span>
+                    Số CCCD <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    name="identity_card_last4"
-                    value={formData.identity_card_last4}
+                    name="identity_card_number"
+                    value={formData.identity_card_number}
                     onChange={handleInputChange}
                     className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    placeholder="1234"
-                    maxLength={4}
-                    pattern="[0-9]{4}"
+                    placeholder="001234567890"
+                    pattern="[0-9]{9,12}"
                     required
                   />
-                  <p className="text-gray-400 text-sm mt-1">Chỉ nhập 4 số cuối để bảo mật</p>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Nhập đầy đủ số CCCD. Dữ liệu sẽ được mã hóa để bảo mật.
+                  </p>
                 </div>
 
                 <div>
@@ -303,18 +610,19 @@ function KYCSubmissionContent() {
                 </div>
 
                 <div>
-                  <label className="block text-gray-300 mb-2">Số tài khoản (4 số cuối)</label>
+                  <label className="block text-gray-300 mb-2">Số tài khoản</label>
                   <input
                     type="text"
-                    name="bank_account.account_number_last4"
-                    value={formData.bank_account.account_number_last4}
+                    name="bank_account.account_number"
+                    value={formData.bank_account.account_number}
                     onChange={handleInputChange}
                     className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    placeholder="5678"
-                    maxLength={4}
-                    pattern="[0-9]{4}"
+                    placeholder="1234567890"
+                    pattern="[0-9]{8,16}"
                   />
-                  <p className="text-gray-400 text-sm mt-1">Chỉ nhập 4 số cuối để bảo mật</p>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Nhập đầy đủ số tài khoản. Dữ liệu sẽ được mã hóa để bảo mật.
+                  </p>
                 </div>
 
                 <div>
@@ -342,72 +650,169 @@ function KYCSubmissionContent() {
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-white mb-6">Tài liệu xác thực</h2>
                 
-                <div className="space-y-4">
+                <div className="space-y-6">
+                  {/* CCCD Mặt trước */}
                   <div>
-                    <label className="block text-gray-300 mb-2">URL ảnh CCCD mặt trước</label>
+                    <label className="block text-gray-300 mb-2">
+                      Ảnh CCCD mặt trước <span className="text-red-500">*</span>
+                    </label>
                     <input
-                      type="url"
-                      name="kyc_documents.identity_front_url"
-                      value={formData.kyc_documents.identity_front_url}
-                      onChange={handleInputChange}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      placeholder="https://example.com/cccd-front.jpg"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleIdentityFrontChange}
+                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
                     />
+                    {identityFrontPreview && (
+                      <div className="mt-4 relative inline-block">
+                        <img
+                          src={identityFrontPreview}
+                          alt="CCCD mặt trước"
+                          className="max-w-full h-64 object-contain rounded-lg border border-gray-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeIdentityFront}
+                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-700 transition-all"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
                   </div>
 
+                  {/* CCCD Mặt sau */}
                   <div>
-                    <label className="block text-gray-300 mb-2">URL ảnh CCCD mặt sau</label>
+                    <label className="block text-gray-300 mb-2">
+                      Ảnh CCCD mặt sau <span className="text-red-500">*</span>
+                    </label>
                     <input
-                      type="url"
-                      name="kyc_documents.identity_back_url"
-                      value={formData.kyc_documents.identity_back_url}
-                      onChange={handleInputChange}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      placeholder="https://example.com/cccd-back.jpg"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleIdentityBackChange}
+                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
                     />
+                    {identityBackPreview && (
+                      <div className="mt-4 relative inline-block">
+                        <img
+                          src={identityBackPreview}
+                          alt="CCCD mặt sau"
+                          className="max-w-full h-64 object-contain rounded-lg border border-gray-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeIdentityBack}
+                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-700 transition-all"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
                   </div>
 
+                  {/* Selfie với CCCD */}
                   <div>
-                    <label className="block text-gray-300 mb-2">URL ảnh selfie với CCCD</label>
-                    <input
-                      type="url"
-                      name="kyc_documents.selfie_url"
-                      value={formData.kyc_documents.selfie_url}
-                      onChange={handleInputChange}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      placeholder="https://example.com/selfie.jpg"
-                    />
+                    <label className="block text-gray-300 mb-2">
+                      Ảnh selfie với CCCD <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-3">
+                      {!selfiePreview && !showCamera && (
+                        <button
+                          type="button"
+                          onClick={startCamera}
+                          className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                        >
+                          <span>📷</span> Chụp ảnh selfie
+                        </button>
+                      )}
+                      
+                      {showCamera && (
+                        <div className="bg-gray-900 rounded-lg p-4">
+                          <div className="relative">
+                            <video
+                              ref={videoRef}
+                              autoPlay
+                              playsInline
+                              muted
+                              className="w-full max-w-md mx-auto rounded-lg bg-black"
+                              style={{ transform: 'scaleX(-1)', minHeight: '400px', objectFit: 'cover' }}
+                            />
+                            <canvas ref={canvasRef} className="hidden" />
+                          </div>
+                          <div className="flex gap-3 mt-4 justify-center">
+                            <button
+                              type="button"
+                              onClick={captureSelfie}
+                              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all"
+                            >
+                              Chụp ảnh
+                            </button>
+                            <button
+                              type="button"
+                              onClick={stopCamera}
+                              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all"
+                            >
+                              Hủy
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {selfiePreview && !showCamera && (
+                        <div className="relative inline-block">
+                          <img
+                            src={selfiePreview}
+                            alt="Selfie"
+                            className="max-w-full h-64 object-contain rounded-lg border border-gray-600"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeSelfie}
+                            className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-700 transition-all"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-gray-400 text-sm mt-2">
+                      Vui lòng chụp ảnh selfie với CCCD trong khung hình. Ảnh sẽ được chụp trực tiếp từ camera.
+                    </p>
                   </div>
 
-                  <div>
-                    <label className="block text-gray-300 mb-2">URL giấy tờ thuế (nếu có)</label>
-                    <input
-                      type="url"
-                      name="kyc_documents.tax_document_url"
-                      value={formData.kyc_documents.tax_document_url}
-                      onChange={handleInputChange}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      placeholder="https://example.com/tax-doc.pdf"
-                    />
-                  </div>
+                  {/* Tài liệu bổ sung (tùy chọn) */}
+                  <div className="border-t border-gray-700 pt-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">Tài liệu bổ sung (tùy chọn)</h3>
+                    
+                    <div>
+                      <label className="block text-gray-300 mb-2">URL giấy tờ thuế (nếu có)</label>
+                      <input
+                        type="url"
+                        name="kyc_documents.tax_document_url"
+                        value={formData.kyc_documents.tax_document_url}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        placeholder="https://example.com/tax-doc.pdf"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-gray-300 mb-2">URL sao kê ngân hàng (nếu có)</label>
-                    <input
-                      type="url"
-                      name="kyc_documents.bank_statement_url"
-                      value={formData.kyc_documents.bank_statement_url}
-                      onChange={handleInputChange}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      placeholder="https://example.com/bank-statement.pdf"
-                    />
+                    <div className="mt-4">
+                      <label className="block text-gray-300 mb-2">URL sao kê ngân hàng (nếu có)</label>
+                      <input
+                        type="url"
+                        name="kyc_documents.bank_statement_url"
+                        value={formData.kyc_documents.bank_statement_url}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        placeholder="https://example.com/bank-statement.pdf"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-4">
-                  <p className="text-yellow-300 text-sm">
-                    ⚠️ <strong>Lưu ý:</strong> Hiện tại bạn cần upload ảnh lên dịch vụ lưu trữ (như Imgur, Cloudinary) 
-                    và dán link vào. Chức năng upload trực tiếp sẽ được bổ sung sau.
+                <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
+                  <p className="text-blue-300 text-sm">
+                    💡 <strong>Lưu ý:</strong> Ảnh CCCD mặt trước, mặt sau và selfie là bắt buộc. 
+                    Ảnh sẽ được upload tự động lên Cloudinary khi bạn gửi yêu cầu.
                   </p>
                 </div>
               </div>
@@ -426,7 +831,7 @@ function KYCSubmissionContent() {
               {currentStep < 3 ? (
                 <button
                   type="button"
-                  onClick={nextStep}
+                  onClick={handleNextStep}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
                 >
                   Tiếp tục
