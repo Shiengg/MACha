@@ -139,8 +139,10 @@ export default function OwnerAdminReports() {
   };
 
   const getReportedAdmin = (report: Report) => {
-    if (report.reported_item && typeof report.reported_item === 'object') {
-      return report.reported_item as any;
+    // Backend populates reported_id as admin object for admin reports
+    const reportedId = (report as any).reported_id;
+    if (reportedId && typeof reportedId === 'object' && reportedId.username) {
+      return reportedId;
     }
     return null;
   };
