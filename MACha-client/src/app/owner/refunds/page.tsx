@@ -202,11 +202,11 @@ export default function OwnerRefunds() {
 
   if (loading) {
     return (
-      <div className="flex h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50">
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50">
         <OwnerSidebar />
-        <div className="flex-1 flex flex-col ml-64">
-          <OwnerHeader />
-          <div className="flex-1 p-8 flex items-center justify-center">
+        <OwnerHeader />
+        <div className="ml-64 pt-16">
+          <div className="p-8 flex items-center justify-center">
             <div className="text-center">
               <RefreshCw className="w-12 h-12 text-purple-500 animate-spin mx-auto mb-4" />
               <p className="text-gray-600">Đang tải...</p>
@@ -218,11 +218,12 @@ export default function OwnerRefunds() {
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50">
       <OwnerSidebar />
-      <div className="flex-1 flex flex-col ml-64">
-        <OwnerHeader />
-        <div className="flex-1 p-8 overflow-y-auto">
+      <OwnerHeader />
+
+      <div className="ml-64 pt-16">
+        <div className="p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Quản lý hoàn tiền</h1>
@@ -287,7 +288,11 @@ export default function OwnerRefunds() {
                             </div>
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Trạng thái</p>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(refund.refund_status)}`}>
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                                  refund.refund_status
+                                )}`}
+                              >
                                 {formatRefundStatus(refund.refund_status)}
                               </span>
                             </div>
@@ -418,7 +423,11 @@ export default function OwnerRefunds() {
 
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Trạng thái</h3>
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedRefund.refund_status)}`}>
+                <span
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                    selectedRefund.refund_status
+                  )}`}
+                >
                   {formatRefundStatus(selectedRefund.refund_status)}
                 </span>
               </div>
@@ -426,7 +435,9 @@ export default function OwnerRefunds() {
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Phương thức</h3>
                 <p className="text-gray-900 capitalize">
-                  {selectedRefund.refund_method === 'escrow' ? 'Escrow (Từ số tiền còn lại)' : 'Recovery (Từ recovery case)'}
+                  {selectedRefund.refund_method === 'escrow'
+                    ? 'Escrow (Từ số tiền còn lại)'
+                    : 'Recovery (Từ recovery case)'}
                 </p>
               </div>
 

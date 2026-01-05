@@ -13,6 +13,8 @@ const getPageTitle = (pathname: string): string => {
     '/owner/financial/campaigns': 'Tài chính Campaign',
     '/owner/admin-activities': 'Hoạt động Admin',
     '/owner/approval-history': 'Lịch sử duyệt/từ chối',
+    '/owner/withdrawal-requests': 'Yêu cầu rút tiền',
+    '/owner/refunds': 'Hoàn trả tiền',
   };
 
   if (routes[pathname]) {
