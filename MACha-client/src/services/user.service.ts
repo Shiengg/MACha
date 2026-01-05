@@ -3,6 +3,7 @@ import {
   FOLLOW_USER_ROUTE,
   GET_USER_BY_ID_ROUTE,
   UNFOLLOW_USER_ROUTE,
+  GET_PUBLIC_ADMINS_ROUTE,
 } from "@/constants/api";
 
 export interface User {
@@ -56,6 +57,37 @@ export const unfollowUser = async (userId: string) => {
     return response.data;
   } catch (error: any) {
     console.error("Error unfollowing user:", error);
+    throw error;
+  }
+};
+
+export interface PublicAdmin {
+  _id: string;
+  username: string;
+  fullname?: string;
+  avatar?: string;
+  createdAt: string;
+  is_verified?: boolean;
+}
+
+export interface GetPublicAdminsResponse {
+  admins: PublicAdmin[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export const getPublicAdmins = async (page = 1, limit = 20): Promise<GetPublicAdminsResponse> => {
+  try {
+    const response = await apiClient.get<GetPublicAdminsResponse>(GET_PUBLIC_ADMINS_ROUTE, {
+      params: { page, limit },
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error("Error fetching public admins:", error);
     throw error;
   }
 };

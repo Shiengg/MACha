@@ -144,6 +144,18 @@ export const getFollowing = async (req, res) => {
     }
 }
 
+export const getPublicAdmins = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+
+        const result = await userService.getPublicAdmins(page, limit);
+        return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
 export const searchUsers = async (req, res) => {
     try {
         const query = req.query.query;

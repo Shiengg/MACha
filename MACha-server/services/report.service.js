@@ -230,6 +230,11 @@ export const executeResolution = async (report, resolution, adminId) => {
 
     const { reported_type, reported_id, resolution_details } = report;
 
+    // Admin reports are handled manually by owner, not through executeResolution
+    if (reported_type === 'admin') {
+        return { success: true, message: 'Admin reports are handled manually by owner' };
+    }
+
     try {
         switch (resolution) {
             case 'removed':
@@ -256,6 +261,46 @@ export const createReport = async (reporterId, reportData) => {
     const hasReported = await Report.hasUserReported(reporterId, reported_type, reported_id);
     if (hasReported) {
         return { success: false, error: 'ALREADY_REPORTED' };
+    }
+
+    // Special handling for admin reports
+    if (reported_type === "admin") {
+        const reportedAdmin = await User.findById(reported_id);
+        if (!reportedAdmin) {
+            return { success: false, error: 'NOT_FOUND' };
+        }
+
+        // Validate reported_id is an admin
+        if (reportedAdmin.role !== "admin") {
+            return { success: false, error: 'INVALID_ADMIN' };
+        }
+
+        // Prevent admin from reporting themselves
+        if (reported_id.toString() === reporterId.toString()) {
+            return { success: false, error: 'CANNOT_REPORT_SELF' };
+        }
+
+        const report = await Report.create({
+            reporter: reporterId,
+            reported_type,
+            reported_id,
+            reported_reason,
+            description: description || null
+        });
+
+        await report.populate('reporter', 'username avatar fullname');
+
+        const keySet = 'reports:keys';
+        const keys = await redisClient.sMembers(keySet);
+
+        if (keys.length > 0) {
+            await redisClient.del(...keys);
+        }
+
+        await redisClient.del(keySet);
+        await redisClient.del(`reports:${reported_type}:${reported_id}`);
+
+        return { success: true, report };
     }
 
     const reportedModelMap = {
@@ -358,7 +403,8 @@ export const getReportById = async (reportId) => {
         campaign: Campaign,
         user: User,
         comment: Comment,
-        event: Event
+        event: Event,
+        admin: User
     };
 
     const ReportedModel = reportedModelMap[report.reported_type];
@@ -412,7 +458,8 @@ export const updateReportStatus = async (reportId, adminId, updateData) => {
             report.resolution_details = resolution_details;
         }
 
-        if (status === 'resolved' && finalResolution !== 'no_action') {
+        // Admin reports are handled manually by owner, not through executeResolution
+        if (status === 'resolved' && finalResolution !== 'no_action' && report.reported_type !== 'admin') {
             const executionResult = await executeResolution(report, finalResolution, adminId);
             if (!executionResult.success) {
                 console.error('Error executing resolution:', executionResult.error);
@@ -455,6 +502,64 @@ export const getReportsByReportedItem = async (reportedType, reportedId) => {
     const reports = await Report.find({
         reported_type: reportedType,
         reported_id: reportedId
+    })
+        .populate('reporter', 'username avatar fullname')
+        .populate('reviewed_by', 'username avatar fullname')
+        .sort({ submitted_at: -1 });
+
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(reports));
+
+    return reports;
+};
+
+// Lấy tất cả reports về admin (cho owner)
+export const getAdminReports = async (filters = {}, page = 0, limit = 20) => {
+    const query = { reported_type: 'admin' };
+    
+    if (filters.status) query.status = filters.status;
+    if (filters.admin_id) query.reported_id = filters.admin_id;
+
+    const cacheKey = `admin_reports:${JSON.stringify(query)}:${page}:${limit}`;
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+
+    const reports = await Report.find(query)
+        .populate('reporter', 'username avatar fullname')
+        .populate('reviewed_by', 'username avatar fullname')
+        .populate('reported_id', 'username avatar fullname email role')
+        .sort({ submitted_at: -1 })
+        .skip(page * limit)
+        .limit(limit);
+
+    const total = await Report.countDocuments(query);
+
+    const result = {
+        reports,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+    };
+
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(result));
+    await redisClient.sAdd('reports:keys', cacheKey);
+
+    return result;
+};
+
+// Lấy reports về 1 admin cụ thể
+export const getReportsByAdmin = async (adminId) => {
+    const cacheKey = `admin_reports:${adminId}`;
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+
+    const reports = await Report.find({
+        reported_type: 'admin',
+        reported_id: adminId
     })
         .populate('reporter', 'username avatar fullname')
         .populate('reviewed_by', 'username avatar fullname')
@@ -563,7 +668,8 @@ export const batchUpdateReportsByItem = async (reportedType, reportedId, adminId
     
     let resolutionExecuted = false;
 
-    if (status === 'resolved' && (finalResolution === 'user_warned' || finalResolution === 'user_banned') && reports.length > 0) {
+    // Admin reports are handled manually by owner, not through executeResolution
+    if (status === 'resolved' && (finalResolution === 'user_warned' || finalResolution === 'user_banned') && reports.length > 0 && reportedType !== 'admin') {
         const templateReport = reports[0];
         templateReport.resolution = finalResolution;
         templateReport.resolution_details = resolution_details || (finalResolution === 'user_banned' ? 'Bị khóa sau nhiều lần cảnh báo' : '');
@@ -597,7 +703,8 @@ export const batchUpdateReportsByItem = async (reportedType, reportedId, adminId
 
     await Promise.all(updatePromises);
 
-    if (!resolutionExecuted && status === 'resolved' && finalResolution !== 'no_action' && reports.length > 0) {
+    // Admin reports are handled manually by owner, not through executeResolution
+    if (!resolutionExecuted && status === 'resolved' && finalResolution !== 'no_action' && reports.length > 0 && reportedType !== 'admin') {
         const templateReport = reports[0];
         templateReport.resolution = finalResolution;
         templateReport.resolution_details = resolution_details || (finalResolution === 'user_banned' ? 'Bị khóa sau nhiều lần cảnh báo' : '');

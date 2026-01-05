@@ -92,6 +92,19 @@ export const updateReportStatus = async (req, res) => {
             });
         }
 
+        const reportResult = await reportService.getReportById(req.params.id);
+        if (!reportResult.success) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                message: HTTP_STATUS_TEXT.NOT_FOUND
+            });
+        }
+
+        if (reportResult.report.reported_type === "admin" && req.user.role !== "owner") {
+            return res.status(HTTP_STATUS.FORBIDDEN).json({
+                message: "Only owner can handle admin reports"
+            });
+        }
+
         const result = await reportService.updateReportStatus(
             req.params.id,
             req.user._id,
@@ -133,7 +146,8 @@ export const getReportsByReportedItem = async (req, res) => {
             campaign: Campaign,
             user: User,
             comment: Comment,
-            event: Event
+            event: Event,
+            admin: User
         };
 
         const ReportedModel = reportedModelMap[reported_type];
@@ -216,6 +230,36 @@ export const batchUpdateReportsByItem = async (req, res) => {
             message: `Updated ${result.count} reports successfully`,
             count: result.count
         });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const getAdminReports = async (req, res) => {
+    try {
+        const { status, admin_id } = req.query;
+        const page = parseInt(req.query.page) || 0;
+        const limit = parseInt(req.query.limit) || 20;
+
+        const filters = {};
+        if (status) filters.status = status;
+        if (admin_id) filters.admin_id = admin_id;
+
+        const result = await reportService.getAdminReports(filters, page, limit);
+
+        return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const getReportsByAdmin = async (req, res) => {
+    try {
+        const { adminId } = req.params;
+
+        const reports = await reportService.getReportsByAdmin(adminId);
+
+        return res.status(HTTP_STATUS.OK).json({ reports });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
     }
