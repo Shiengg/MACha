@@ -33,7 +33,8 @@ const notificationSchema = new mongoose.Schema({
             "user_banned",
             "admin_reported",
             "system",
-            "withdrawal_released"
+            "withdrawal_released",
+            "refund_processed"
         ],
         required: true,
         index: true

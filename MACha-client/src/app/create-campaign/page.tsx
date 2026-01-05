@@ -559,11 +559,22 @@ function CreateCampaignContent() {
       const result = await Swal.fire({
         title: 'Xác nhận gửi chiến dịch?',
         html: `
-          <div class="text-left space-y-2">
+          <div style="text-align: left; margin-bottom: 20px;">
             <p><strong>Tiêu đề:</strong> ${formData.title}</p>
             <p><strong>Mục tiêu:</strong> ${parseInt(formData.goal_amount || '0', 10).toLocaleString('vi-VN')} VNĐ</p>
             <p><strong>Danh mục:</strong> ${CATEGORIES.find(c => c.value === formData.category)?.label}</p>
-            <p class="text-sm text-gray-600 mt-4">Chiến dịch sẽ được gửi đến admin để xét duyệt.</p>
+            <p style="margin-top: 15px; color: #6b7280; font-size: 14px;">Chiến dịch sẽ được gửi đến admin để xét duyệt.</p>
+          </div>
+          <div style="text-align: left; margin-bottom: 15px;">
+            <label style="display: flex; align-items: center; cursor: pointer; color: #374151;">
+              <input type="checkbox" id="terms-checkbox" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+              <span>Tôi cam kết chịu trách nhiệm với quyết định của mình</span>
+            </label>
+          </div>
+          <div style="text-align: center; margin-top: 10px;">
+            <a href="/terms" target="_blank" style="color: #2563eb; text-decoration: underline; font-size: 14px;">
+              Xem điều khoản cam kết
+            </a>
           </div>
         `,
         icon: 'question',
@@ -572,6 +583,43 @@ function CreateCampaignContent() {
         cancelButtonColor: '#6b7280',
         confirmButtonText: 'Gửi chiến dịch',
         cancelButtonText: 'Kiểm tra lại',
+        didOpen: () => {
+          const checkbox = document.getElementById('terms-checkbox') as HTMLInputElement;
+          const confirmButton = Swal.getConfirmButton();
+          
+          // Disable button ban đầu
+          if (confirmButton) {
+            confirmButton.disabled = true;
+            confirmButton.style.opacity = '0.5';
+            confirmButton.style.cursor = 'not-allowed';
+          }
+          
+          // Add event listener cho checkbox
+          if (checkbox) {
+            checkbox.addEventListener('change', () => {
+              const confirmButton = Swal.getConfirmButton();
+              if (confirmButton) {
+                if (checkbox.checked) {
+                  confirmButton.disabled = false;
+                  confirmButton.style.opacity = '1';
+                  confirmButton.style.cursor = 'pointer';
+                } else {
+                  confirmButton.disabled = true;
+                  confirmButton.style.opacity = '0.5';
+                  confirmButton.style.cursor = 'not-allowed';
+                }
+              }
+            });
+          }
+        },
+        preConfirm: () => {
+          const checkbox = document.getElementById('terms-checkbox') as HTMLInputElement;
+          if (!checkbox || !checkbox.checked) {
+            return false;
+          }
+          return true;
+        },
+        allowOutsideClick: () => !Swal.isLoading(),
       });
 
       if (!result.isConfirmed) {

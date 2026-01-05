@@ -95,24 +95,44 @@ const removeReportedItem = async (reportedType, reportedId, resolutionDetails, a
             }
 
             try {
-                const { default: refundService } = await import('./refund.service.js');
-                const { default: recoveryService } = await import('./recovery.service.js');
-                const { default: escrowService } = await import('./escrow.service.js');
+                const refundServiceModule = await import('./refund.service.js');
+                const recoveryServiceModule = await import('./recovery.service.js');
+                const escrowServiceModule = await import('./escrow.service.js');
                 
-                await escrowService.cancelPendingWithdrawalRequests(reportedId);
+                await escrowServiceModule.cancelPendingWithdrawalRequests(reportedId);
+                
+                const totalReleasedAmount = await escrowServiceModule.getTotalReleasedAmount(reportedId);
                 
                 if (reportedItem.current_amount > 0) {
-                    const refundResult = await refundService.processProportionalRefund(reportedId, adminId, resolutionDetails);
+                    const refundResult = await refundServiceModule.processProportionalRefund(reportedId, adminId, resolutionDetails);
                     
-                    if (refundResult.success && !refundResult.isFullRefund) {
-                        const totalReleasedAmount = await escrowService.getTotalReleasedAmount(reportedId);
-                        if (totalReleasedAmount > 0) {
-                            await recoveryService.createRecoveryCase(reportedId, adminId, 30);
+                    if (!refundResult.success) {
+                        const errorMsg = `Refund failed: ${refundResult.error || refundResult.message}`;
+                        console.error(errorMsg);
+                        throw new Error(errorMsg);
+                    }
+                    
+                    if (totalReleasedAmount > 0) {
+                        const recoveryResult = await recoveryServiceModule.createRecoveryCase(reportedId, adminId, 30);
+                        if (!recoveryResult.success) {
+                            const errorMsg = `Failed to create recovery case: ${recoveryResult.error || 'Unknown error'}`;
+                            console.error(errorMsg);
+                            throw new Error(errorMsg);
+                        }
+                    }
+                } else {
+                    if (totalReleasedAmount > 0) {
+                        const recoveryResult = await recoveryServiceModule.createRecoveryCase(reportedId, adminId, 30);
+                        if (!recoveryResult.success) {
+                            const errorMsg = `Failed to create recovery case: ${recoveryResult.error || 'Unknown error'}`;
+                            console.error(errorMsg);
+                            throw new Error(errorMsg);
                         }
                     }
                 }
             } catch (refundError) {
                 console.error('Error processing refund for cancelled campaign:', refundError);
+                throw refundError;
             }
             break;
         case 'event':

@@ -19,11 +19,20 @@ export const processProportionalRefund = async (campaignId, adminId, reason = nu
     }
 
     const totalDonated = campaign.current_amount;
+    const totalReleasedAmount = await escrowService.getTotalReleasedAmount(campaignId);
+    const isFullRefund = totalReleasedAmount === 0;
+
     if (totalDonated <= 0) {
-        return { success: true, message: "No donations to refund", refunds: [], totalRefunded: 0 };
+        return { 
+            success: true, 
+            message: "No donations to refund", 
+            refunds: [], 
+            totalRefunded: 0,
+            totalReleased: totalReleasedAmount,
+            isFullRefund: isFullRefund
+        };
     }
 
-    const totalReleasedAmount = await escrowService.getTotalReleasedAmount(campaignId);
     const availableAmount = totalDonated - totalReleasedAmount;
 
     if (availableAmount <= 0) {
@@ -32,12 +41,13 @@ export const processProportionalRefund = async (campaignId, adminId, reason = nu
             message: "No available amount to refund",
             refunds: [],
             totalRefunded: 0,
-            totalReleased: totalReleasedAmount
+            totalReleased: totalReleasedAmount,
+            isFullRefund: isFullRefund,
+            totalDonated: totalDonated
         };
     }
 
     const refundRatio = availableAmount / totalDonated;
-    const isFullRefund = totalReleasedAmount === 0;
 
     const donations = await Donation.find({
         campaign: campaignId,
@@ -45,7 +55,15 @@ export const processProportionalRefund = async (campaignId, adminId, reason = nu
     }).populate("donor", "username email fullname");
 
     if (donations.length === 0) {
-        return { success: true, message: "No completed donations found", refunds: [] };
+        return { 
+            success: true, 
+            message: "No completed donations found", 
+            refunds: [],
+            totalRefunded: 0,
+            totalReleased: totalReleasedAmount,
+            isFullRefund: isFullRefund,
+            totalDonated: totalDonated
+        };
     }
 
     const refunds = [];
@@ -213,11 +231,15 @@ export const updateRefundStatus = async (refundId, status, transactionData = nul
         if (donation) {
             if (donation.remaining_refund_pending > 0) {
                 donation.payment_status = "partially_refunded";
+                refund.refund_status = "partial";
             } else {
                 donation.payment_status = "refunded";
                 donation.refunded_at = new Date();
+                refund.refund_status = "completed";
             }
             await donation.save();
+        } else {
+            refund.refund_status = "completed";
         }
     }
 
@@ -249,7 +271,7 @@ export const getRefundById = async (refundId) => {
 };
 
 export const getPendingRefunds = async () => {
-    const refunds = await Refund.find({ refund_status: "pending" })
+    const refunds = await Refund.find({ refund_status: { $in: ["pending", "partial"] } })
         .populate("donor", "username email fullname")
         .populate("donation", "order_invoice_number sepay_transaction_id")
         .populate("campaign", "title")
