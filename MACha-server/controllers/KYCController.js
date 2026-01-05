@@ -34,7 +34,7 @@ export const submitKYC = async (req, res) => {
         }
 
         return res.status(HTTP_STATUS.OK).json({
-            message: "KYC submitted successfully. Please wait for admin review.",
+            message: "KYC đã được gửi thành công. Vui lòng chờ admin duyệt.",
             kyc: result.kyc,
             user: result.user
         });

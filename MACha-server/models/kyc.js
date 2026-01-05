@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { encrypt, decrypt, isEncrypted } from "../utils/encryption.js";
 
 const kycSchema = new mongoose.Schema({
     user: {
@@ -132,6 +133,52 @@ const kycSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+kycSchema.pre('save', function(next) {
+    if (this.extracted_data?.identity_card_number) {
+        const cardNumber = this.extracted_data.identity_card_number;
+        if (!isEncrypted(cardNumber)) {
+            this.extracted_data.identity_card_number = encrypt(cardNumber);
+            if (cardNumber.length >= 4) {
+                this.extracted_data.identity_card_last4 = cardNumber.slice(-4);
+            }
+        }
+    }
+    
+    if (this.extracted_data?.bank_account?.account_number) {
+        const accountNumber = this.extracted_data.bank_account.account_number;
+        if (!isEncrypted(accountNumber)) {
+            this.extracted_data.bank_account.account_number = encrypt(accountNumber);
+            if (accountNumber.length >= 4) {
+                this.extracted_data.bank_account.account_number_last4 = accountNumber.slice(-4);
+            }
+        }
+    }
+    
+    next();
+});
+
+kycSchema.methods.getDecryptedData = function() {
+    const decrypted = this.toObject();
+    
+    // Decrypt identity_card_number
+    if (decrypted.extracted_data?.identity_card_number) {
+        const decryptedNumber = decrypt(decrypted.extracted_data.identity_card_number);
+        if (decryptedNumber) {
+            decrypted.extracted_data.identity_card_number = decryptedNumber;
+        }
+    }
+    
+    // Decrypt account_number
+    if (decrypted.extracted_data?.bank_account?.account_number) {
+        const decryptedAccount = decrypt(decrypted.extracted_data.bank_account.account_number);
+        if (decryptedAccount) {
+            decrypted.extracted_data.bank_account.account_number = decryptedAccount;
+        }
+    }
+    
+    return decrypted;
+};
 
 kycSchema.index({ user: 1, status: 1 });
 kycSchema.index({ status: 1, submitted_at: -1 });
