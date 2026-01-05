@@ -18,7 +18,8 @@ import {
   ChartLine,
   ClipboardList,
   Flag,
-  CreditCard
+  CreditCard,
+  ArrowLeftRight
 } from 'lucide-react';
 
 interface MenuItem {
@@ -62,6 +63,7 @@ export default function OwnerSidebar() {
         { icon: Activity, label: 'Hoạt động Admin', href: '/owner/admin-activities' },
         { icon: ClipboardList, label: 'Lịch sử duyệt/từ chối', href: '/owner/approval-history' },
         { icon: CreditCard, label: 'Yêu cầu rút tiền', href: '/owner/withdrawal-requests' },
+        { icon: ArrowLeftRight, label: 'Quản lý hoàn tiền', href: '/owner/refunds' },
       ],
       showMenuIcon: true,
     },

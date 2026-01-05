@@ -51,7 +51,7 @@ const donationSchema = new mongoose.Schema({
     },
     payment_status: {
         type: String,
-        enum: ["pending", "completed", "failed", "cancelled", "refunded"],
+        enum: ["pending", "completed", "failed", "cancelled", "refunded", "partially_refunded"],
         default: "pending",
         index: true
     },
@@ -64,6 +64,26 @@ const donationSchema = new mongoose.Schema({
         default: null
     },
     cancelled_at: {
+        type: Date,
+        default: null
+    },
+    refunded_amount: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    refund_ratio: {
+        type: Number,
+        default: null,
+        min: 0,
+        max: 1
+    },
+    remaining_refund_pending: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    refunded_at: {
         type: Date,
         default: null
     },

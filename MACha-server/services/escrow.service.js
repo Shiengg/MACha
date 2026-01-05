@@ -37,6 +37,33 @@ export const calculateAvailableAmount = async (campaignId, currentAmount) => {
     return currentAmount - totalReleasedAmount;
 };
 
+export const cancelPendingWithdrawalRequests = async (campaignId) => {
+    const cancelled = await Escrow.updateMany(
+        {
+            campaign: campaignId,
+            request_status: {
+                $in: [
+                    "pending_voting",
+                    "voting_in_progress",
+                    "voting_completed",
+                    "admin_approved"
+                ]
+            }
+        },
+        {
+            request_status: "cancelled"
+        }
+    );
+
+    await redisClient.del(`campaign:${campaignId}`);
+    await redisClient.del("campaigns");
+
+    return {
+        success: true,
+        cancelledCount: cancelled.modifiedCount
+    };
+};
+
 const startVotingPeriod = (escrow) => {
     const now = new Date();
     const votingEndDate = new Date(now);

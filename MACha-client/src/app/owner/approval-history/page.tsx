@@ -70,7 +70,8 @@ export default function OwnerApprovalHistory() {
   };
 
   const getActionColor = (action: string) => {
-    if (action === 'approved' || action === 'verified') return 'bg-green-100 text-green-800';
+    if (action === 'approved') return 'bg-green-100 text-green-800';
+    if (action === 'verified') return 'bg-blue-100 text-blue-800';
     if (action === 'rejected') return 'bg-red-100 text-red-800';
     return 'bg-gray-100 text-gray-800';
   };
@@ -148,10 +149,17 @@ export default function OwnerApprovalHistory() {
         const reason = item.action === 'rejected' 
           ? (item.item?.rejection_reason || item.item?.rejected_reason || item.item?.admin_rejection_reason || 'No reason provided')
           : (item.item?.approval_reason || 'N/A');
+        const itemName = item.type === 'campaign' ? (item.item?.title || 'N/A') :
+          item.type === 'event' ? (item.item?.title || 'N/A') :
+          item.type === 'escrow' ? (item.item?.campaign?.title || 'N/A') :
+          item.type === 'report' ? (item.item?.reported_type || 'N/A') :
+          item.type === 'kyc' ? (item.item?.user?.username || item.item?.user?.fullname || 'N/A') :
+          'N/A';
+        
         return [
           getTypeLabel(item.type),
           item.action,
-          item.item?.title || item.item?.reported_type || 'N/A',
+          itemName,
           item.admin?.username || 'N/A',
           reason.replace(/,/g, ';'),
           new Date(item.timestamp).toLocaleString('vi-VN')
@@ -319,6 +327,15 @@ export default function OwnerApprovalHistory() {
                         return null;
                       };
 
+                      const getItemName = () => {
+                        if (item.type === 'campaign') return item.item?.title || 'N/A';
+                        if (item.type === 'event') return item.item?.title || 'N/A';
+                        if (item.type === 'escrow') return item.item?.campaign?.title || 'N/A';
+                        if (item.type === 'report') return item.item?.reported_type || 'N/A';
+                        if (item.type === 'kyc') return item.item?.user?.username || item.item?.user?.fullname || 'N/A';
+                        return 'N/A';
+                      };
+
                       const getReason = () => {
                         if (item.action === 'rejected' || item.action === 'rejected') {
                           return item.item?.rejection_reason || item.item?.rejected_reason || item.item?.admin_rejection_reason || 'No reason provided';
@@ -328,6 +345,7 @@ export default function OwnerApprovalHistory() {
 
                       const link = getItemLink();
                       const reason = getReason();
+                      const itemName = getItemName();
 
                       return (
                         <tr key={index} className="hover:bg-gray-50">
@@ -341,7 +359,7 @@ export default function OwnerApprovalHistory() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="text-sm text-gray-900">
-                              {item.item?.title || item.item?.reported_type || 'N/A'}
+                              {itemName}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">

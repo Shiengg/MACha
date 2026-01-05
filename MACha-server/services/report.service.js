@@ -93,6 +93,27 @@ const removeReportedItem = async (reportedType, reportedId, resolutionDetails, a
             } catch (error) {
                 console.error('Error pushing CAMPAIGN_REMOVED job:', error);
             }
+
+            try {
+                const { default: refundService } = await import('./refund.service.js');
+                const { default: recoveryService } = await import('./recovery.service.js');
+                const { default: escrowService } = await import('./escrow.service.js');
+                
+                await escrowService.cancelPendingWithdrawalRequests(reportedId);
+                
+                if (reportedItem.current_amount > 0) {
+                    const refundResult = await refundService.processProportionalRefund(reportedId, adminId, resolutionDetails);
+                    
+                    if (refundResult.success && !refundResult.isFullRefund) {
+                        const totalReleasedAmount = await escrowService.getTotalReleasedAmount(reportedId);
+                        if (totalReleasedAmount > 0) {
+                            await recoveryService.createRecoveryCase(reportedId, adminId, 30);
+                        }
+                    }
+                }
+            } catch (refundError) {
+                console.error('Error processing refund for cancelled campaign:', refundError);
+            }
             break;
         case 'event':
             creatorId = reportedItem.creator;

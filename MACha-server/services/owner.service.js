@@ -827,67 +827,131 @@ export const getApprovalHistory = async (filters = {}, page = 1, limit = 20) => 
     let activities = [];
 
     if (!type || type === "campaign") {
-        const campaignQuery = {};
-        if (adminId) campaignQuery.$or = [
-            { approved_by: adminId },
-            { rejected_by: adminId }
-        ];
+        const campaignQuery = {
+            $or: [
+                { approved_by: { $ne: null } },
+                { rejected_by: { $ne: null } },
+                { approved_at: { $ne: null } },
+                { rejected_at: { $ne: null } }
+            ]
+        };
+        if (adminId) {
+            campaignQuery.$and = [
+                {
+                    $or: [
+                        { approved_by: adminId },
+                        { rejected_by: adminId }
+                    ]
+                }
+            ];
+        }
         if (startDate || endDate) {
-            campaignQuery.$or = campaignQuery.$or || [];
             const dateQuery = {};
             if (startDate) dateQuery.$gte = new Date(startDate);
             if (endDate) dateQuery.$lte = new Date(endDate);
-            campaignQuery.$or.push(
+            const dateOr = [
                 { approved_at: dateQuery },
                 { rejected_at: dateQuery }
-            );
+            ];
+            if (adminId) {
+                campaignQuery.$and.push({ $or: dateOr });
+            } else {
+                campaignQuery.$and = [{ $or: dateOr }];
+            }
         }
 
         const campaigns = await Campaign.find(campaignQuery)
-            .select("title status approved_by approved_at rejected_by rejected_at rejection_reason")
+            .select("title status approved_by approved_at rejected_by rejected_at rejection_reason _id")
             .populate("approved_by", "username fullname")
             .populate("rejected_by", "username fullname")
+            .lean()
             .sort({ updatedAt: -1 });
 
-        activities.push(...campaigns.map(c => ({
-            type: "campaign",
-            action: c.approved_by ? "approved" : "rejected",
-            item: c,
-            admin: c.approved_by || c.rejected_by,
-            timestamp: c.approved_at || c.rejected_at
-        })));
+        activities.push(...campaigns.map(c => {
+            const isApproved = c.approved_by || c.approved_at || c.status === "active" || c.status === "approved";
+            const isRejected = c.rejected_by || c.rejected_at || c.status === "rejected";
+            
+            let action = "unknown";
+            if (isApproved && !isRejected) {
+                action = "approved";
+            } else if (isRejected) {
+                action = "rejected";
+            } else if (isApproved) {
+                action = "approved";
+            }
+            
+            return {
+                type: "campaign",
+                action: action,
+                item: c,
+                admin: c.approved_by || c.rejected_by,
+                timestamp: c.approved_at || c.rejected_at || c.updatedAt
+            };
+        }));
     }
 
     if (!type || type === "event") {
-        const eventQuery = {};
-        if (adminId) eventQuery.$or = [
-            { approved_by: adminId },
-            { rejected_by: adminId }
-        ];
+        const eventQuery = {
+            $or: [
+                { approved_by: { $ne: null } },
+                { rejected_by: { $ne: null } },
+                { approved_at: { $ne: null } },
+                { rejected_at: { $ne: null } }
+            ]
+        };
+        if (adminId) {
+            eventQuery.$and = [
+                {
+                    $or: [
+                        { approved_by: adminId },
+                        { rejected_by: adminId }
+                    ]
+                }
+            ];
+        }
         if (startDate || endDate) {
-            eventQuery.$or = eventQuery.$or || [];
             const dateQuery = {};
             if (startDate) dateQuery.$gte = new Date(startDate);
             if (endDate) dateQuery.$lte = new Date(endDate);
-            eventQuery.$or.push(
+            const dateOr = [
                 { approved_at: dateQuery },
                 { rejected_at: dateQuery }
-            );
+            ];
+            if (adminId) {
+                eventQuery.$and.push({ $or: dateOr });
+            } else {
+                eventQuery.$and = [{ $or: dateOr }];
+            }
         }
 
         const events = await Event.find(eventQuery)
-            .select("title status approved_by approved_at rejected_by rejected_at rejected_reason")
+            .select("title status approved_by approved_at rejected_by rejected_at rejected_reason _id")
             .populate("approved_by", "username fullname")
             .populate("rejected_by", "username fullname")
+            .lean()
             .sort({ updatedAt: -1 });
 
-        activities.push(...events.map(e => ({
-            type: "event",
-            action: e.approved_by ? "approved" : "rejected",
-            item: e,
-            admin: e.approved_by || e.rejected_by,
-            timestamp: e.approved_at || e.rejected_at
-        })));
+        activities.push(...events.map(e => {
+            const isApproved = e.approved_by || e.approved_at || e.status === "published" || e.status === "active" || e.status === "approved";
+            const isRejected = e.rejected_by || e.rejected_at || e.status === "rejected";
+            
+            let action = "unknown";
+            if (isApproved && !isRejected) {
+                action = "approved";
+            } else if (isRejected) {
+                action = "rejected";
+            } else if (isApproved) {
+                action = "approved";
+            }
+            
+            return {
+                type: "event",
+                action: action,
+                item: e,
+                admin: e.approved_by || e.rejected_by,
+                timestamp: e.approved_at || e.rejected_at || e.updatedAt
+            };
+        }));
     }
 
     if (!type || type === "kyc") {
@@ -908,10 +972,11 @@ export const getApprovalHistory = async (filters = {}, page = 1, limit = 20) => 
         }
 
         const kycs = await KYC.find(kycQuery)
-            .select("user status verified_by verified_at rejected_by rejected_at rejection_reason")
+            .select("user status verified_by verified_at rejected_by rejected_at rejection_reason _id")
             .populate("verified_by", "username fullname")
             .populate("rejected_by", "username fullname")
             .populate("user", "username fullname")
+            .lean()
             .sort({ updatedAt: -1 });
 
         activities.push(...kycs.map(k => ({
@@ -956,18 +1021,30 @@ export const getApprovalHistory = async (filters = {}, page = 1, limit = 20) => 
         }
 
         const escrows = await Escrow.find(escrowQuery)
-            .select("campaign request_status admin_reviewed_by admin_reviewed_at admin_rejection_reason")
+            .select("campaign request_status admin_reviewed_by admin_reviewed_at admin_rejection_reason _id")
             .populate("admin_reviewed_by", "username fullname")
             .populate("campaign", "title")
+            .lean()
             .sort({ admin_reviewed_at: -1 });
 
-        activities.push(...escrows.map(e => ({
-            type: "escrow",
-            action: e.request_status === "admin_approved" ? "approved" : "rejected",
-            item: e,
-            admin: e.admin_reviewed_by,
-            timestamp: e.admin_reviewed_at
-        })));
+        activities.push(...escrows.map(e => {
+            let action = "unknown";
+            if (e.request_status === "admin_approved" || e.request_status === "released") {
+                action = "approved";
+            } else if (e.request_status === "admin_rejected") {
+                action = "rejected";
+            } else if (e.admin_reviewed_by) {
+                action = "rejected";
+            }
+            
+            return {
+                type: "escrow",
+                action: action,
+                item: e,
+                admin: e.admin_reviewed_by,
+                timestamp: e.admin_reviewed_at || e.updatedAt
+            };
+        }));
     }
 
     activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));

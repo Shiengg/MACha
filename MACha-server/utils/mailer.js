@@ -758,4 +758,218 @@ Trân trọng,
 
     return await sendEmail(to, subject, text, htmlContent);
 };
+
+export const sendRefundEmail = async (to, data) => {
+    const { username, campaignTitle, campaignId, originalAmount, refundedAmount, refundRatio, remainingRefund, reason } = data;
+    const campaignUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/campaigns/${campaignId}`;
+    const subject = `Hoàn tiền cho chiến dịch "${campaignTitle}"`;
+    const refundPercentage = (refundRatio * 100).toFixed(2);
+    const remainingPercentage = remainingRefund > 0 ? ((remainingRefund / originalAmount) * 100).toFixed(2) : 0;
+    const text = `
+Xin chào ${username},
+
+Chúng tôi xin thông báo về việc hoàn tiền cho khoản đóng góp của bạn cho chiến dịch "${campaignTitle}".
+
+Thông tin hoàn tiền:
+- Số tiền đã quyên góp: ${originalAmount.toLocaleString('vi-VN')} VND
+- Đã được hoàn: ${refundedAmount.toLocaleString('vi-VN')} VND (${refundPercentage}%)
+${remainingRefund > 0 ? `- Đang thu hồi để hoàn tiếp: ${remainingRefund.toLocaleString('vi-VN')} VND (${remainingPercentage}%)` : ''}
+
+Lý do: ${reason}
+
+${remainingRefund > 0 ? 'Chúng tôi đang nỗ lực thu hồi phần tiền còn lại từ creator và sẽ hoàn tiền cho bạn ngay khi có thể.' : ''}
+
+Xem chi tiết chiến dịch: ${campaignUrl}
+
+Trân trọng,
+Đội ngũ MACha
+    `.trim();
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">Hoàn tiền</h1>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <p style="font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 20px 0;">
+                                Xin chào <strong>${username}</strong>,
+                            </p>
+                            <p style="font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 20px 0;">
+                                Chúng tôi xin thông báo về việc hoàn tiền cho khoản đóng góp của bạn cho chiến dịch <strong>"${campaignTitle}"</strong>.
+                            </p>
+                            <div style="background-color: #f9fafb; border-left: 4px solid #667eea; padding: 20px; margin: 30px 0; border-radius: 4px;">
+                                <h3 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px;">Thông tin hoàn tiền:</h3>
+                                <table width="100%" cellpadding="8">
+                                    <tr>
+                                        <td style="color: #6b7280; width: 50%;">Số tiền đã quyên góp:</td>
+                                        <td style="color: #1f2937; font-weight: 600;">${originalAmount.toLocaleString('vi-VN')} VND</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #6b7280;">Đã được hoàn:</td>
+                                        <td style="color: #10b981; font-weight: 600;">${refundedAmount.toLocaleString('vi-VN')} VND (${refundPercentage}%)</td>
+                                    </tr>
+                                    ${remainingRefund > 0 ? `
+                                    <tr>
+                                        <td style="color: #6b7280;">Đang thu hồi để hoàn tiếp:</td>
+                                        <td style="color: #f59e0b; font-weight: 600;">${remainingRefund.toLocaleString('vi-VN')} VND (${remainingPercentage}%)</td>
+                                    </tr>
+                                    ` : ''}
+                                </table>
+                            </div>
+                            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                                <p style="margin: 0; color: #92400e; font-size: 14px;">
+                                    <strong>Lý do:</strong> ${reason}
+                                </p>
+                            </div>
+                            ${remainingRefund > 0 ? `
+                            <p style="font-size: 15px; line-height: 1.6; color: #4b5563; margin: 20px 0;">
+                                Chúng tôi đang nỗ lực thu hồi phần tiền còn lại từ creator và sẽ hoàn tiền cho bạn ngay khi có thể.
+                            </p>
+                            ` : ''}
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="${campaignUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600;">
+                                    Xem chi tiết chiến dịch
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                            <p style="font-size: 14px; color: #6b7280; line-height: 1.6; margin: 0;">
+                                Trân trọng,<br>
+                                <strong>Đội ngũ MACha</strong>
+                            </p>
+                            <hr style="border:none;border-top:1px solid #e5e7eb;margin:32px 0;" />
+                            <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:0;">
+                                Đây là email được gửi tự động từ hệ thống MACha.<br>
+                                Vui lòng không trả lời email này.
+                            </p>
+                            <p style="font-size:12px;color:#9ca3af;line-height:1.5;margin:8px 0 0 0;">
+                                © ${new Date().getFullYear()} MACha. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+    `.trim();
+    return await sendEmail(to, subject, text, htmlContent);
+};
+
+export const sendRecoveryNotificationEmail = async (to, data) => {
+    const { username, campaignTitle, campaignId, amount, deadline } = data;
+    const campaignUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/campaigns/${campaignId}`;
+    const deadlineFormatted = new Date(deadline).toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    const subject = `Yêu cầu hoàn trả số tiền đã nhận từ chiến dịch "${campaignTitle}"`;
+    const text = `
+Xin chào ${username},
+
+Chiến dịch "${campaignTitle}" của bạn đã bị hủy do vi phạm tiêu chuẩn cộng đồng.
+
+Chúng tôi yêu cầu bạn hoàn trả số tiền đã nhận từ chiến dịch này:
+
+Số tiền cần hoàn trả: ${amount.toLocaleString('vi-VN')} VND
+Hạn chót: ${deadlineFormatted}
+
+Vui lòng liên hệ với chúng tôi để thực hiện hoàn trả trong thời hạn quy định. Nếu không hoàn trả đúng hạn, chúng tôi sẽ phải áp dụng các biện pháp pháp lý cần thiết.
+
+Xem chi tiết chiến dịch: ${campaignUrl}
+
+Trân trọng,
+Đội ngũ MACha
+    `.trim();
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 30px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">Yêu cầu hoàn trả</h1>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <p style="font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 20px 0;">
+                                Xin chào <strong>${username}</strong>,
+                            </p>
+                            <p style="font-size: 16px; line-height: 1.6; color: #333333; margin: 0 0 20px 0;">
+                                Chiến dịch <strong>"${campaignTitle}"</strong> của bạn đã bị hủy do vi phạm tiêu chuẩn cộng đồng.
+                            </p>
+                            <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 20px; margin: 30px 0; border-radius: 4px;">
+                                <h3 style="margin: 0 0 15px 0; color: #991b1b; font-size: 18px;">Yêu cầu hoàn trả</h3>
+                                <table width="100%" cellpadding="8">
+                                    <tr>
+                                        <td style="color: #6b7280; width: 40%;">Số tiền cần hoàn trả:</td>
+                                        <td style="color: #dc2626; font-weight: 600; font-size: 18px;">${amount.toLocaleString('vi-VN')} VND</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #6b7280;">Hạn chót:</td>
+                                        <td style="color: #991b1b; font-weight: 600;">${deadlineFormatted}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div style="background-color: #fff7ed; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                                <p style="margin: 0; color: #92400e; font-size: 14px;">
+                                    <strong>Lưu ý:</strong> Vui lòng liên hệ với chúng tôi để thực hiện hoàn trả trong thời hạn quy định. Nếu không hoàn trả đúng hạn, chúng tôi sẽ phải áp dụng các biện pháp pháp lý cần thiết.
+                                </p>
+                            </div>
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="${campaignUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600;">
+                                    Xem chi tiết chiến dịch
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                            <p style="font-size: 14px; color: #6b7280; line-height: 1.6; margin: 0;">
+                                Trân trọng,<br>
+                                <strong>Đội ngũ MACha</strong>
+                            </p>
+                            <hr style="border:none;border-top:1px solid #e5e7eb;margin:32px 0;" />
+                            <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:0;">
+                                Đây là email được gửi tự động từ hệ thống MACha.<br>
+                                Vui lòng không trả lời email này.
+                            </p>
+                            <p style="font-size:12px;color:#9ca3af;line-height:1.5;margin:8px 0 0 0;">
+                                © ${new Date().getFullYear()} MACha. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+    `.trim();
+    return await sendEmail(to, subject, text, htmlContent);
+};
   

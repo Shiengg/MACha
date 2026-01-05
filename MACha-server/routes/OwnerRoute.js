@@ -159,5 +159,39 @@ OwnerRoutes.get(
     ownerController.sepayWithdrawalCancel
 );
 
+OwnerRoutes.get(
+    "/refunds",
+    authMiddleware,
+    checkOwner,
+    ownerController.getPendingRefunds
+);
+
+OwnerRoutes.post(
+    "/refund/:refundId/sepay/init",
+    authMiddleware,
+    checkOwner,
+    ownerController.initSepayRefundPayment
+);
+
+OwnerRoutes.post(
+    "/refund/sepay/callback",
+    ownerController.sepayRefundCallback
+);
+
+OwnerRoutes.get(
+    "/refund/sepay/success",
+    ownerController.sepayRefundSuccess
+);
+
+OwnerRoutes.get(
+    "/refund/sepay/error",
+    ownerController.sepayRefundError
+);
+
+OwnerRoutes.get(
+    "/refund/sepay/cancel",
+    ownerController.sepayRefundCancel
+);
+
 export default OwnerRoutes;
 

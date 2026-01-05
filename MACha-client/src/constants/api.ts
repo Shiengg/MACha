@@ -169,3 +169,5 @@ export const OWNER_RESET_USER_KYC_ROUTE = (userId: string) => `${OWNER_ROUTE}/us
 export const OWNER_GET_USER_HISTORY_ROUTE = (userId: string) => `${OWNER_ROUTE}/users/${userId}/history`;
 export const OWNER_GET_WITHDRAWAL_REQUESTS_ROUTE = `${OWNER_ROUTE}/withdrawal-requests`;
 export const OWNER_INIT_SEPAY_WITHDRAWAL_ROUTE = (escrowId: string) => `${OWNER_ROUTE}/escrow/${escrowId}/sepay/init`;
+export const OWNER_GET_REFUNDS_ROUTE = `${OWNER_ROUTE}/refunds`;
+export const OWNER_INIT_SEPAY_REFUND_ROUTE = (refundId: string) => `${OWNER_ROUTE}/refund/${refundId}/sepay/init`;
