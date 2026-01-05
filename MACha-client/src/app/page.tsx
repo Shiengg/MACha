@@ -8,7 +8,7 @@ import TrendingHashtags from "@/components/shared/TrendingHashtags";
 import CreatePostModal from "@/components/shared/CreatePostModal";
 import { getPosts, Post } from "@/services/post.service";
 import { useAuth } from "@/contexts/AuthContext";
-import { FaSync, FaUser, FaComments, FaShieldAlt } from "react-icons/fa";
+import { FaSync, FaUser, FaComments, FaShieldAlt, FaFileContract } from "react-icons/fa";
 import Image from "next/image";
 
 function HomeContent() {
@@ -234,6 +234,40 @@ function HomeContent() {
                   : 'text-gray-700 dark:text-gray-300'
               }`}>
                 Đội ngũ Admin
+              </span>
+            </button>
+
+            {/* Terms Button */}
+            <button
+              onClick={() => router.push('/terms')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+                pathname === '/terms'
+                  ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
+                background: 'linear-gradient(to bottom right, #667eea, #764ba2)',
+              }}>
+                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
+                  <FaFileContract 
+                    className="w-5 h-5"
+                    style={{
+                      color: 'transparent',
+                      background: 'linear-gradient(to bottom right, #667eea, #764ba2)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                    }}
+                  />
+                </div>
+              </div>
+              <span className={`text-lg font-semibold truncate ${
+                pathname === '/terms'
+                  ? 'text-gray-900 dark:text-white'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}>
+                Điều khoản
               </span>
             </button>
 

@@ -17,7 +17,47 @@ import {
   OWNER_UNBAN_USER_ROUTE,
   OWNER_RESET_USER_KYC_ROUTE,
   OWNER_GET_USER_HISTORY_ROUTE,
+  OWNER_GET_WITHDRAWAL_REQUESTS_ROUTE,
+  OWNER_INIT_SEPAY_WITHDRAWAL_ROUTE,
+  OWNER_GET_REFUNDS_ROUTE,
+  OWNER_INIT_SEPAY_REFUND_ROUTE,
 } from "@/constants/api";
+import { Escrow } from "@/services/escrow.service";
+
+export interface Refund {
+  _id: string;
+  campaign: {
+    _id: string;
+    title: string;
+  };
+  donation: {
+    _id: string;
+    order_invoice_number?: string;
+    sepay_transaction_id?: string;
+  };
+  donor: {
+    _id: string;
+    username: string;
+    email: string;
+    fullname?: string;
+  };
+  original_amount: number;
+  refunded_amount: number;
+  refund_ratio: number;
+  remaining_refund: number;
+  refund_status: "pending" | "completed" | "failed" | "partial";
+  refund_method: "escrow" | "recovery";
+  refund_transaction_id?: string;
+  refund_response_data?: any;
+  refunded_at?: string;
+  created_by?: {
+    _id: string;
+    username: string;
+  };
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Admin {
   _id: string;
@@ -487,6 +527,62 @@ export const ownerService = {
       params: { page, limit },
       withCredentials: true,
     });
+    return response.data;
+  },
+
+  async getAdminApprovedWithdrawalRequests(): Promise<{ escrows: Escrow[]; count: number }> {
+    const response = await apiClient.get(OWNER_GET_WITHDRAWAL_REQUESTS_ROUTE, {
+      withCredentials: true,
+    });
+    return response.data;
+  },
+
+  async initSepayWithdrawalPayment(
+    escrowId: string,
+    paymentMethod: string = "BANK_TRANSFER"
+  ): Promise<{
+    checkoutUrl: string;
+    formFields: any;
+    escrow: {
+      _id: string;
+      withdrawal_request_amount: number;
+      order_invoice_number: string;
+      request_status: string;
+    };
+  }> {
+    const response = await apiClient.post(
+      OWNER_INIT_SEPAY_WITHDRAWAL_ROUTE(escrowId),
+      { paymentMethod },
+      { withCredentials: true }
+    );
+    return response.data;
+  },
+
+  async getPendingRefunds(): Promise<{ refunds: Refund[]; count: number }> {
+    const response = await apiClient.get(OWNER_GET_REFUNDS_ROUTE, {
+      withCredentials: true,
+    });
+    return response.data;
+  },
+
+  async initSepayRefundPayment(
+    refundId: string,
+    paymentMethod: string = "BANK_TRANSFER"
+  ): Promise<{
+    checkoutUrl: string;
+    formFields: any;
+    refund: {
+      _id: string;
+      refunded_amount: number;
+      refund_transaction_id?: string;
+      refund_status: string;
+    };
+  }> {
+    const response = await apiClient.post(
+      OWNER_INIT_SEPAY_REFUND_ROUTE(refundId),
+      { paymentMethod },
+      { withCredentials: true }
+    );
     return response.data;
   },
 };

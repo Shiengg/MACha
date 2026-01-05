@@ -1,5 +1,8 @@
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as ownerService from "../services/owner.service.js";
+import * as escrowService from "../services/escrow.service.js";
+import * as sepayService from "../services/sepay.service.js";
+import * as refundService from "../services/refund.service.js";
 
 export const getDashboard = async (req, res) => {
     try {
@@ -491,6 +494,434 @@ export const getUserHistory = async (req, res) => {
         return res.status(HTTP_STATUS.OK).json(result);
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
+export const getAdminApprovedWithdrawalRequests = async (req, res) => {
+    try {
+        const escrows = await escrowService.getAdminApprovedWithdrawalRequests();
+        
+        return res.status(HTTP_STATUS.OK).json({
+            escrows,
+            count: escrows.length
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message || "Internal server error"
+        });
+    }
+};
+
+export const initSepayWithdrawalPayment = async (req, res) => {
+    try {
+        const { escrowId } = req.params;
+        const ownerId = req.user._id;
+        const { paymentMethod } = req.body;
+
+        const result = await escrowService.initSepayWithdrawalPayment(escrowId, paymentMethod || 'BANK_TRANSFER');
+
+        if (!result.success) {
+            const errorStatusMap = {
+                "ESCROW_NOT_FOUND": HTTP_STATUS.NOT_FOUND,
+                "INVALID_STATUS": HTTP_STATUS.BAD_REQUEST,
+                "PAYMENT_ALREADY_INITIATED": HTTP_STATUS.BAD_REQUEST
+            };
+            
+            const statusCode = errorStatusMap[result.error] || HTTP_STATUS.BAD_REQUEST;
+            
+            return res.status(statusCode).json({
+                message: result.message,
+                error: result.error
+            });
+        }
+
+        const { escrow, orderInvoiceNumber } = result;
+        const serverUrl = process.env.SERVER_URL || 'http://localhost:5000';
+
+        const paymentParams = {
+            orderInvoiceNumber,
+            orderAmount: escrow.withdrawal_request_amount,
+            currency: 'VND',
+            paymentMethod: escrow.sepay_payment_method,
+            customerId: ownerId.toString(),
+            orderDescription: `Withdrawal payment for campaign: ${escrow.campaign.title}`,
+            successUrl: `${serverUrl}/api/owner/escrow/sepay/success?order_invoice_number=${orderInvoiceNumber}`,
+            errorUrl: `${serverUrl}/api/owner/escrow/sepay/error?order_invoice_number=${orderInvoiceNumber}`,
+            cancelUrl: `${serverUrl}/api/owner/escrow/sepay/cancel?order_invoice_number=${orderInvoiceNumber}`,
+            customData: JSON.stringify({
+                escrowId: escrow._id.toString(),
+                campaignId: escrow.campaign._id.toString()
+            })
+        };
+
+        const { checkoutUrl, formFields } = await sepayService.initPayment(paymentParams);
+
+        return res.status(HTTP_STATUS.OK).json({
+            checkoutUrl,
+            formFields,
+            escrow: {
+                _id: escrow._id,
+                withdrawal_request_amount: escrow.withdrawal_request_amount,
+                order_invoice_number: escrow.order_invoice_number,
+                request_status: escrow.request_status
+            }
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message || "Internal server error"
+        });
+    }
+};
+
+export const sepayWithdrawalCallback = async (req, res) => {
+    try {
+        const sepayData = req.body;
+        const orderInvoiceNumber = sepayData.order_invoice_number;
+
+        if (!orderInvoiceNumber) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                status: "error",
+                message: "order_invoice_number is required"
+            });
+        }
+
+        const currentEscrow = await escrowService.getEscrowByOrderInvoice(orderInvoiceNumber);
+        if (currentEscrow && currentEscrow.request_status === 'released') {
+            return res.status(HTTP_STATUS.OK).json({
+                status: "ok",
+                message: "Withdrawal already released, callback ignored"
+            });
+        }
+
+        let status = 'pending';
+        if (sepayData.transaction_status === 'COMPLETED' || sepayData.status === 'COMPLETED') {
+            status = 'completed';
+        } else if (sepayData.transaction_status === 'FAILED' || sepayData.status === 'FAILED') {
+            status = 'failed';
+        } else if (sepayData.transaction_status === 'CANCELLED' || sepayData.status === 'CANCELLED') {
+            status = 'cancelled';
+        }
+
+        const result = await escrowService.updateSepayWithdrawalStatus(orderInvoiceNumber, status, sepayData);
+
+        if (!result) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                status: "error",
+                message: "Withdrawal request not found"
+            });
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            status: "ok",
+            message: "Callback processed successfully"
+        });
+    } catch (error) {
+        console.error('[SePay][WITHDRAWAL][CALLBACK][ERROR]', error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            status: "error",
+            message: error.message
+        });
+    }
+};
+
+export const sepayWithdrawalSuccess = async (req, res) => {
+    try {
+        const { order_invoice_number } = req.query;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+        if (order_invoice_number) {
+            const result = await escrowService.updateSepayWithdrawalStatus(order_invoice_number, 'completed', {});
+            if (result && result.escrow) {
+                return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=success`);
+            }
+        }
+
+        return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=success`);
+    } catch (error) {
+        console.error('[SePay][WITHDRAWAL][SUCCESS][ERROR]', error);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=error`);
+    }
+};
+
+export const sepayWithdrawalError = async (req, res) => {
+    try {
+        const { order_invoice_number } = req.query;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+        if (order_invoice_number) {
+            const result = await escrowService.updateSepayWithdrawalStatus(order_invoice_number, 'failed', {});
+            if (result && result.escrow) {
+                return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=error`);
+            }
+        }
+
+        return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=error`);
+    } catch (error) {
+        console.error('[SePay][WITHDRAWAL][ERROR][EXCEPTION]', error);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=error`);
+    }
+};
+
+export const sepayWithdrawalCancel = async (req, res) => {
+    try {
+        const { order_invoice_number } = req.query;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+        if (order_invoice_number) {
+            const escrow = await escrowService.getEscrowByOrderInvoice(order_invoice_number);
+            
+            if (escrow) {
+                if (escrow.request_status === 'released') {
+                    return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=success`);
+                }
+
+                if (escrow.sepay_transaction_id || escrow.released_at) {
+                    return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=success`);
+                }
+
+                if (escrow.request_status === 'admin_approved') {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    const recheckEscrow = await escrowService.getEscrowByOrderInvoice(order_invoice_number);
+                    if (recheckEscrow) {
+                        if (recheckEscrow.request_status === 'released') {
+                            return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=success`);
+                        }
+                        if (recheckEscrow.request_status !== 'admin_approved') {
+                            return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=${recheckEscrow.request_status}`);
+                        }
+                    }
+                    
+                    const result = await escrowService.updateSepayWithdrawalStatus(order_invoice_number, 'cancelled', {});
+                    if (result && result.escrow) {
+                        const updatedEscrow = await escrowService.getEscrowByOrderInvoice(order_invoice_number);
+                        if (updatedEscrow && updatedEscrow.request_status === 'released') {
+                            return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=success`);
+                        }
+                        return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=cancelled`);
+                    }
+                } else {
+                    return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=${escrow.request_status}`);
+                }
+            }
+        }
+
+        return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=cancelled`);
+    } catch (error) {
+        console.error('[SePay][WITHDRAWAL][CANCEL][EXCEPTION]', error);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=cancelled`);
+    }
+};
+
+export const getPendingRefunds = async (req, res) => {
+    try {
+        const refunds = await refundService.getPendingRefunds();
+        return res.status(HTTP_STATUS.OK).json({
+            refunds,
+            count: refunds.length
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message || "Internal server error"
+        });
+    }
+};
+
+export const initSepayRefundPayment = async (req, res) => {
+    try {
+        const { refundId } = req.params;
+        const ownerId = req.user._id;
+        const { paymentMethod } = req.body;
+
+        const result = await refundService.initSepayRefundPayment(refundId, paymentMethod || 'BANK_TRANSFER');
+
+        if (!result.success) {
+            const errorStatusMap = {
+                "REFUND_NOT_FOUND": HTTP_STATUS.NOT_FOUND,
+                "INVALID_STATUS": HTTP_STATUS.BAD_REQUEST,
+                "PAYMENT_ALREADY_INITIATED": HTTP_STATUS.BAD_REQUEST
+            };
+            
+            const statusCode = errorStatusMap[result.error] || HTTP_STATUS.BAD_REQUEST;
+            
+            return res.status(statusCode).json({
+                message: result.message,
+                error: result.error
+            });
+        }
+
+        const { refund, orderInvoiceNumber } = result;
+        const serverUrl = process.env.SERVER_URL || 'http://localhost:5000';
+
+        const paymentParams = {
+            orderInvoiceNumber,
+            orderAmount: refund.refunded_amount,
+            currency: 'VND',
+            paymentMethod: paymentMethod || 'BANK_TRANSFER',
+            customerId: refund.donor._id.toString(),
+            orderDescription: `Refund for campaign: ${refund.campaign.title} - Original donation: ${refund.original_amount.toLocaleString('vi-VN')} VND`,
+            successUrl: `${serverUrl}/api/owner/refund/sepay/success?order_invoice_number=${orderInvoiceNumber}`,
+            errorUrl: `${serverUrl}/api/owner/refund/sepay/error?order_invoice_number=${orderInvoiceNumber}`,
+            cancelUrl: `${serverUrl}/api/owner/refund/sepay/cancel?order_invoice_number=${orderInvoiceNumber}`,
+            customData: JSON.stringify({
+                refundId: refund._id.toString(),
+                campaignId: refund.campaign._id.toString(),
+                donationId: refund.donation._id.toString()
+            })
+        };
+
+        const { checkoutUrl, formFields } = await sepayService.initPayment(paymentParams);
+
+        return res.status(HTTP_STATUS.OK).json({
+            checkoutUrl,
+            formFields,
+            refund: {
+                _id: refund._id,
+                refunded_amount: refund.refunded_amount,
+                refund_transaction_id: refund.refund_transaction_id,
+                refund_status: refund.refund_status
+            }
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message || "Internal server error"
+        });
+    }
+};
+
+export const sepayRefundCallback = async (req, res) => {
+    try {
+        const sepayData = req.body;
+        const orderInvoiceNumber = sepayData.order_invoice_number;
+
+        if (!orderInvoiceNumber) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                status: "error",
+                message: "order_invoice_number is required"
+            });
+        }
+
+        const currentRefund = await refundService.getRefundByOrderInvoice(orderInvoiceNumber);
+        if (!currentRefund) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                status: "error",
+                message: "Refund not found"
+            });
+        }
+
+        if (currentRefund.refund_status === 'completed') {
+            return res.status(HTTP_STATUS.OK).json({
+                status: "ok",
+                message: "Refund already completed, callback ignored"
+            });
+        }
+
+        let status = 'pending';
+        if (sepayData.transaction_status === 'COMPLETED' || sepayData.status === 'COMPLETED') {
+            status = 'completed';
+        } else if (sepayData.transaction_status === 'FAILED' || sepayData.status === 'FAILED') {
+            status = 'failed';
+        } else if (sepayData.transaction_status === 'CANCELLED' || sepayData.status === 'CANCELLED') {
+            status = 'pending';
+        }
+
+        const result = await refundService.updateRefundStatus(
+            currentRefund._id.toString(),
+            status,
+            {
+                transaction_id: sepayData.transaction_id || orderInvoiceNumber,
+                response_data: sepayData
+            }
+        );
+
+        if (!result || !result.success) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                status: "error",
+                message: "Refund update failed"
+            });
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            status: "ok",
+            message: "Callback processed successfully"
+        });
+    } catch (error) {
+        console.error('[SePay][REFUND][CALLBACK][ERROR]', error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            status: "error",
+            message: error.message
+        });
+    }
+};
+
+export const sepayRefundSuccess = async (req, res) => {
+    try {
+        const { order_invoice_number } = req.query;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+        if (order_invoice_number) {
+            const refund = await refundService.getRefundByOrderInvoice(order_invoice_number);
+            if (refund) {
+                await refundService.updateRefundStatus(
+                    refund._id.toString(),
+                    'completed',
+                    {
+                        transaction_id: order_invoice_number,
+                        response_data: {}
+                    }
+                );
+            }
+            return res.redirect(`${frontendUrl}/owner/refunds?payment=success`);
+        }
+
+        return res.redirect(`${frontendUrl}/owner/refunds?payment=success`);
+    } catch (error) {
+        console.error('[SePay][REFUND][SUCCESS][ERROR]', error);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        return res.redirect(`${frontendUrl}/owner/refunds?payment=error`);
+    }
+};
+
+export const sepayRefundError = async (req, res) => {
+    try {
+        const { order_invoice_number } = req.query;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+        if (order_invoice_number) {
+            const refund = await refundService.getRefundByOrderInvoice(order_invoice_number);
+            if (refund) {
+                await refundService.updateRefundStatus(
+                    refund._id.toString(),
+                    'failed',
+                    {
+                        response_data: {}
+                    }
+                );
+            }
+            return res.redirect(`${frontendUrl}/owner/refunds?payment=error`);
+        }
+
+        return res.redirect(`${frontendUrl}/owner/refunds?payment=error`);
+    } catch (error) {
+        console.error('[SePay][REFUND][ERROR][EXCEPTION]', error);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        return res.redirect(`${frontendUrl}/owner/refunds?payment=error`);
+    }
+};
+
+export const sepayRefundCancel = async (req, res) => {
+    try {
+        const { order_invoice_number } = req.query;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+        return res.redirect(`${frontendUrl}/owner/refunds?payment=cancelled`);
+    } catch (error) {
+        console.error('[SePay][REFUND][CANCEL][EXCEPTION]', error);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        return res.redirect(`${frontendUrl}/owner/refunds?payment=cancelled`);
     }
 };
 

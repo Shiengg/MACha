@@ -3,7 +3,10 @@ import Escrow from "../models/escrow.js";
 import Campaign from "../models/campaign.js";
 import Donation from "../models/donation.js";
 import Vote from "../models/vote.js";
+import User from "../models/user.js";
+import Notification from "../models/notification.js";
 import { redisClient } from "../config/redis.js";
+import * as mailerService from "../utils/mailer.js";
 
 const VOTING_DURATION_DAYS = 3;
 
@@ -32,6 +35,33 @@ export const getTotalReleasedAmount = async (campaignId) => {
 export const calculateAvailableAmount = async (campaignId, currentAmount) => {
     const totalReleasedAmount = await getTotalReleasedAmount(campaignId);
     return currentAmount - totalReleasedAmount;
+};
+
+export const cancelPendingWithdrawalRequests = async (campaignId) => {
+    const cancelled = await Escrow.updateMany(
+        {
+            campaign: campaignId,
+            request_status: {
+                $in: [
+                    "pending_voting",
+                    "voting_in_progress",
+                    "voting_completed",
+                    "admin_approved"
+                ]
+            }
+        },
+        {
+            request_status: "cancelled"
+        }
+    );
+
+    await redisClient.del(`campaign:${campaignId}`);
+    await redisClient.del("campaigns");
+
+    return {
+        success: true,
+        cancelledCount: cancelled.modifiedCount
+    };
 };
 
 const startVotingPeriod = (escrow) => {
@@ -614,4 +644,227 @@ export const getVotesByEscrow = async (escrowId) => {
         .sort({ createdAt: -1 });
     
     return votes;
+};
+
+export const getAdminApprovedWithdrawalRequests = async () => {
+    const escrows = await Escrow.find({ request_status: "admin_approved" })
+        .populate("campaign", "title goal_amount current_amount creator")
+        .populate("requested_by", "username email fullname avatar")
+        .populate("admin_reviewed_by", "username fullname")
+        .sort({ createdAt: -1 });
+    
+    const escrowsWithVotingResults = await Promise.all(
+        escrows.map(async (escrow) => {
+            const votes = await Vote.find({ escrow: escrow._id });
+            
+            let totalApproveWeight = 0;
+            let totalRejectWeight = 0;
+            let approveCount = 0;
+            let rejectCount = 0;
+            
+            votes.forEach(vote => {
+                if (vote.value === "approve") {
+                    totalApproveWeight += vote.vote_weight || 0;
+                    approveCount++;
+                } else if (vote.value === "reject") {
+                    totalRejectWeight += vote.vote_weight || 0;
+                    rejectCount++;
+                }
+            });
+            
+            const totalWeight = totalApproveWeight + totalRejectWeight;
+            const approvePercentage = totalWeight > 0 ? (totalApproveWeight / totalWeight) * 100 : 0;
+            const rejectPercentage = totalWeight > 0 ? (totalRejectWeight / totalWeight) * 100 : 0;
+            
+            return {
+                ...escrow.toObject(),
+                votingResults: {
+                    totalVotes: votes.length,
+                    approveCount,
+                    rejectCount,
+                    totalApproveWeight,
+                    totalRejectWeight,
+                    approvePercentage: approvePercentage.toFixed(2),
+                    rejectPercentage: rejectPercentage.toFixed(2)
+                }
+            };
+        })
+    );
+    
+    return escrowsWithVotingResults;
+};
+
+export const initSepayWithdrawalPayment = async (escrowId, paymentMethod = 'BANK_TRANSFER') => {
+    const escrow = await Escrow.findById(escrowId).populate("campaign");
+    if (!escrow) {
+        return {
+            success: false,
+            error: "ESCROW_NOT_FOUND",
+            message: "Không tìm thấy withdrawal request"
+        };
+    }
+    
+    if (escrow.request_status !== "admin_approved") {
+        return {
+            success: false,
+            error: "INVALID_STATUS",
+            message: `Withdrawal request không ở trạng thái admin_approved. Hiện tại: ${escrow.request_status}`
+        };
+    }
+    
+    if (escrow.order_invoice_number) {
+        return {
+            success: false,
+            error: "PAYMENT_ALREADY_INITIATED",
+            message: "Payment đã được khởi tạo cho withdrawal request này"
+        };
+    }
+    
+    const orderInvoiceNumber = `WITHDRAWAL-${escrow._id}-${Date.now()}`;
+    escrow.order_invoice_number = orderInvoiceNumber;
+    escrow.sepay_payment_method = paymentMethod;
+    await escrow.save();
+    
+    return {
+        success: true,
+        escrow: escrow,
+        orderInvoiceNumber: orderInvoiceNumber
+    };
+};
+
+export const getEscrowByOrderInvoice = async (orderInvoiceNumber) => {
+    const escrow = await Escrow.findOne({ order_invoice_number: orderInvoiceNumber });
+    return escrow;
+};
+
+const getUniqueDonorsByCampaign = async (campaignId) => {
+    const uniqueDonors = await Donation.aggregate([
+        {
+            $match: {
+                campaign: mongoose.Types.ObjectId.isValid(campaignId) 
+                    ? new mongoose.Types.ObjectId(campaignId)
+                    : campaignId,
+                payment_status: "completed"
+            }
+        },
+        {
+            $group: {
+                _id: "$donor"
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                donorId: "$_id"
+            }
+        }
+    ]);
+    
+    return uniqueDonors.map(d => d.donorId);
+};
+
+export const updateSepayWithdrawalStatus = async (orderInvoiceNumber, status, sepayData) => {
+    const escrow = await Escrow.findOne({ order_invoice_number: orderInvoiceNumber }).populate("campaign");
+    if (!escrow) {
+        return null;
+    }
+
+    if (escrow.request_status === 'released') {
+        return { escrow, campaign: escrow.campaign };
+    }
+    
+    let newStatus = escrow.request_status;
+    if (status === 'completed' && escrow.request_status === 'admin_approved') {
+        newStatus = 'released';
+    }
+    
+    const updateData = {
+        sepay_response_data: sepayData
+    };
+    
+    if (sepayData?.transaction_id) {
+        updateData.sepay_transaction_id = sepayData.transaction_id;
+    }
+    
+    if (newStatus === 'released') {
+        updateData.released_at = new Date();
+        escrow.request_status = 'released';
+    }
+
+    Object.assign(escrow, updateData);
+    await escrow.save();
+    
+    const campaign = escrow.campaign;
+    if (campaign && newStatus === 'released') {
+        await redisClient.del(`campaign:${campaign._id}`);
+        await redisClient.del('campaigns');
+        
+        try {
+            await escrow.populate("requested_by", "username email fullname");
+            const creator = escrow.requested_by;
+            
+            if (creator && creator.email) {
+                try {
+                    await mailerService.sendWithdrawalReleasedEmail(creator.email, {
+                        username: creator.username || creator.fullname || 'Người dùng',
+                        campaignTitle: campaign.title,
+                        campaignId: campaign._id.toString(),
+                        withdrawalAmount: escrow.withdrawal_request_amount
+                    });
+                } catch (emailError) {
+                    console.error('[Withdrawal] Error sending email to creator:', emailError);
+                }
+            }
+            
+            const donorIds = await getUniqueDonorsByCampaign(campaign._id);
+            
+            if (donorIds.length > 0) {
+                const notifications = donorIds.map(donorId => ({
+                    receiver: donorId,
+                    sender: creator._id,
+                    type: 'withdrawal_released',
+                    campaign: campaign._id,
+                    message: `Chiến dịch "${campaign.title}" đã giải ngân thành công số tiền ${escrow.withdrawal_request_amount.toLocaleString('vi-VN')} VND`,
+                    is_read: false
+                }));
+                
+                const createdNotifications = await Notification.insertMany(notifications);
+                
+                for (let i = 0; i < createdNotifications.length; i++) {
+                    try {
+                        const notification = createdNotifications[i];
+                        const donorId = donorIds[i];
+                        
+                        await redisClient.publish('notification:new', JSON.stringify({
+                            recipientId: donorId.toString(),
+                            notification: {
+                                _id: notification._id.toString(),
+                                type: 'withdrawal_released',
+                                message: notifications[i].message,
+                                sender: {
+                                    _id: creator._id.toString(),
+                                    username: creator.username,
+                                    fullname: creator.fullname
+                                },
+                                campaign: {
+                                    _id: campaign._id.toString(),
+                                    title: campaign.title
+                                },
+                                is_read: false,
+                                createdAt: notification.createdAt
+                            }
+                        }));
+                    } catch (notifError) {
+                        console.error('[Withdrawal] Error publishing notification:', notifError);
+                    }
+                }
+                
+                await redisClient.del(donorIds.map(id => `notifications:${id}`));
+            }
+        } catch (error) {
+            console.error('[Withdrawal] Error sending email/notifications:', error);
+        }
+    }
+    
+    return { escrow, campaign };
 };
