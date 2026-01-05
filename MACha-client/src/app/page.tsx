@@ -178,13 +178,20 @@ function HomeContent() {
                   : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
               }`}
             >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-emerald-500 to-orange-500 p-0.5">
-                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center">
-                  <FaComments className="w-5 h-5 bg-gradient-to-br from-emerald-500 to-orange-500 bg-clip-text text-transparent" style={{
-                    backgroundImage: 'linear-gradient(to bottom right, #10b981, #f97316)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                  }} />
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
+                background: 'linear-gradient(to bottom right, #10b981, #f97316)',
+              }}>
+                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
+                  <FaComments 
+                    className="w-5 h-5"
+                    style={{
+                      color: 'transparent',
+                      background: 'linear-gradient(to bottom right, #10b981, #f97316)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                    }}
+                  />
                 </div>
               </div>
               <span className={`text-lg font-semibold truncate ${
@@ -205,11 +212,14 @@ function HomeContent() {
                   : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
               }`}
             >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-emerald-500 to-orange-500 p-0.5">
-                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
+                background: 'linear-gradient(to bottom right, #10b981, #f97316)',
+              }}>
+                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
                   <FaShieldAlt 
                     className="w-5 h-5"
                     style={{
+                      color: 'transparent',
                       background: 'linear-gradient(to bottom right, #10b981, #f97316)',
                       WebkitBackgroundClip: 'text',
                       WebkitTextFillColor: 'transparent',
