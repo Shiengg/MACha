@@ -57,12 +57,12 @@ const campaignSchema = new mongoose.Schema({
     status: {
         type: String,
         enum: [
-            "pending", 
+            "pending",
             "active",
             "voting",
-            "approved", 
-            "completed", 
-            "rejected", 
+            "approved",
+            "completed",
+            "rejected",
             "cancelled"
         ],
         default: "pending"
@@ -79,11 +79,11 @@ const campaignSchema = new mongoose.Schema({
             "disability",         // Người khuyết tật
             "animal",             // Động vật
             "environment",        // Môi trường
-            "community",          // Cộng đồng
-            "other"              // Khác
+            "hardship",           // Hoàn cảnh khó khăn
+            "other",              // Khác
         ],
         required: true,
-        index: true  
+        index: true
     },
     banner_image: {
         type: String,
