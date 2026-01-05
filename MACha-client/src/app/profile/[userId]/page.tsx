@@ -398,32 +398,6 @@ function ProfileContent() {
                       </h1>
                       {getKYCBadge()}
                       {getRoleBadge()}
-                      {!isOwnProfile && (
-                        <div className="relative ml-auto" ref={dropdownRef}>
-                          <button
-                            onClick={() => setShowDropdown(!showDropdown)}
-                            className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                            aria-label="More options"
-                          >
-                            <MoreHorizontal className="w-5 h-5 text-gray-600" />
-                          </button>
-                          
-                          {showDropdown && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                              <button
-                                onClick={() => {
-                                  setShowReportModal(true);
-                                  setShowDropdown(false);
-                                }}
-                                className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors text-red-600"
-                              >
-                                <Flag className="w-4 h-4" />
-                                <span className="text-sm font-medium">Báo cáo người dùng</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                     <p className="text-gray-500 mt-1 text-sm md:text-base">
                       @{user.username}
@@ -505,6 +479,32 @@ function ProfileContent() {
                           Nhắn tin
                         </button>
                       )}
+                      <div className="relative" ref={dropdownRef}>
+                        <button
+                          onClick={() => setShowDropdown(!showDropdown)}
+                          className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors border border-gray-300 bg-white"
+                          aria-label="More options"
+                        >
+                          <MoreHorizontal className="w-5 h-5 text-gray-600" />
+                        </button>
+                        
+                        {showDropdown && (
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                            <button
+                              onClick={() => {
+                                setShowReportModal(true);
+                                setShowDropdown(false);
+                              }}
+                              className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors text-red-600"
+                            >
+                              <Flag className="w-4 h-4" />
+                              <span className="text-sm font-medium">
+                                {user?.role === 'admin' ? 'Báo cáo admin' : 'Báo cáo người dùng'}
+                              </span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -735,7 +735,7 @@ function ProfileContent() {
       {/* Report Modal */}
       {user && (
         <ReportModal
-          reportedType="user"
+          reportedType={user.role === 'admin' ? 'admin' : 'user'}
           reportedId={user._id}
           isOpen={showReportModal}
           onClose={() => setShowReportModal(false)}

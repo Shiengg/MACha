@@ -9,7 +9,7 @@ const reportSchema = new mongoose.Schema({
     },
     reported_type: {
         type: String,
-        enum: ["post", "campaign", "user", "comment", "event"],
+        enum: ["post", "campaign", "user", "comment", "event", "admin"],
         required: true,
         index: true
     },
@@ -29,6 +29,8 @@ const reportSchema = new mongoose.Schema({
             "violence",
             "copyright",
             "misinformation",
+            "abuse_of_power",
+            "inappropriate_handling",
             "other"
         ],
         required: true,
@@ -61,6 +63,9 @@ const reportSchema = new mongoose.Schema({
             "removed",
             "user_warned",
             "user_banned",
+            "admin_warned",
+            "admin_removed",
+            "admin_banned",
             "no_action",
         ],
         default: null,

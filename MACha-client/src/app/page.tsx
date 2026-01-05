@@ -1,19 +1,20 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import ProtectedRoute from "@/components/guards/ProtectedRoute";
 import PostCard from "@/components/shared/PostCard";
 import TrendingHashtags from "@/components/shared/TrendingHashtags";
 import CreatePostModal from "@/components/shared/CreatePostModal";
 import { getPosts, Post } from "@/services/post.service";
 import { useAuth } from "@/contexts/AuthContext";
-import { FaSync } from "react-icons/fa";
+import { FaSync, FaUser, FaComments, FaShieldAlt } from "react-icons/fa";
 import Image from "next/image";
 
 function HomeContent() {
   const { user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -122,13 +123,115 @@ function HomeContent() {
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <div className="flex max-w-[1920px] mx-auto">
-        {/* Left Sidebar - Pink placeholder */}
-        <aside className="hidden lg:block lg:w-[280px] xl:w-[360px] fixed left-0 top-0 h-screen overflow-y-auto bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
-          <div className="p-4 pt-20 space-y-4">
-          <TrendingHashtags onHashtagClick={handleHashtagClick} />
-            <div className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-              (Làm sau)
-            </div>
+        {/* Left Sidebar - Navigation Menu */}
+        <aside className="hidden lg:block lg:w-[280px] xl:w-[360px] fixed left-0 top-0 h-screen overflow-y-auto bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
+          <div className="p-4 pt-20 space-y-1">
+            {/* Profile Button */}
+            {user && (() => {
+              const userId = (user as any)?._id || (user as any)?.id;
+              const isActive = pathname === `/profile/${userId}`;
+              return (
+                <button
+                  onClick={() => {
+                    if (userId) {
+                      router.push(`/profile/${userId}`);
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+                    isActive
+                      ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
+                      : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
+                  }`}
+                >
+                  <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-purple-400 to-pink-500 flex-shrink-0">
+                    {user.avatar ? (
+                      <Image
+                        src={user.avatar}
+                        alt={user.username || 'User avatar'}
+                        fill
+                        sizes="40px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white font-semibold">
+                        {user.username?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                    )}
+                  </div>
+                  <span className={`text-lg font-semibold truncate ${
+                    isActive
+                      ? 'text-gray-900 dark:text-white'
+                      : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    {user.fullname || user.username || 'Trang cá nhân'}
+                  </span>
+                </button>
+              );
+            })()}
+
+            {/* Messages Button */}
+            <button
+              onClick={() => router.push('/messages')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+                pathname === '/messages'
+                  ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-emerald-500 to-orange-500 p-0.5">
+                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center">
+                  <FaComments className="w-5 h-5 bg-gradient-to-br from-emerald-500 to-orange-500 bg-clip-text text-transparent" style={{
+                    backgroundImage: 'linear-gradient(to bottom right, #10b981, #f97316)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }} />
+                </div>
+              </div>
+              <span className={`text-lg font-semibold truncate ${
+                pathname === '/messages'
+                  ? 'text-gray-900 dark:text-white'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}>
+                Nhắn tin
+              </span>
+            </button>
+
+            {/* Admin Team Button */}
+            <button
+              onClick={() => router.push('/admins')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+                pathname === '/admins'
+                  ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-emerald-500 to-orange-500 p-0.5">
+                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center">
+                  <FaShieldAlt 
+                    className="w-5 h-5"
+                    style={{
+                      background: 'linear-gradient(to bottom right, #10b981, #f97316)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                    }}
+                  />
+                </div>
+              </div>
+              <span className={`text-lg font-semibold truncate ${
+                pathname === '/admins'
+                  ? 'text-gray-900 dark:text-white'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}>
+                Đội ngũ Admin
+              </span>
+            </button>
+
+            {/* Divider */}
+            <div className="my-4 border-t border-gray-200 dark:border-gray-700"></div>
+
+            {/* Trending Hashtags */}
+            <TrendingHashtags onHashtagClick={handleHashtagClick} />
           </div>
         </aside>
 

@@ -7,6 +7,8 @@ import {
   UPDATE_REPORT_STATUS_ROUTE,
   GET_REPORTS_BY_ITEM_ROUTE,
   BATCH_UPDATE_REPORTS_BY_ITEM_ROUTE,
+  GET_ADMIN_REPORTS_ROUTE,
+  GET_REPORTS_BY_ADMIN_ROUTE,
 } from "@/constants/api";
 
 export type ReportReason =
@@ -18,9 +20,11 @@ export type ReportReason =
   | "violence"
   | "copyright"
   | "misinformation"
+  | "abuse_of_power"
+  | "inappropriate_handling"
   | "other";
 
-export type ReportedType = "post" | "campaign" | "user" | "comment" | "event";
+export type ReportedType = "post" | "campaign" | "user" | "comment" | "event" | "admin";
 
 export type ReportStatus =
   | "pending"
@@ -32,6 +36,9 @@ export type ReportResolution =
   | "removed"
   | "user_warned"
   | "user_banned"
+  | "admin_warned"
+  | "admin_removed"
+  | "admin_banned"
   | "no_action";
 
 export interface Reporter {
@@ -236,6 +243,51 @@ export const batchUpdateReportsByItem = async (
     return response.data;
   } catch (error) {
     console.error(`Error batch updating reports for ${reportedType} ${reportedId}:`, error);
+    throw error;
+  }
+};
+
+export interface GetAdminReportsResponse {
+  reports: Report[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export const getAdminReports = async (
+  filters?: {
+    status?: ReportStatus;
+    admin_id?: string;
+  },
+  page?: number,
+  limit?: number
+): Promise<GetAdminReportsResponse> => {
+  try {
+    const params: any = {};
+    if (filters?.status) params.status = filters.status;
+    if (filters?.admin_id) params.admin_id = filters.admin_id;
+    if (page !== undefined) params.page = page;
+    if (limit !== undefined) params.limit = limit;
+
+    const response = await apiClient.get<GetAdminReportsResponse>(GET_ADMIN_REPORTS_ROUTE, {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching admin reports:", error);
+    throw error;
+  }
+};
+
+export const getReportsByAdmin = async (adminId: string): Promise<Report[]> => {
+  try {
+    const response = await apiClient.get<{ reports: Report[] }>(
+      GET_REPORTS_BY_ADMIN_ROUTE(adminId)
+    );
+    return response.data.reports;
+  } catch (error) {
+    console.error(`Error fetching reports for admin ${adminId}:`, error);
     throw error;
   }
 };

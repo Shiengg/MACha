@@ -8,6 +8,7 @@ const getPageTitle = (pathname: string): string => {
   const routes: { [key: string]: string } = {
     '/owner/dashboard': 'Dashboard',
     '/owner/admins': 'Quản lý Admin',
+    '/owner/admin-reports': 'Báo cáo về Admin',
     '/owner/financial': 'Tài chính tổng quan',
     '/owner/financial/campaigns': 'Tài chính Campaign',
     '/owner/admin-activities': 'Hoạt động Admin',

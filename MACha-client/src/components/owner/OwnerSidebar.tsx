@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Wallet,
   ChartLine,
-  ClipboardList
+  ClipboardList,
+  Flag
 } from 'lucide-react';
 
 interface MenuItem {
@@ -53,6 +54,7 @@ export default function OwnerSidebar() {
       title: 'QUẢN LÝ HỆ THỐNG',
       items: [
         { icon: ShieldCheck, label: 'Quản lý Admin', href: '/owner/admins', badge: undefined },
+        { icon: Flag, label: 'Báo cáo về Admin', href: '/owner/admin-reports', badge: undefined },
         { icon: Users, label: 'Quản lý Users', href: '/owner/users', badge: undefined },
         { icon: Wallet, label: 'Tài chính tổng quan', href: '/owner/financial' },
         { icon: ChartLine, label: 'Tài chính Campaign', href: '/owner/financial/campaigns' },

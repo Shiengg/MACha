@@ -44,6 +44,7 @@ export const USER_ROUTE = "api/users";
 export const GET_USER_BY_ID_ROUTE = (userId: string) => `${USER_ROUTE}/${userId}`;
 export const FOLLOW_USER_ROUTE = (userId: string) => `${USER_ROUTE}/${userId}/follow`;
 export const UNFOLLOW_USER_ROUTE = (userId: string) => `${USER_ROUTE}/${userId}/unfollow`;
+export const GET_PUBLIC_ADMINS_ROUTE = `${USER_ROUTE}/public/admins`;
 
 export const CAMPAIGN_ROUTE = "api/campaigns";
 export const GET_ALL_CAMPAIGNS_ROUTE = `${CAMPAIGN_ROUTE}`;
@@ -110,6 +111,8 @@ export const GET_REPORT_BY_ID_ROUTE = (id: string) => `${REPORT_ROUTE}/${id}`;
 export const UPDATE_REPORT_STATUS_ROUTE = (id: string) => `${REPORT_ROUTE}/${id}/status`;
 export const GET_REPORTS_BY_ITEM_ROUTE = (reportedType: string, reportedId: string) => `${REPORT_ROUTE}/item/${reportedType}/${reportedId}`;
 export const BATCH_UPDATE_REPORTS_BY_ITEM_ROUTE = (reportedType: string, reportedId: string) => `${REPORT_ROUTE}/item/${reportedType}/${reportedId}/batch`;
+export const GET_ADMIN_REPORTS_ROUTE = `${REPORT_ROUTE}/admins`;
+export const GET_REPORTS_BY_ADMIN_ROUTE = (adminId: string) => `${REPORT_ROUTE}/admins/${adminId}`;
 
 export const SEARCH_ROUTE = "api/search";
 export const SAVE_SEARCH_HISTORY_ROUTE = `${SEARCH_ROUTE}/history`;

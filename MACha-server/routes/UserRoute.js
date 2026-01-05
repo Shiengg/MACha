@@ -6,7 +6,8 @@ import {
     unfollowUser, 
     getFollowers, 
     getFollowing, 
-    searchUsers
+    searchUsers,
+    getPublicAdmins
 } from "../controllers/UserController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { checkRole } from "../middlewares/checkRole.js";
@@ -14,6 +15,7 @@ import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 
 const userRoutes = Router();
 
+userRoutes.get('/public/admins', getPublicAdmins);
 userRoutes.get('/', authMiddleware, checkRole('admin'), getAllUsers);
 userRoutes.get('/search', authMiddleware, searchUsers);
 userRoutes.get('/:id', authMiddleware, getUserById);

@@ -210,6 +210,39 @@ export const getAllUsers = async () => {
     return users;
 };
 
+export const getPublicAdmins = async (page = 1, limit = 20) => {
+    const skip = (page - 1) * limit;
+    const cacheKey = `public:admins:${page}:${limit}`;
+    
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+    
+    const [admins, total] = await Promise.all([
+        User.find({ role: "admin", is_banned: false })
+            .select("_id username fullname avatar createdAt is_verified")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit),
+        User.countDocuments({ role: "admin", is_banned: false })
+    ]);
+    
+    const result = {
+        admins,
+        pagination: {
+            page,
+            limit,
+            total,
+            pages: Math.ceil(total / limit)
+        }
+    };
+    
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(result));
+    
+    return result;
+};
+
 /**
  * Search users with Cache-Aside Pattern
  */

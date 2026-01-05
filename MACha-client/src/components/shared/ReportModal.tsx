@@ -13,14 +13,23 @@ interface ReportModalProps {
   onSuccess?: () => void;
 }
 
-const REPORT_REASONS: Array<{ value: ReportReason; label: string }> = [
+const REPORT_REASONS_USER: Array<{ value: ReportReason; label: string }> = [
   { value: 'scam', label: 'Lừa đảo, gian lận hoặc mạo danh' },
   { value: 'inappropriate_content', label: 'Nội dung người lớn' },
   { value: 'spam', label: 'Bán hoặc quảng cáo mặt hàng bị hạn chế' },
   { value: 'violence', label: 'Bạo lực, thù ghét hoặc bóc lột' },
   { value: 'harassment', label: 'Bắt nạt hoặc liên hệ theo cách không mong muốn' },
   { value: 'copyright', label: 'Quyền sở hữu trí tuệ' },
-  { value: 'violence', label: 'Tự hại bản thân' },
+  { value: 'misinformation', label: 'Thông tin sai sự thật' },
+  { value: 'other', label: 'Khác' },
+];
+
+const REPORT_REASONS_ADMIN: Array<{ value: ReportReason; label: string }> = [
+  { value: 'abuse_of_power', label: 'Lạm quyền' },
+  { value: 'inappropriate_handling', label: 'Xử lý sai hoặc không phù hợp' },
+  { value: 'harassment', label: 'Bắt nạt hoặc quấy rối' },
+  { value: 'scam', label: 'Lừa đảo, gian lận' },
+  { value: 'violence', label: 'Bạo lực, thù ghét' },
   { value: 'misinformation', label: 'Thông tin sai sự thật' },
   { value: 'other', label: 'Khác' },
 ];
@@ -129,6 +138,7 @@ export default function ReportModal({
 
   if (!isOpen) return null;
 
+  const REPORT_REASONS = reportedType === 'admin' ? REPORT_REASONS_ADMIN : REPORT_REASONS_USER;
   const selectedReasonLabel = selectedReasonIndex >= 0 ? REPORT_REASONS[selectedReasonIndex]?.label || '' : '';
 
   return (
