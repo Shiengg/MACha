@@ -88,6 +88,25 @@ const escrowSchema = new mongoose.Schema({
     released_at: {
         type: Date,
         default: null
+    },
+    order_invoice_number: {
+        type: String,
+        unique: true,
+        sparse: true,
+        index: true
+    },
+    sepay_transaction_id: {
+        type: String,
+        index: true
+    },
+    sepay_payment_method: {
+        type: String,
+        enum: ["CARD", "BANK_TRANSFER", "NAPAS_BANK_TRANSFER"],
+        default: null
+    },
+    sepay_response_data: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null
     }
 },
     {

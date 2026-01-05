@@ -665,4 +665,97 @@ Trân trọng,
 
     return await sendEmail(to, subject, text, htmlContent);
 };
+
+export const sendWithdrawalReleasedEmail = async (to, data) => {
+    const { username, campaignTitle, campaignId, withdrawalAmount } = data;
+    const campaignUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/campaigns/${campaignId}`;
+
+    const subject = `✅ Giải ngân thành công cho chiến dịch "${campaignTitle}"`;
+
+    const text = `
+Xin chào ${username},
+
+Tin vui! Yêu cầu giải ngân của bạn đã được xử lý thành công.
+
+Chiến dịch: ${campaignTitle}
+Số tiền giải ngân: ${withdrawalAmount.toLocaleString('vi-VN')} VND
+
+Số tiền đã được chuyển vào tài khoản của bạn. Vui lòng kiểm tra tài khoản ngân hàng.
+
+Xem chiến dịch: ${campaignUrl}
+
+Nếu bạn có thắc mắc, vui lòng liên hệ với chúng tôi.
+
+Trân trọng,
+Đội ngũ MACha
+    `.trim();
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px;">✅ Giải ngân thành công!</h1>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <p style="color: #374151; font-size: 16px; margin-bottom: 20px;">
+                                Xin chào <strong>${username}</strong>,
+                            </p>
+                            
+                            <p style="color: #374151; font-size: 16px; margin-bottom: 20px;">
+                                Tin vui! Yêu cầu giải ngân của bạn đã được xử lý thành công.
+                            </p>
+                            
+                            <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 20px; margin: 25px 0; border-radius: 4px;">
+                                <h2 style="color: #065f46; margin: 0 0 10px 0; font-size: 20px;">${campaignTitle}</h2>
+                                <p style="color: #047857; margin: 5px 0; font-size: 14px;">Số tiền giải ngân:</p>
+                                <p style="color: #065f46; margin: 0; font-size: 24px; font-weight: bold;">
+                                    ${withdrawalAmount.toLocaleString('vi-VN')} VND
+                                </p>
+                            </div>
+                            
+                            <p style="color: #374151; font-size: 16px; margin-bottom: 30px;">
+                                Số tiền đã được chuyển vào tài khoản của bạn. Vui lòng kiểm tra tài khoản ngân hàng để xác nhận.
+                            </p>
+                            
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="${campaignUrl}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                                    Xem chiến dịch
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 25px; text-align: center; border-top: 1px solid #e5e7eb;">
+                            <p style="color: #6b7280; font-size: 14px; margin: 0 0 10px 0;">
+                                Cảm ơn bạn đã sử dụng MACha 💚
+                            </p>
+                            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                                © ${new Date().getFullYear()} MACha. Tất cả quyền được bảo lưu.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+    `.trim();
+
+    return await sendEmail(to, subject, text, htmlContent);
+};
   

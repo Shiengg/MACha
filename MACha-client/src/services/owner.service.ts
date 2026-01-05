@@ -17,7 +17,10 @@ import {
   OWNER_UNBAN_USER_ROUTE,
   OWNER_RESET_USER_KYC_ROUTE,
   OWNER_GET_USER_HISTORY_ROUTE,
+  OWNER_GET_WITHDRAWAL_REQUESTS_ROUTE,
+  OWNER_INIT_SEPAY_WITHDRAWAL_ROUTE,
 } from "@/constants/api";
+import { Escrow } from "@/services/escrow.service";
 
 export interface Admin {
   _id: string;
@@ -487,6 +490,34 @@ export const ownerService = {
       params: { page, limit },
       withCredentials: true,
     });
+    return response.data;
+  },
+
+  async getAdminApprovedWithdrawalRequests(): Promise<{ escrows: Escrow[]; count: number }> {
+    const response = await apiClient.get(OWNER_GET_WITHDRAWAL_REQUESTS_ROUTE, {
+      withCredentials: true,
+    });
+    return response.data;
+  },
+
+  async initSepayWithdrawalPayment(
+    escrowId: string,
+    paymentMethod: string = "BANK_TRANSFER"
+  ): Promise<{
+    checkoutUrl: string;
+    formFields: any;
+    escrow: {
+      _id: string;
+      withdrawal_request_amount: number;
+      order_invoice_number: string;
+      request_status: string;
+    };
+  }> {
+    const response = await apiClient.post(
+      OWNER_INIT_SEPAY_WITHDRAWAL_ROUTE(escrowId),
+      { paymentMethod },
+      { withCredentials: true }
+    );
     return response.data;
   },
 };

@@ -26,7 +26,7 @@ const donationSchema = new mongoose.Schema({
     },
     donation_method: {
         type: String,
-        enum: ["bank_transfer", "crypto", "cash", "sepay"],
+        enum: ["bank_transfer", "cash", "sepay"],
         required: true,
         index: true
     },
