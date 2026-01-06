@@ -54,6 +54,7 @@ const CATEGORIES = [
   { value: 'poverty', label: 'Người nghèo' },
   { value: 'disaster', label: 'Thiên tai' },
   { value: 'medical', label: 'Y tế' },
+  {value: 'hardship', label: 'Hoàn cảnh khó khăn'},
   { value: 'education', label: 'Giáo dục' },
   { value: 'disability', label: 'Người khuyết tật' },
   { value: 'animal', label: 'Động vật' },

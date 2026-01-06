@@ -97,7 +97,7 @@ export default function TermsPage() {
                 </ul>
                 <p>
                   <strong>3.2. Danh mục chiến dịch:</strong> Chiến dịch phải thuộc một trong các danh mục 
-                  được phép: Trẻ em, Người già, Người nghèo, Thiên tai, Y tế, Giáo dục, Người khuyết tật, 
+                  được phép: Trẻ em, Người già, Người nghèo, Thiên tai, Y tế, Giáo dục, Người khuyết tật, Hoàn cảnh khó khăn,
                   Động vật, Môi trường, Cộng đồng, hoặc Khác.
                 </p>
                 <p>

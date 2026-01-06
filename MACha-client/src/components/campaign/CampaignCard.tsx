@@ -65,6 +65,7 @@ export default function CampaignCard({ campaign, showCreator = false, onClick, d
       'poverty': 'Người nghèo',
       'disaster': 'Thiên tai',
       'medical': 'Y tế',
+      'hardship': 'Hoàn cảnh khó khăn',
       'education': 'Giáo dục',
       'disability': 'Người khuyết tật',
       'animal': 'Động vật',
