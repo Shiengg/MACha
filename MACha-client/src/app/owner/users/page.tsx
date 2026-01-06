@@ -241,9 +241,8 @@ export default function OwnerUsers() {
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  <option value="">All Roles</option>
+                  <option value="">All Users</option>
                   <option value="user">User</option>
-                  <option value="admin">Admin</option>
                 </select>
               </div>
               <div>

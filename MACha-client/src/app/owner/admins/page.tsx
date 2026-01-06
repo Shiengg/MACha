@@ -487,7 +487,6 @@ export default function OwnerAdmins() {
                                 <>
                                   <div>Approvals: {admin.stats.approvals}</div>
                                   <div>Rejections: {admin.stats.rejections}</div>
-                                  <div className="text-xs text-gray-500">Total: {admin.stats.total}</div>
                                 </>
                               ) : (
                                 <span className="text-gray-400">No data</span>
