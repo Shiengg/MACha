@@ -207,14 +207,22 @@ function DiscoverContent() {
       }
     };
 
+    const handleCampaignCancelled = (event: any) => {
+      if (event.campaignId) {
+        setCampaigns(prev => prev.filter(c => String(c._id) !== String(event.campaignId)));
+      }
+    };
+
     socket.on('campaign:created', handleCampaignCreated);
     socket.on('campaign:updated', handleCampaignUpdated);
+    socket.on('campaign:cancelled', handleCampaignCancelled);
     socket.on('donation:status_changed', handleDonationStatusChanged);
     socket.on('donation:updated', handleDonationUpdated);
 
     return () => {
       socket.off('campaign:created', handleCampaignCreated);
       socket.off('campaign:updated', handleCampaignUpdated);
+      socket.off('campaign:cancelled', handleCampaignCancelled);
       socket.off('donation:status_changed', handleDonationStatusChanged);
       socket.off('donation:updated', handleDonationUpdated);
     };
