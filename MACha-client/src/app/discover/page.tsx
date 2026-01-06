@@ -13,6 +13,7 @@ const categoryConfig: Record<string, { label: string; icon: any }> = {
   'poverty': { label: 'Xóa nghèo', icon: Home },
   'disaster': { label: 'Thiên tai', icon: AlertCircle },
   'medical': { label: 'Y tế', icon: Stethoscope },
+  'hardship': { label: 'Hoàn cảnh khó khăn', icon: Home },
   'education': { label: 'Giáo dục', icon: GraduationCap },
   'disability': { label: 'Người khuyết tật', icon: Users },
   'animal': { label: 'Động vật', icon: PawPrint },
@@ -50,27 +51,49 @@ function DiscoverContent() {
     try {
       setLoading(true);
       
-      // Convert to 0-based for API (page 1 -> page 0)
-      const apiPage = page - 1;
-      
-      // Load campaigns with pagination
-      const result = await campaignService.getAllCampaigns(apiPage, limit);
-      
-      // Only show active campaigns that haven't expired
-      const validCampaigns = result.campaigns.filter(c => isCampaignValid(c));
-      
-      setCampaigns(validCampaigns);
-      setTotal(result.total);
-      setTotalPages(result.totalPages);
-      setCurrentPage(page);
+      if (selectedCategory === 'all') {
+        // For "all" category, use paginated API
+        const apiPage = page - 1;
+        const result = await campaignService.getAllCampaigns(apiPage, limit);
+        
+        // Only show active campaigns that haven't expired
+        const validCampaigns = result.campaigns.filter(c => isCampaignValid(c));
+        
+        setCampaigns(validCampaigns);
+        setTotal(result.total);
+        setTotalPages(result.totalPages);
+        setCurrentPage(page);
+      } else {
+        // For specific category, load all campaigns of that category
+        const allCategoryCampaigns = await campaignService.getCampaignsByCategory(selectedCategory);
+        
+        // Filter valid campaigns
+        const validCampaigns = allCategoryCampaigns.filter(c => isCampaignValid(c));
+        
+        // Calculate pagination for client-side
+        const totalValid = validCampaigns.length;
+        const totalPagesForCategory = Math.ceil(totalValid / limit);
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedCampaigns = validCampaigns.slice(startIndex, endIndex);
+        
+        setCampaigns(paginatedCampaigns);
+        setTotal(totalValid);
+        setTotalPages(totalPagesForCategory);
+        setCurrentPage(page);
+      }
       
       // Load categories only on initial load (when page is 1)
       if (page === 1) {
         const categoriesData = await campaignService.getActiveCategories();
         
+        // Get total count for "all" category
+        const allCampaignsResult = await campaignService.getAllCampaigns(0, 1);
+        const allCampaignsTotal = allCampaignsResult.total;
+        
         // Map categories with config - use count from server
         const mappedCategories = [
-          { id: 'all', label: 'Tất cả', icon: Heart, count: result.total },
+          { id: 'all', label: 'Tất cả', icon: Heart, count: allCampaignsTotal },
           ...categoriesData.map((cat: CategoryWithCount) => {
             return {
               id: cat.category,
@@ -88,7 +111,7 @@ function DiscoverContent() {
     } finally {
       setLoading(false);
     }
-  }, [limit]);
+  }, [limit, selectedCategory]);
 
   useEffect(() => {
     loadData(1);
@@ -100,10 +123,8 @@ function DiscoverContent() {
     loadData(1);
   }, [selectedCategory, loadData]);
 
-  // Filter campaigns by category (client-side filtering for now)
-  const filteredCampaigns = selectedCategory === 'all' 
-    ? campaigns 
-    : campaigns.filter(c => c.category === selectedCategory);
+  // Campaigns are already filtered by category in loadData, so no need to filter again
+  const filteredCampaigns = campaigns;
 
   // Listen for campaign updates via Socket.IO
   useEffect(() => {
@@ -311,7 +332,7 @@ function DiscoverContent() {
               {selectedCategory === 'all' ? (
                 <>Tìm thấy <span className="font-bold text-gray-800">{total}</span> chiến dịch</>
               ) : (
-                <>Tìm thấy <span className="font-bold text-gray-800">{filteredCampaigns.length}</span> chiến dịch trong danh mục này</>
+                <>Tìm thấy <span className="font-bold text-gray-800">{total}</span> chiến dịch trong danh mục này</>
               )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -319,7 +340,7 @@ function DiscoverContent() {
                 <CampaignCard key={campaign._id} campaign={campaign} showCreator={true} />
               ))}
             </div>
-            {totalPages > 1 && selectedCategory === 'all' && (
+            {totalPages > 1 && (
               <div className="flex justify-center items-center gap-2 mt-8">
                 {/* Current Page / Total Pages */}
                 <div className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium">
