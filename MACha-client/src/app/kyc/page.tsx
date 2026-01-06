@@ -8,6 +8,23 @@ import apiClient from '@/lib/api-client';
 import Swal from 'sweetalert2';
 import { SUBMIT_KYC_ROUTE } from '@/constants/api';
 import { cloudinaryService } from '@/services/cloudinary.service';
+import { 
+  User, 
+  CreditCard, 
+  FileText, 
+  CheckCircle2, 
+  Building2, 
+  MapPin, 
+  Calendar,
+  Upload,
+  Camera,
+  X,
+  Lock,
+  Shield,
+  ArrowRight,
+  ArrowLeft,
+  AlertCircle
+} from 'lucide-react';
 
 function KYCSubmissionContent() {
   const router = useRouter();
@@ -454,139 +471,199 @@ function KYCSubmissionContent() {
 
   if (checkingStatus) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">Đang kiểm tra trạng thái...</p>
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Đang kiểm tra trạng thái...</p>
         </div>
       </div>
     );
   }
 
+  const steps = [
+    { number: 1, label: 'Thông tin cá nhân', icon: User },
+    { number: 2, label: 'Thông tin ngân hàng', icon: Building2 },
+    { number: 3, label: 'Tài liệu', icon: FileText },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-white py-12 px-4 relative overflow-hidden">
+      {/* Background decorative elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-50 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-50 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="max-w-4xl mx-auto relative z-10">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-4">Xác thực danh tính (KYC)</h1>
-          <p className="text-gray-400">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-50 rounded-2xl mb-6 border border-blue-100">
+            <Shield className="w-8 h-8 text-blue-600" />
+          </div>
+          <h1 className="text-5xl font-bold text-gray-900 mb-4 tracking-tight">Xác thực danh tính</h1>
+          <p className="text-gray-600 text-lg font-medium">
             Hoàn thành xác thực để có thể tạo chiến dịch gây quỹ
           </p>
         </div>
 
-        {/* Stepper */}
-        <div className="mb-8">
-          <div className="flex items-center justify-center">
-            {[1, 2, 3].map((step) => (
-              <div key={step} className="flex items-center">
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all ${
-                    currentStep >= step
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-400'
-                  }`}
-                >
-                  {step}
-                </div>
-                {step < 3 && (
+        {/* Progress Indicator */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between relative">
+            {/* Progress line */}
+            <div className="absolute top-6 left-0 right-0 h-0.5 bg-gray-200 -z-10">
+              <div 
+                className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500 ease-out"
+                style={{ width: `${((currentStep - 1) / 2) * 100}%` }}
+              ></div>
+            </div>
+
+            {steps.map((step, index) => {
+              const StepIcon = step.icon;
+              const isActive = currentStep === step.number;
+              const isCompleted = currentStep > step.number;
+              
+              return (
+                <div key={step.number} className="flex flex-col items-center flex-1">
                   <div
-                    className={`w-24 h-1 mx-2 transition-all ${
-                      currentStep > step ? 'bg-blue-600' : 'bg-gray-700'
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center font-semibold text-sm transition-all duration-300 ${
+                      isCompleted
+                        ? 'bg-gradient-to-br from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/30'
+                        : isActive
+                        ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/30 scale-110'
+                        : 'bg-gray-100 text-gray-400 border border-gray-200'
                     }`}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-center mt-4 gap-24">
-            <span className={`text-sm ${currentStep >= 1 ? 'text-blue-400' : 'text-gray-500'}`}>
-              Thông tin cá nhân
-            </span>
-            <span className={`text-sm ${currentStep >= 2 ? 'text-blue-400' : 'text-gray-500'}`}>
-              Ngân hàng
-            </span>
-            <span className={`text-sm ${currentStep >= 3 ? 'text-blue-400' : 'text-gray-500'}`}>
-              Tài liệu
-            </span>
+                  >
+                    {isCompleted ? (
+                      <CheckCircle2 className="w-6 h-6" />
+                    ) : (
+                      <StepIcon className="w-6 h-6" />
+                    )}
+                  </div>
+                  <span
+                    className={`mt-3 text-sm font-medium transition-colors ${
+                      isActive || isCompleted
+                        ? 'text-gray-900'
+                        : 'text-gray-400'
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit}>
-          <div className="bg-gray-800 rounded-lg p-8 shadow-xl border border-gray-700">
+          <div className="bg-white rounded-2xl p-8 md:p-10 shadow-2xl border border-white/10 backdrop-blur-sm">
             {/* Step 1: Personal Info */}
             {currentStep === 1 && (
               <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-white mb-6">Thông tin cá nhân</h2>
-                
-                <div>
-                  <label className="block text-gray-300 mb-2">
-                    Họ và tên (theo CCCD) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="identity_verified_name"
-                    value={formData.identity_verified_name}
-                    onChange={handleInputChange}
-                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    placeholder="Nguyễn Văn A"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 mb-2">
-                    Số CCCD <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="identity_card_number"
-                    value={formData.identity_card_number}
-                    onChange={handleInputChange}
-                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    placeholder="001234567890"
-                    pattern="[0-9]{9,12}"
-                    required
-                  />
-                  <p className="text-gray-400 text-sm mt-1">
-                    Nhập đầy đủ số CCCD. Dữ liệu sẽ được mã hóa để bảo mật.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 mb-2">Mã số thuế (nếu có)</label>
-                  <input
-                    type="text"
-                    name="tax_code"
-                    value={formData.tax_code}
-                    onChange={handleInputChange}
-                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    placeholder="0123456789"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-gray-300 mb-2">Tỉnh/Thành phố</label>
-                    <input
-                      type="text"
-                      name="address.city"
-                      value={formData.address.city}
-                      onChange={handleInputChange}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      placeholder="Hà Nội"
-                    />
+                <div className="flex items-center gap-3 mb-8 pb-6 border-b border-gray-200">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <User className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <label className="block text-gray-300 mb-2">Quận/Huyện</label>
+                    <h2 className="text-2xl font-bold text-gray-900">Thông tin cá nhân</h2>
+                    <p className="text-gray-500 text-sm mt-0.5">Vui lòng điền đầy đủ thông tin theo CCCD</p>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2 text-sm">
+                    Họ và tên (theo CCCD) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                      <User className="w-5 h-5" />
+                    </div>
                     <input
                       type="text"
-                      name="address.district"
-                      value={formData.address.district}
+                      name="identity_verified_name"
+                      value={formData.identity_verified_name}
                       onChange={handleInputChange}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      placeholder="Hoàn Kiếm"
+                      className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="Nguyễn Văn A"
+                      required
                     />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2 text-sm">
+                    Số CCCD <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <input
+                      type="text"
+                      name="identity_card_number"
+                      value={formData.identity_card_number}
+                      onChange={handleInputChange}
+                      className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="001234567890"
+                      pattern="[0-9]{9,12}"
+                      required
+                    />
+                  </div>
+                  <div className="flex items-start gap-2 mt-2 text-sm text-gray-500">
+                    <Lock className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <p>Dữ liệu sẽ được mã hóa để bảo mật</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2 text-sm">Mã số thuế (nếu có)</label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <input
+                      type="text"
+                      name="tax_code"
+                      value={formData.tax_code}
+                      onChange={handleInputChange}
+                      className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="0123456789"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2 text-sm">Tỉnh/Thành phố</label>
+                    <div className="relative">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                        <MapPin className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="text"
+                        name="address.city"
+                        value={formData.address.city}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="Hà Nội"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2 text-sm">Quận/Huyện</label>
+                    <div className="relative">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                        <MapPin className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="text"
+                        name="address.district"
+                        value={formData.address.district}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="Hoàn Kiếm"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -595,51 +672,76 @@ function KYCSubmissionContent() {
             {/* Step 2: Bank Info */}
             {currentStep === 2 && (
               <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-white mb-6">Thông tin ngân hàng</h2>
+                <div className="flex items-center gap-3 mb-8 pb-6 border-b border-gray-200">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <Building2 className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Thông tin ngân hàng</h2>
+                    <p className="text-gray-500 text-sm mt-0.5">Thông tin để nhận tiền từ chiến dịch</p>
+                  </div>
+                </div>
                 
                 <div>
-                  <label className="block text-gray-300 mb-2">Tên ngân hàng</label>
-                  <input
-                    type="text"
-                    name="bank_account.bank_name"
-                    value={formData.bank_account.bank_name}
-                    onChange={handleInputChange}
-                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    placeholder="Vietcombank"
-                  />
+                  <label className="block text-gray-700 font-semibold mb-2 text-sm">Tên ngân hàng</label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <input
+                      type="text"
+                      name="bank_account.bank_name"
+                      value={formData.bank_account.bank_name}
+                      onChange={handleInputChange}
+                      className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="Vietcombank"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-gray-300 mb-2">Số tài khoản</label>
-                  <input
-                    type="text"
-                    name="bank_account.account_number"
-                    value={formData.bank_account.account_number}
-                    onChange={handleInputChange}
-                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    placeholder="1234567890"
-                    pattern="[0-9]{8,16}"
-                  />
-                  <p className="text-gray-400 text-sm mt-1">
-                    Nhập đầy đủ số tài khoản. Dữ liệu sẽ được mã hóa để bảo mật.
-                  </p>
+                  <label className="block text-gray-700 font-semibold mb-2 text-sm">Số tài khoản</label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <input
+                      type="text"
+                      name="bank_account.account_number"
+                      value={formData.bank_account.account_number}
+                      onChange={handleInputChange}
+                      className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="1234567890"
+                      pattern="[0-9]{8,16}"
+                    />
+                  </div>
+                  <div className="flex items-start gap-2 mt-2 text-sm text-gray-500">
+                    <Lock className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <p>Dữ liệu sẽ được mã hóa để bảo mật</p>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-gray-300 mb-2">Chủ tài khoản</label>
-                  <input
-                    type="text"
-                    name="bank_account.account_holder_name"
-                    value={formData.bank_account.account_holder_name}
-                    onChange={handleInputChange}
-                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    placeholder="NGUYEN VAN A"
-                  />
+                  <label className="block text-gray-700 font-semibold mb-2 text-sm">Chủ tài khoản</label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <input
+                      type="text"
+                      name="bank_account.account_holder_name"
+                      value={formData.bank_account.account_holder_name}
+                      onChange={handleInputChange}
+                      className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="NGUYEN VAN A"
+                    />
+                  </div>
                 </div>
 
-                <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
-                  <p className="text-blue-300 text-sm">
-                    💡 <strong>Lưu ý:</strong> Thông tin ngân hàng được sử dụng để nhận tiền từ các chiến dịch thành công.
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-blue-700 text-sm">
+                    <strong className="font-semibold">Lưu ý:</strong> Thông tin ngân hàng được sử dụng để nhận tiền từ các chiến dịch thành công.
                   </p>
                 </div>
               </div>
@@ -648,33 +750,53 @@ function KYCSubmissionContent() {
             {/* Step 3: Documents */}
             {currentStep === 3 && (
               <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-white mb-6">Tài liệu xác thực</h2>
+                <div className="flex items-center gap-3 mb-8 pb-6 border-b border-gray-200">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Tài liệu xác thực</h2>
+                    <p className="text-gray-500 text-sm mt-0.5">Upload các tài liệu cần thiết</p>
+                  </div>
+                </div>
                 
                 <div className="space-y-6">
                   {/* CCCD Mặt trước */}
                   <div>
-                    <label className="block text-gray-300 mb-2">
+                    <label className="block text-gray-700 font-semibold mb-3 text-sm">
                       Ảnh CCCD mặt trước <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleIdentityFrontChange}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
-                    />
-                    {identityFrontPreview && (
-                      <div className="mt-4 relative inline-block">
-                        <img
-                          src={identityFrontPreview}
-                          alt="CCCD mặt trước"
-                          className="max-w-full h-64 object-contain rounded-lg border border-gray-600"
+                    {!identityFrontPreview ? (
+                      <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors group">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <Upload className="w-10 h-10 text-gray-400 group-hover:text-blue-600 transition-colors mb-3" />
+                          <p className="mb-2 text-sm text-gray-500 font-medium">
+                            <span className="text-blue-600">Click để upload</span> hoặc kéo thả file
+                          </p>
+                          <p className="text-xs text-gray-400">PNG, JPG, JPEG (MAX. 5MB)</p>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleIdentityFrontChange}
+                          className="hidden"
                         />
+                      </label>
+                    ) : (
+                      <div className="relative group">
+                        <div className="border-2 border-gray-200 rounded-xl p-4 bg-gray-50">
+                          <img
+                            src={identityFrontPreview}
+                            alt="CCCD mặt trước"
+                            className="w-full h-64 object-contain rounded-lg"
+                          />
+                        </div>
                         <button
                           type="button"
                           onClick={removeIdentityFront}
-                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-700 transition-all"
+                          className="absolute top-6 right-6 bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-red-600 transition-all shadow-lg"
                         >
-                          ×
+                          <X className="w-5 h-5" />
                         </button>
                       </div>
                     )}
@@ -682,28 +804,40 @@ function KYCSubmissionContent() {
 
                   {/* CCCD Mặt sau */}
                   <div>
-                    <label className="block text-gray-300 mb-2">
+                    <label className="block text-gray-700 font-semibold mb-3 text-sm">
                       Ảnh CCCD mặt sau <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleIdentityBackChange}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
-                    />
-                    {identityBackPreview && (
-                      <div className="mt-4 relative inline-block">
-                        <img
-                          src={identityBackPreview}
-                          alt="CCCD mặt sau"
-                          className="max-w-full h-64 object-contain rounded-lg border border-gray-600"
+                    {!identityBackPreview ? (
+                      <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors group">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <Upload className="w-10 h-10 text-gray-400 group-hover:text-blue-600 transition-colors mb-3" />
+                          <p className="mb-2 text-sm text-gray-500 font-medium">
+                            <span className="text-blue-600">Click để upload</span> hoặc kéo thả file
+                          </p>
+                          <p className="text-xs text-gray-400">PNG, JPG, JPEG (MAX. 5MB)</p>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleIdentityBackChange}
+                          className="hidden"
                         />
+                      </label>
+                    ) : (
+                      <div className="relative group">
+                        <div className="border-2 border-gray-200 rounded-xl p-4 bg-gray-50">
+                          <img
+                            src={identityBackPreview}
+                            alt="CCCD mặt sau"
+                            className="w-full h-64 object-contain rounded-lg"
+                          />
+                        </div>
                         <button
                           type="button"
                           onClick={removeIdentityBack}
-                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-700 transition-all"
+                          className="absolute top-6 right-6 bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-red-600 transition-all shadow-lg"
                         >
-                          ×
+                          <X className="w-5 h-5" />
                         </button>
                       </div>
                     )}
@@ -711,7 +845,7 @@ function KYCSubmissionContent() {
 
                   {/* Selfie với CCCD */}
                   <div>
-                    <label className="block text-gray-300 mb-2">
+                    <label className="block text-gray-700 font-semibold mb-3 text-sm">
                       Ảnh selfie với CCCD <span className="text-red-500">*</span>
                     </label>
                     <div className="space-y-3">
@@ -719,38 +853,41 @@ function KYCSubmissionContent() {
                         <button
                           type="button"
                           onClick={startCamera}
-                          className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                          className="w-full h-48 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors flex flex-col items-center justify-center group"
                         >
-                          <span>📷</span> Chụp ảnh selfie
+                          <Camera className="w-10 h-10 text-gray-400 group-hover:text-blue-600 transition-colors mb-3" />
+                          <p className="text-sm text-gray-500 font-medium">Chụp ảnh selfie với CCCD</p>
                         </button>
                       )}
                       
                       {showCamera && (
-                        <div className="bg-gray-900 rounded-lg p-4">
-                          <div className="relative">
+                        <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-6">
+                          <div className="relative bg-black rounded-lg overflow-hidden">
                             <video
                               ref={videoRef}
                               autoPlay
                               playsInline
                               muted
-                              className="w-full max-w-md mx-auto rounded-lg bg-black"
+                              className="w-full max-w-md mx-auto"
                               style={{ transform: 'scaleX(-1)', minHeight: '400px', objectFit: 'cover' }}
                             />
                             <canvas ref={canvasRef} className="hidden" />
                           </div>
-                          <div className="flex gap-3 mt-4 justify-center">
+                          <div className="flex gap-3 mt-6 justify-center">
                             <button
                               type="button"
                               onClick={captureSelfie}
-                              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all"
+                              className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all font-semibold shadow-lg shadow-green-500/30 flex items-center gap-2"
                             >
+                              <Camera className="w-5 h-5" />
                               Chụp ảnh
                             </button>
                             <button
                               type="button"
                               onClick={stopCamera}
-                              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all"
+                              className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all font-semibold flex items-center gap-2"
                             >
+                              <X className="w-5 h-5" />
                               Hủy
                             </button>
                           </div>
@@ -758,60 +895,76 @@ function KYCSubmissionContent() {
                       )}
 
                       {selfiePreview && !showCamera && (
-                        <div className="relative inline-block">
-                          <img
-                            src={selfiePreview}
-                            alt="Selfie"
-                            className="max-w-full h-64 object-contain rounded-lg border border-gray-600"
-                          />
+                        <div className="relative group">
+                          <div className="border-2 border-gray-200 rounded-xl p-4 bg-gray-50">
+                            <img
+                              src={selfiePreview}
+                              alt="Selfie"
+                              className="w-full h-64 object-contain rounded-lg"
+                            />
+                          </div>
                           <button
                             type="button"
                             onClick={removeSelfie}
-                            className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-700 transition-all"
+                            className="absolute top-6 right-6 bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-red-600 transition-all shadow-lg"
                           >
-                            ×
+                            <X className="w-5 h-5" />
                           </button>
                         </div>
                       )}
                     </div>
-                    <p className="text-gray-400 text-sm mt-2">
+                    <p className="text-gray-500 text-sm mt-3 flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                       Vui lòng chụp ảnh selfie với CCCD trong khung hình. Ảnh sẽ được chụp trực tiếp từ camera.
                     </p>
                   </div>
 
                   {/* Tài liệu bổ sung (tùy chọn) */}
-                  <div className="border-t border-gray-700 pt-6">
-                    <h3 className="text-lg font-semibold text-white mb-4">Tài liệu bổ sung (tùy chọn)</h3>
+                  <div className="border-t border-gray-200 pt-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Tài liệu bổ sung (tùy chọn)</h3>
                     
-                    <div>
-                      <label className="block text-gray-300 mb-2">URL giấy tờ thuế (nếu có)</label>
-                      <input
-                        type="url"
-                        name="kyc_documents.tax_document_url"
-                        value={formData.kyc_documents.tax_document_url}
-                        onChange={handleInputChange}
-                        className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        placeholder="https://example.com/tax-doc.pdf"
-                      />
-                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-gray-700 font-semibold mb-2 text-sm">URL giấy tờ thuế (nếu có)</label>
+                        <div className="relative">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <input
+                            type="url"
+                            name="kyc_documents.tax_document_url"
+                            value={formData.kyc_documents.tax_document_url}
+                            onChange={handleInputChange}
+                            className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            placeholder="https://example.com/tax-doc.pdf"
+                          />
+                        </div>
+                      </div>
 
-                    <div className="mt-4">
-                      <label className="block text-gray-300 mb-2">URL sao kê ngân hàng (nếu có)</label>
-                      <input
-                        type="url"
-                        name="kyc_documents.bank_statement_url"
-                        value={formData.kyc_documents.bank_statement_url}
-                        onChange={handleInputChange}
-                        className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        placeholder="https://example.com/bank-statement.pdf"
-                      />
+                      <div>
+                        <label className="block text-gray-700 font-semibold mb-2 text-sm">URL sao kê ngân hàng (nếu có)</label>
+                        <div className="relative">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <input
+                            type="url"
+                            name="kyc_documents.bank_statement_url"
+                            value={formData.kyc_documents.bank_statement_url}
+                            onChange={handleInputChange}
+                            className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            placeholder="https://example.com/bank-statement.pdf"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
-                  <p className="text-blue-300 text-sm">
-                    💡 <strong>Lưu ý:</strong> Ảnh CCCD mặt trước, mặt sau và selfie là bắt buộc. 
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3 mt-6">
+                  <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-blue-700 text-sm">
+                    <strong className="font-semibold">Lưu ý:</strong> Ảnh CCCD mặt trước, mặt sau và selfie là bắt buộc. 
                     Ảnh sẽ được upload tự động lên Cloudinary khi bạn gửi yêu cầu.
                   </p>
                 </div>
@@ -819,12 +972,13 @@ function KYCSubmissionContent() {
             )}
 
             {/* Navigation Buttons */}
-            <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-700">
+            <div className="flex items-center justify-between mt-10 pt-8 border-t border-gray-200">
               <button
                 type="button"
                 onClick={currentStep === 1 ? handleCancel : prevStep}
-                className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-all"
+                className="px-6 py-3.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold flex items-center gap-2"
               >
+                <ArrowLeft className="w-5 h-5" />
                 {currentStep === 1 ? 'Hủy' : 'Quay lại'}
               </button>
 
@@ -832,15 +986,16 @@ function KYCSubmissionContent() {
                 <button
                   type="button"
                   onClick={handleNextStep}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
+                  className="px-8 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-semibold shadow-lg shadow-blue-500/30 flex items-center gap-2"
                 >
                   Tiếp tục
+                  <ArrowRight className="w-5 h-5" />
                 </button>
               ) : (
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-8 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg shadow-green-500/30 flex items-center gap-2"
                 >
                   {loading ? (
                     <>
@@ -848,7 +1003,10 @@ function KYCSubmissionContent() {
                       Đang gửi...
                     </>
                   ) : (
-                    'Gửi yêu cầu'
+                    <>
+                      <CheckCircle2 className="w-5 h-5" />
+                      Gửi yêu cầu
+                    </>
                   )}
                 </button>
               )}
@@ -857,14 +1015,33 @@ function KYCSubmissionContent() {
         </form>
 
         {/* Info Box */}
-        <div className="mt-8 bg-gray-800/50 border border-gray-700 rounded-lg p-6">
-          <h3 className="text-white font-semibold mb-3">📝 Tại sao cần xác thực?</h3>
-          <ul className="text-gray-400 space-y-2 text-sm">
-            <li>✓ Đảm bảo tính minh bạch và uy tín của người tạo chiến dịch</li>
-            <li>✓ Bảo vệ người quyên góp khỏi các chiến dịch lừa đảo</li>
-            <li>✓ Tuân thủ quy định pháp luật về gây quỹ từ thiện</li>
-            <li>✓ Tạo niềm tin cho cộng đồng</li>
-          </ul>
+        <div className="mt-8 bg-gray-50 rounded-2xl p-6 md:p-8 shadow-lg border border-gray-200">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+              <Shield className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-gray-900 font-bold text-lg mb-4">Tại sao cần xác thực?</h3>
+              <ul className="space-y-3 text-gray-600">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm">Đảm bảo tính minh bạch và uy tín của người tạo chiến dịch</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm">Bảo vệ người quyên góp khỏi các chiến dịch lừa đảo</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm">Tuân thủ quy định pháp luật về gây quỹ từ thiện</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm">Tạo niềm tin cho cộng đồng</span>
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>
