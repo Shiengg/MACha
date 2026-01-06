@@ -171,3 +171,8 @@ export const OWNER_GET_WITHDRAWAL_REQUESTS_ROUTE = `${OWNER_ROUTE}/withdrawal-re
 export const OWNER_INIT_SEPAY_WITHDRAWAL_ROUTE = (escrowId: string) => `${OWNER_ROUTE}/escrow/${escrowId}/sepay/init`;
 export const OWNER_GET_REFUNDS_ROUTE = `${OWNER_ROUTE}/refunds`;
 export const OWNER_INIT_SEPAY_REFUND_ROUTE = (refundId: string) => `${OWNER_ROUTE}/refund/${refundId}/sepay/init`;
+
+export const RECOVERY_ROUTE = "api/recovery";
+export const GET_RECOVERY_CASES_BY_CREATOR_ROUTE = `${RECOVERY_ROUTE}/creator`;
+export const GET_RECOVERY_CASE_BY_ID_ROUTE = (recoveryCaseId: string) => `${RECOVERY_ROUTE}/${recoveryCaseId}`;
+export const INIT_SEPAY_RECOVERY_PAYMENT_ROUTE = (recoveryCaseId: string) => `${RECOVERY_ROUTE}/${recoveryCaseId}/sepay/init`;

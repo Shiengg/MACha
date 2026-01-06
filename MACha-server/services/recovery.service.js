@@ -6,7 +6,6 @@ import Donation from "../models/donation.js";
 import { redisClient } from "../config/redis.js";
 import * as escrowService from "./escrow.service.js";
 import * as mailerService from "../utils/mailer.js";
-import Notification from "../models/notification.js";
 
 export const createRecoveryCase = async (campaignId, adminId, deadlineDays = 30) => {
     const campaign = await Campaign.findById(campaignId).populate("creator", "username email fullname");
@@ -117,72 +116,178 @@ export const processRecoveryRefund = async (recoveryCaseId, userId) => {
 
     const campaignId = recoveryCase.campaign._id || recoveryCase.campaign;
     
+    // Tìm donations cần refund lần 2: những donation đã được refund một phần (partially_refunded)
+    // hoặc có remaining_refund_pending > 0
     const donations = await Donation.find({
         campaign: campaignId,
-        payment_status: "partially_refunded",
-        remaining_refund_pending: { $gt: 0 }
+        $or: [
+            { payment_status: "partially_refunded" },
+            { remaining_refund_pending: { $gt: 0 } }
+        ]
     }).populate("donor", "username email fullname");
 
     if (donations.length === 0) {
         return { success: true, message: "No pending refunds found", refunds: [] };
     }
 
-    const totalPendingRefund = donations.reduce((sum, d) => sum + d.remaining_refund_pending, 0);
+    // Tính totalPendingRefund dựa trên secondRefundRatio (không dựa vào remaining_refund_pending vì có thể sai do làm tròn)
+    const totalPendingRefund = donations.reduce((sum, d) => {
+        const firstRefundRatio = d.refund_ratio || (d.refunded_amount || 0) / d.amount;
+        const secondRefundRatio = 1 - firstRefundRatio;
+        const calculatedRefundAmount = Math.floor(d.amount * secondRefundRatio);
+        return sum + calculatedRefundAmount;
+    }, 0);
+    
     const recoveredAmount = recoveryCase.recovered_amount;
     
-    const refundRatio = Math.min(1, recoveredAmount / totalPendingRefund);
+    if (totalPendingRefund <= 0 || recoveredAmount <= 0) {
+        return { success: true, message: "No pending refunds or recovered amount is zero", refunds: [] };
+    }
     
     const refunds = [];
+    let totalRefundedAmount = 0;
+    let remainingRecoveredAmount = recoveredAmount;
     
-    for (const donation of donations) {
-        if (recoveredAmount <= 0) break;
-        
-        const refundAmount = Math.min(
-            Math.floor(donation.remaining_refund_pending * refundRatio),
-            recoveredAmount
-        );
-        
-        if (refundAmount <= 0) continue;
-
-        try {
-            const refund = await Refund.create({
-                campaign: campaignId,
-                donation: donation._id,
-                donor: donation.donor._id,
-                original_amount: donation.amount,
-                refunded_amount: refundAmount,
-                refund_ratio: donation.refund_ratio || 0,
-                remaining_refund: donation.remaining_refund_pending - refundAmount,
-                refund_status: "pending",
-                refund_method: "recovery",
-                created_by: userId,
-                notes: `Refund from recovery. Recovery case: ${recoveryCaseId}`
-            });
-
-            donation.refunded_amount += refundAmount;
-            donation.remaining_refund_pending -= refundAmount;
+    if (recoveredAmount >= totalPendingRefund) {
+        for (const donation of donations) {
+            if (remainingRecoveredAmount <= 0) break;
             
-            if (donation.remaining_refund_pending <= 0) {
-                donation.payment_status = "refunded";
-                donation.refunded_at = new Date();
+            // Lần đầu refund: tính % từ availableAmount/totalDonated
+            // Lần hai (recovery): tính 100% - phần trăm lần đầu
+            const firstRefundRatio = donation.refund_ratio || (donation.refunded_amount || 0) / donation.amount;
+            const secondRefundRatio = 1 - firstRefundRatio;
+            
+            // Tính refundAmount dựa trên secondRefundRatio (không dựa vào remaining_refund_pending vì có thể sai do làm tròn)
+            const calculatedRefundAmount = Math.floor(donation.amount * secondRefundRatio);
+            // Chỉ giới hạn bởi remainingRecoveredAmount (số tiền creator đã trả)
+            const refundAmount = Math.min(
+                calculatedRefundAmount,
+                remainingRecoveredAmount
+            );
+            
+            if (refundAmount <= 0) continue;
+
+            try {
+                // Tính remaining_refund dựa trên tổng số tiền đã refund (không dựa vào remaining_refund_pending vì có thể sai do làm tròn)
+                const currentRefundedAmount = donation.refunded_amount || 0;
+                const totalRefundedAfterThis = currentRefundedAmount + refundAmount;
+                const remainingRefund = Math.max(0, donation.amount - totalRefundedAfterThis);
+                
+                const refund = await Refund.create({
+                    campaign: campaignId,
+                    donation: donation._id,
+                    donor: donation.donor._id,
+                    original_amount: donation.amount,
+                    refunded_amount: refundAmount,
+                    refund_ratio: secondRefundRatio,
+                    remaining_refund: remainingRefund,
+                    refund_status: "pending",
+                    refund_method: "recovery",
+                    created_by: userId,
+                    notes: `Refund from recovery. Recovery case: ${recoveryCaseId}`
+                });
+
+                // Cập nhật donation: cộng thêm refunded_amount và tính lại remaining_refund_pending
+                donation.refunded_amount = totalRefundedAfterThis;
+                donation.remaining_refund_pending = remainingRefund;
+                
+                // Nếu đã refund đủ (remaining_refund_pending = 0), cập nhật status
+                if (donation.remaining_refund_pending <= 0) {
+                    donation.payment_status = "refunded";
+                    donation.refunded_at = new Date();
+                } else {
+                    donation.payment_status = "partially_refunded";
+                }
+                
+                await donation.save();
+
+                totalRefundedAmount += refundAmount;
+                remainingRecoveredAmount -= refundAmount;
+
+                refunds.push({
+                    refundId: refund._id,
+                    donationId: donation._id,
+                    donorId: donation.donor._id,
+                    refundAmount
+                });
+            } catch (error) {
+                console.error(`[RECOVERY][PROCESS_REFUND] Error processing recovery refund for donation ${donation._id}:`, error);
             }
+        }
+    } else {
+        const refundRatio = recoveredAmount / totalPendingRefund;
+        
+        for (const donation of donations) {
+            if (remainingRecoveredAmount <= 0) break;
+            
+            const firstRefundRatio = donation.refund_ratio || (donation.refunded_amount || 0) / donation.amount;
+            const secondRefundRatio = 1 - firstRefundRatio;
+            
+            // Tính refundAmount dựa trên secondRefundRatio, nhưng áp dụng tỷ lệ recoveredAmount/totalPendingRefund
+            // (không dựa vào remaining_refund_pending vì có thể sai do làm tròn)
+            const calculatedRefundAmount = Math.floor(donation.amount * secondRefundRatio * refundRatio);
+            // Chỉ giới hạn bởi remainingRecoveredAmount (số tiền creator đã trả)
+            const refundAmount = Math.min(
+                calculatedRefundAmount,
+                remainingRecoveredAmount
+            );
+            
+            if (refundAmount <= 0) continue;
 
-            await donation.save();
+            try {
+                // Tính remaining_refund dựa trên tổng số tiền đã refund (không dựa vào remaining_refund_pending vì có thể sai do làm tròn)
+                const currentRefundedAmount = donation.refunded_amount || 0;
+                const totalRefundedAfterThis = currentRefundedAmount + refundAmount;
+                const remainingRefund = Math.max(0, donation.amount - totalRefundedAfterThis);
+                
+                const refund = await Refund.create({
+                    campaign: campaignId,
+                    donation: donation._id,
+                    donor: donation.donor._id,
+                    original_amount: donation.amount,
+                    refunded_amount: refundAmount,
+                    refund_ratio: secondRefundRatio,
+                    remaining_refund: remainingRefund,
+                    refund_status: "pending",
+                    refund_method: "recovery",
+                    created_by: userId,
+                    notes: `Refund from recovery. Recovery case: ${recoveryCaseId}`
+                });
 
-            refunds.push({
-                refundId: refund._id,
-                donationId: donation._id,
-                donorId: donation.donor._id,
-                refundAmount
-            });
-        } catch (error) {
-            console.error(`Error processing recovery refund for donation ${donation._id}:`, error);
+                // Cập nhật donation: cộng thêm refunded_amount và tính lại remaining_refund_pending
+                donation.refunded_amount = totalRefundedAfterThis;
+                donation.remaining_refund_pending = remainingRefund;
+                
+                // Nếu đã refund đủ (remaining_refund_pending = 0), cập nhật status
+                if (donation.remaining_refund_pending <= 0) {
+                    donation.payment_status = "refunded";
+                    donation.refunded_at = new Date();
+                } else {
+                    donation.payment_status = "partially_refunded";
+                }
+                
+                await donation.save();
+
+                totalRefundedAmount += refundAmount;
+                remainingRecoveredAmount -= refundAmount;
+
+                refunds.push({
+                    refundId: refund._id,
+                    donationId: donation._id,
+                    donorId: donation.donor._id,
+                    refundAmount
+                });
+            } catch (error) {
+                console.error(`[RECOVERY][PROCESS_REFUND] Error processing recovery refund for donation ${donation._id}:`, error);
+            }
         }
     }
-
-    recoveryCase.recovered_amount = Math.max(0, recoveryCase.recovered_amount - recoveredAmount);
     
-    if (recoveryCase.recovered_amount <= 0 && recoveryCase.status !== "completed") {
+    if (refunds.length === 0) {
+        return { success: true, message: "No refunds were created", refunds: [] };
+    }
+
+    if (recoveryCase.recovered_amount >= recoveryCase.total_amount && recoveryCase.status !== "completed") {
         recoveryCase.status = "completed";
     } else if (recoveryCase.status === "pending") {
         recoveryCase.status = "in_progress";
@@ -191,49 +296,12 @@ export const processRecoveryRefund = async (recoveryCaseId, userId) => {
     recoveryCase.timeline.push({
         date: new Date(),
         action: "Refund processed",
-        amount: -recoveredAmount,
+        amount: -totalRefundedAmount,
         notes: `Processed refunds for ${refunds.length} donations`,
         created_by: userId
     });
 
     await recoveryCase.save();
-
-    const donorIds = [...new Set(refunds.map(r => r.donorId.toString()))];
-    
-    const notifications = donorIds.map(donorId => ({
-        receiver: donorId,
-        sender: userId,
-        type: "recovery_refund_processed",
-        campaign: campaignId,
-        message: `Bạn đã được refund thêm từ khoản thu hồi của chiến dịch "${recoveryCase.campaign.title || "campaign"}"`,
-        is_read: false
-    }));
-
-    try {
-        const createdNotifications = await Notification.insertMany(notifications);
-        for (let i = 0; i < createdNotifications.length; i++) {
-            try {
-                await redisClient.publish("notification:new", JSON.stringify({
-                    recipientId: donorIds[i],
-                    notification: {
-                        _id: createdNotifications[i]._id.toString(),
-                        type: "recovery_refund_processed",
-                        message: notifications[i].message,
-                        campaign: {
-                            _id: campaignId.toString(),
-                            title: recoveryCase.campaign.title || ""
-                        },
-                        is_read: false,
-                        createdAt: createdNotifications[i].createdAt
-                    }
-                }));
-            } catch (notifError) {
-                console.error("Error publishing recovery refund notification:", notifError);
-            }
-        }
-    } catch (notifError) {
-        console.error("Error creating recovery refund notifications:", notifError);
-    }
 
     await redisClient.del(`campaign:${campaignId}`);
     await redisClient.del(`donations:${campaignId}`);

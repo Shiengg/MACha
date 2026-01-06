@@ -15,12 +15,13 @@ export const initPayment = async (params) => {
         successUrl,
         errorUrl,
         cancelUrl,
+        callbackUrl,
         customData,
     } = params;
 
     const checkoutUrl = sepayClient.checkout.initCheckoutUrl();
 
-    const formFields = sepayClient.checkout.initOneTimePaymentFields({
+    const formFieldsData = {
         operation: 'PURCHASE',
         payment_method: paymentMethod,
         order_invoice_number: orderInvoiceNumber,
@@ -32,7 +33,13 @@ export const initPayment = async (params) => {
         error_url: errorUrl,
         cancel_url: cancelUrl,
         custom_data: customData,
-    });
+    };
+
+    if (callbackUrl) {
+        formFieldsData.return_url = callbackUrl;
+    }
+
+    const formFields = sepayClient.checkout.initOneTimePaymentFields(formFieldsData);
 
     return {
         checkoutUrl,

@@ -15,6 +15,7 @@ import reportRoutes from "./ReportRoute.js";
 import searchRoutes from "./SearchRoute.js";
 import eventRoutes from "./EventRoute.js";
 import ownerRoutes from "./OwnerRoute.js";
+import recoveryRoutes from "./RecoveryRoute.js";
 
 export {
     authRoutes,
@@ -34,5 +35,6 @@ export {
     reportRoutes,
     searchRoutes,
     eventRoutes,
-    ownerRoutes
+    ownerRoutes,
+    recoveryRoutes
 }
