@@ -1071,11 +1071,11 @@ export const getAllUsers = async (page = 1, limit = 20, filters = {}) => {
 
     const query = {};
 
-    // Filter by role (exclude owner)
+    // Filter by role (default to "user" only, exclude owner and admin)
     if (role) {
         query.role = role;
     } else {
-        query.role = { $ne: "owner" };
+        query.role = "user";
     }
 
     // Filter by ban status
@@ -1108,11 +1108,12 @@ export const getAllUsers = async (page = 1, limit = 20, filters = {}) => {
 
     const [users, total] = await Promise.all([
         User.find(finalQuery)
-            .select("-password")
+            .select("username email fullname avatar role is_verified kyc_status is_banned banned_at banned_by ban_reason createdAt updatedAt")
             .populate("banned_by", "username fullname")
             .sort({ createdAt: -1 })
             .skip(skip)
-            .limit(limit),
+            .limit(limit)
+            .lean(),
         User.countDocuments(finalQuery)
     ]);
 

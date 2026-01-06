@@ -11,6 +11,7 @@ import CampaignCard from '@/components/campaign/CampaignCard';
 import CommentModal from './CommentModal';
 import ReportModal from './ReportModal';
 import ShareModal from './ShareModal';
+import ImageViewerModal from './ImageViewerModal';
 import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -71,6 +72,8 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
   const [showShareModal, setShowShareModal] = useState(false);
   const [fullCampaign, setFullCampaign] = useState<Campaign | null>(null);
   const [isLoadingCampaign, setIsLoadingCampaign] = useState(false);
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [imageViewerIndex, setImageViewerIndex] = useState(0);
 
   const justLikedRef = useRef(false);
   const justCommentedRef = useRef(false);
@@ -321,19 +324,28 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
     ? post.content_text.slice(0, 100) + '...'
     : post.content_text;
 
+  const handleImageClick = (index: number) => {
+    setImageViewerIndex(index);
+    setShowImageViewer(true);
+  };
+
   const renderImageItem = (url: string, index: number, className = "", showOverlay = false, overlayText = "") => (
-    <div key={index} className={`relative group ${className}`}>
+    <div 
+      key={index} 
+      className={`relative group ${className} cursor-pointer`}
+      onClick={() => handleImageClick(index)}
+    >
       <div className="w-full h-full rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900">
         <Image
           src={url}
           alt={`Post media ${index + 1}`}
           width={800}
           height={800}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
         />
       </div>
       {showOverlay && (
-        <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-lg">
+        <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-lg pointer-events-none">
           <span className="text-white text-3xl font-semibold">
             {overlayText}
           </span>
@@ -856,6 +868,16 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
       />
+
+      {/* Image Viewer Modal */}
+      {post.media_url && post.media_url.length > 0 && (
+        <ImageViewerModal
+          isOpen={showImageViewer}
+          onClose={() => setShowImageViewer(false)}
+          images={post.media_url}
+          initialIndex={imageViewerIndex}
+        />
+      )}
     </div>
   );
 }

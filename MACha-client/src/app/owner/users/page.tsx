@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
 import { ownerService, User } from '@/services/owner.service';
@@ -18,6 +19,9 @@ export default function OwnerUsers() {
   const [banFilter, setBanFilter] = useState<string>('');
   const [kycFilter, setKycFilter] = useState<string>('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+  const menuRef = useRef<HTMLDivElement>(null);
   const [banReason, setBanReason] = useState('');
   const [showBanModal, setShowBanModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -26,6 +30,26 @@ export default function OwnerUsers() {
   useEffect(() => {
     fetchUsers();
   }, [currentPage, roleFilter, banFilter, kycFilter, searchQuery]);
+
+  // Handle click outside to close menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openMenuId && menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        const button = buttonRefs.current[openMenuId];
+        if (button && !button.contains(event.target as Node)) {
+          setOpenMenuId(null);
+          setMenuPosition(null);
+        }
+      }
+    };
+
+    if (openMenuId) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [openMenuId]);
 
   const fetchUsers = async () => {
     try {
@@ -58,8 +82,27 @@ export default function OwnerUsers() {
     }
   };
 
+  const handleToggleMenu = (userId: string) => {
+    if (openMenuId === userId) {
+      setOpenMenuId(null);
+      setMenuPosition(null);
+    } else {
+      const button = buttonRefs.current[userId];
+      if (button) {
+        const rect = button.getBoundingClientRect();
+        setMenuPosition({
+          top: rect.bottom + 8, // Use viewport coordinates for fixed positioning
+          left: rect.right - 192, // 192 = w-48 (12rem = 192px)
+        });
+      }
+      setOpenMenuId(userId);
+    }
+  };
+
   const handleBanUser = async (user: User) => {
     setSelectedUser(user);
+    setOpenMenuId(null);
+    setMenuPosition(null);
     setShowBanModal(true);
   };
 
@@ -87,6 +130,8 @@ export default function OwnerUsers() {
   };
 
   const handleUnbanUser = async (userId: string) => {
+    setOpenMenuId(null);
+    setMenuPosition(null);
     const result = await Swal.fire({
       title: 'Unban User?',
       text: 'Are you sure you want to unban this user?',
@@ -117,6 +162,8 @@ export default function OwnerUsers() {
   };
 
   const handleResetKYC = async (userId: string) => {
+    setOpenMenuId(null);
+    setMenuPosition(null);
     const result = await Swal.fire({
       title: 'Reset KYC Status?',
       text: 'This will reset the user\'s KYC status to unverified. Continue?',
@@ -241,9 +288,8 @@ export default function OwnerUsers() {
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  <option value="">All Roles</option>
+                  <option value="">All Users</option>
                   <option value="user">User</option>
-                  <option value="admin">Admin</option>
                 </select>
               </div>
               <div>
@@ -354,56 +400,14 @@ export default function OwnerUsers() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="relative inline-block">
                           <button
-                            onClick={() => setOpenMenuId(openMenuId === user._id ? null : user._id)}
+                            ref={(el) => {
+                              buttonRefs.current[user._id] = el;
+                            }}
+                            onClick={() => handleToggleMenu(user._id)}
                             className="text-gray-600 hover:text-gray-900"
                           >
                             <MoreVertical className="w-5 h-5" />
                           </button>
-                          {openMenuId === user._id && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                              <Link
-                                href={`/owner/users/${user._id}/history`}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                onClick={() => setOpenMenuId(null)}
-                              >
-                                <Eye className="w-4 h-4" />
-                                View History
-                              </Link>
-                              {user.is_banned ? (
-                                <button
-                                  onClick={() => {
-                                    handleUnbanUser(user._id);
-                                    setOpenMenuId(null);
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 flex items-center gap-2"
-                                >
-                                  <Unlock className="w-4 h-4" />
-                                  Unban
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => {
-                                    handleBanUser(user);
-                                    setOpenMenuId(null);
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-orange-700 hover:bg-orange-50 flex items-center gap-2"
-                                >
-                                  <Ban className="w-4 h-4" />
-                                  Ban
-                                </button>
-                              )}
-                              <button
-                                onClick={() => {
-                                  handleResetKYC(user._id);
-                                  setOpenMenuId(null);
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2"
-                              >
-                                <RotateCcw className="w-4 h-4" />
-                                Reset KYC
-                              </button>
-                            </div>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -435,6 +439,65 @@ export default function OwnerUsers() {
           </div>
         </div>
       </div>
+
+      {/* Portal-rendered dropdown menu */}
+      {openMenuId && menuPosition && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+            zIndex: 9999,
+          }}
+          className="w-48 bg-white border border-gray-200 rounded-lg shadow-lg"
+        >
+          {(() => {
+            const user = users.find(u => u._id === openMenuId);
+            if (!user) return null;
+            return (
+              <>
+                <Link
+                  href={`/owner/users/${user._id}/history`}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  onClick={() => {
+                    setOpenMenuId(null);
+                    setMenuPosition(null);
+                  }}
+                >
+                  <Eye className="w-4 h-4" />
+                  View History
+                </Link>
+                {user.is_banned ? (
+                  <button
+                    onClick={() => handleUnbanUser(user._id)}
+                    className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 flex items-center gap-2"
+                  >
+                    <Unlock className="w-4 h-4" />
+                    Unban
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleBanUser(user)}
+                    className="w-full text-left px-4 py-2 text-sm text-orange-700 hover:bg-orange-50 flex items-center gap-2"
+                  >
+                    <Ban className="w-4 h-4" />
+                    Ban
+                  </button>
+                )}
+                <button
+                  onClick={() => handleResetKYC(user._id)}
+                  className="w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reset KYC
+                </button>
+              </>
+            );
+          })()}
+        </div>,
+        document.body
+      )}
 
       {/* Ban Modal */}
       {showBanModal && selectedUser && (

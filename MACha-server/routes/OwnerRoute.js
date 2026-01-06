@@ -13,7 +13,7 @@ OwnerRoutes.get(
 );
 
 OwnerRoutes.get(
-    "/users",
+    "/users/for-admin-creation",
     authMiddleware,
     checkOwner,
     ownerController.getUsersForAdminCreation

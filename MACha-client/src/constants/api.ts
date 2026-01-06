@@ -152,7 +152,7 @@ export const DELETE_EVENT_UPDATE_ROUTE = (eventId: string, updateId: string) => 
 
 export const OWNER_ROUTE = "api/owner";
 export const OWNER_DASHBOARD_ROUTE = `${OWNER_ROUTE}/dashboard`;
-export const OWNER_GET_USERS_ROUTE = `${OWNER_ROUTE}/users`;
+export const OWNER_GET_USERS_ROUTE = `${OWNER_ROUTE}/users/for-admin-creation`;
 export const OWNER_GET_ADMINS_ROUTE = `${OWNER_ROUTE}/admins`;
 export const OWNER_CREATE_ADMIN_ROUTE = `${OWNER_ROUTE}/admins`;
 export const OWNER_UPDATE_ADMIN_ROUTE = (adminId: string) => `${OWNER_ROUTE}/admins/${adminId}`;

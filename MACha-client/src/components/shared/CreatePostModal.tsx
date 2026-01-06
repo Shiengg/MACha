@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { FaImages, FaMapMarkerAlt, FaBullhorn, FaTimes, FaSync } from 'react-icons/fa';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,21 +32,170 @@ export default function CreatePostModal({
   const [error, setError] = useState<string | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(initialCampaign);
   const [isCampaignSelectOpen, setIsCampaignSelectOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Helper function to resize and compress image
+  const resizeAndCompressImage = useCallback((file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Could not get canvas context'));
+            return;
+          }
+
+          // Set maximum dimensions (1920px for longest side)
+          const MAX_DIMENSION = 1920;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_DIMENSION) {
+              height = (height * MAX_DIMENSION) / width;
+              width = MAX_DIMENSION;
+            }
+          } else {
+            if (height > MAX_DIMENSION) {
+              width = (width * MAX_DIMENSION) / height;
+              height = MAX_DIMENSION;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          // Draw and compress
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Convert to blob with compression (quality: 0.85)
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('Failed to compress image'));
+                return;
+              }
+
+              // Create new file with compressed blob
+              const compressedFile = new File(
+                [blob],
+                file.name,
+                { type: file.type, lastModified: Date.now() }
+              );
+              resolve(compressedFile);
+            },
+            file.type,
+            0.85 // Quality: 0.85 (85%)
+          );
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    setSelectedFiles((prev) => [...prev, ...files]);
+    try {
+      // Resize and compress all images
+      const processedFiles = await Promise.all(
+        files.map(file => resizeAndCompressImage(file))
+      );
 
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreviews((prev) => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
+      setSelectedFiles((prev) => [...prev, ...processedFiles]);
+
+      processedFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreviews((prev) => [...prev, reader.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+    } catch (error) {
+      console.error('Error processing images:', error);
+      setError('Không thể xử lý ảnh. Vui lòng thử lại.');
+    }
   };
+
+  const addImageFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+
+    try {
+      // Resize and compress all images
+      const processedFiles = await Promise.all(
+        files.map(file => resizeAndCompressImage(file))
+      );
+
+      setSelectedFiles((prev) => [...prev, ...processedFiles]);
+
+      processedFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreviews((prev) => [...prev, reader.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+    } catch (error) {
+      console.error('Error processing images:', error);
+      setError('Không thể xử lý ảnh. Vui lòng thử lại.');
+    }
+  }, [resizeAndCompressImage]);
+
+  const handlePaste = useCallback(async (e: ClipboardEvent) => {
+    if (!isOpen) return;
+    
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageFiles: File[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      
+      if (item.type.indexOf('image') !== -1) {
+        e.preventDefault();
+        
+        const file = item.getAsFile();
+        if (file) {
+          // Tạo tên file với timestamp để tránh trùng lặp
+          const timestamp = Date.now();
+          const extension = file.type.split('/')[1] || 'png';
+          const blob = file.slice(0, file.size, file.type);
+          const renamedFile = new File([blob], `pasted-image-${timestamp}.${extension}`, {
+            type: file.type,
+          });
+          imageFiles.push(renamedFile);
+        }
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      await addImageFiles(imageFiles);
+    }
+  }, [isOpen, addImageFiles]);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Focus vào textarea khi modal mở để có thể paste
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
+      
+      // Thêm event listener cho paste
+      document.addEventListener('paste', handlePaste);
+      
+      return () => {
+        document.removeEventListener('paste', handlePaste);
+      };
+    }
+  }, [isOpen, handlePaste]);
 
   const handleRemoveImage = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
@@ -291,6 +440,7 @@ export default function CreatePostModal({
           <div className="overflow-y-auto flex-1">
             <div className="px-4 pt-3 pb-4">
               <textarea
+                ref={textareaRef}
                 value={contentText}
                 onChange={(e) => setContentText(e.target.value)}
                 className="w-full min-h-[140px] bg-transparent resize-none outline-none border-0 text-lg text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
@@ -372,12 +522,12 @@ export default function CreatePostModal({
               {isUploading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Đang tải ảnh...
+                  Đang đăng...
                 </>
               ) : isSubmitting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Đang đăng...
+                  Đang tạo bài viết...
                 </>
               ) : (
                 "Đăng"
