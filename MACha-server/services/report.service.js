@@ -7,6 +7,7 @@ import Event from "../models/event.js";
 import { redisClient } from "../config/redis.js";
 import * as queueService from "./queue.service.js";
 import * as postService from "./post.service.js";
+import * as trackingService from "./tracking.service.js";
 
 const invalidateEventCaches = async (eventId, category = null, status = null) => {
     const keys = [
@@ -26,6 +27,27 @@ const invalidateEventCaches = async (eventId, category = null, status = null) =>
     }
     
     await Promise.all(keys.map(key => redisClient.del(key)));
+};
+
+const invalidateCampaignCaches = async (campaignId, category = null) => {
+    const keySet = 'campaigns:all:keys';
+    const keys = await redisClient.sMembers(keySet);
+    const cachesToInvalidate = [
+        redisClient.del(`campaign:${campaignId}`),
+        redisClient.del('campaigns:all:total')
+    ];
+    
+    if (category) {
+        cachesToInvalidate.push(redisClient.del(`campaigns:category:${category}`));
+    }
+    
+    if (keys.length > 0) {
+        cachesToInvalidate.push(redisClient.del(...keys));
+    }
+    
+    cachesToInvalidate.push(redisClient.del(keySet));
+    
+    await Promise.all(cachesToInvalidate);
 };
 
 const removeReportedItem = async (reportedType, reportedId, resolutionDetails, adminId = null) => {
@@ -81,7 +103,27 @@ const removeReportedItem = async (reportedType, reportedId, resolutionDetails, a
             reportedItem.status = 'cancelled';
             reportedItem.cancellation_reason = resolutionDetails || 'Removed due to report';
             reportedItem.cancelled_at = new Date();
+            reportedItem.cancelled_by = adminId;
             await reportedItem.save();
+            
+            // Invalidate campaign cache to remove it from discover page
+            try {
+                await invalidateCampaignCaches(reportedId, reportedItem.category);
+            } catch (cacheError) {
+                console.error('Error invalidating campaign cache:', cacheError);
+            }
+            
+            // Publish campaign cancelled event for real-time UI updates
+            try {
+                await trackingService.publishEvent("tracking:campaign:cancelled", {
+                    campaignId: reportedId.toString(),
+                    userId: adminId ? adminId.toString() : null,
+                    reason: resolutionDetails || 'Removed due to report',
+                    category: reportedItem.category,
+                });
+            } catch (eventError) {
+                console.error('Error publishing campaign cancelled event:', eventError);
+            }
             
             try {
                 await queueService.pushJob({
