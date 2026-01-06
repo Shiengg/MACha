@@ -45,7 +45,7 @@ export const initSepayRecoveryPayment = async (req, res) => {
     try {
         const { recoveryCaseId } = req.params;
         const creatorId = req.user._id;
-        const { amount, paymentMethod } = req.body;
+        const { paymentMethod } = req.body;
 
         const recoveryCase = await recoveryService.getRecoveryCaseById(recoveryCaseId);
         
@@ -62,17 +62,10 @@ export const initSepayRecoveryPayment = async (req, res) => {
         }
 
         const remainingAmount = recoveryCase.total_amount - recoveryCase.recovered_amount;
-        const paymentAmount = amount || remainingAmount;
 
-        if (paymentAmount <= 0) {
+        if (remainingAmount <= 0) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({
                 message: "No remaining amount to pay"
-            });
-        }
-
-        if (paymentAmount > remainingAmount) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({
-                message: `Payment amount cannot exceed remaining amount: ${remainingAmount.toLocaleString('vi-VN')} VND`
             });
         }
 
@@ -87,11 +80,11 @@ export const initSepayRecoveryPayment = async (req, res) => {
 
         const paymentParams = {
             orderInvoiceNumber,
-            orderAmount: paymentAmount,
+            orderAmount: remainingAmount,
             currency: 'VND',
             paymentMethod: paymentMethod || 'BANK_TRANSFER',
             customerId: creatorId.toString(),
-            orderDescription: `Recovery payment for campaign: ${recoveryCase.campaign.title || 'Campaign'} - Amount: ${paymentAmount.toLocaleString('vi-VN')} VND`,
+            orderDescription: `Recovery payment for campaign: ${recoveryCase.campaign.title || 'Campaign'} - Full amount: ${remainingAmount.toLocaleString('vi-VN')} VND`,
             successUrl: `${serverUrl}/api/recovery/sepay/success?order_invoice_number=${orderInvoiceNumber}`,
             errorUrl: `${serverUrl}/api/recovery/sepay/error?order_invoice_number=${orderInvoiceNumber}`,
             cancelUrl: `${serverUrl}/api/recovery/sepay/cancel?order_invoice_number=${orderInvoiceNumber}`,
@@ -99,7 +92,7 @@ export const initSepayRecoveryPayment = async (req, res) => {
             customData: JSON.stringify({
                 recoveryCaseId: recoveryCaseId,
                 campaignId: recoveryCase.campaign._id.toString(),
-                amount: paymentAmount
+                amount: remainingAmount
             })
         };
 
@@ -114,7 +107,7 @@ export const initSepayRecoveryPayment = async (req, res) => {
                 recovered_amount: recoveryCase.recovered_amount,
                 remaining_amount: remainingAmount
             },
-            paymentAmount
+            paymentAmount: remainingAmount
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({

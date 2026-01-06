@@ -63,7 +63,6 @@ export const recoveryService = {
 
   async initSepayRecoveryPayment(
     recoveryCaseId: string,
-    amount?: number,
     paymentMethod: string = "BANK_TRANSFER"
   ): Promise<{
     checkoutUrl: string;
@@ -78,7 +77,7 @@ export const recoveryService = {
   }> {
     const response = await apiClient.post(
       INIT_SEPAY_RECOVERY_PAYMENT_ROUTE(recoveryCaseId),
-      { amount, paymentMethod },
+      { paymentMethod },
       { withCredentials: true }
     );
     return response.data;

@@ -83,8 +83,6 @@ export default function CreatorRecoveryCases() {
   const [loading, setLoading] = useState(true);
   const [selectedCase, setSelectedCase] = useState<RecoveryCase | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
@@ -160,50 +158,20 @@ export default function CreatorRecoveryCases() {
     }
   };
 
-  const handlePayment = (recoveryCase: RecoveryCase) => {
-    setSelectedCase(recoveryCase);
-    setPaymentAmount('');
-    setShowPaymentModal(true);
-  };
-
-  const handleProcessPayment = async () => {
-    if (!selectedCase) return;
-
-    const remainingAmount = selectedCase.total_amount - selectedCase.recovered_amount;
-    const amountValue = paymentAmount 
-      ? parseFloat(paymentAmount.replace(/\D/g, ''))
-      : remainingAmount;
-
-    if (amountValue <= 0) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Lỗi',
-        text: 'Số tiền không hợp lệ',
-      });
-      return;
-    }
-
-    if (amountValue > remainingAmount) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Lỗi',
-        text: `Số tiền không được vượt quá ${formatCurrencyVND(remainingAmount)}`,
-      });
-      return;
-    }
+  const handlePayment = async (recoveryCase: RecoveryCase) => {
+    const remainingAmount = recoveryCase.total_amount - recoveryCase.recovered_amount;
 
     const result = await Swal.fire({
       title: 'Xác nhận thanh toán',
       html: `
         <div class="text-left">
-          <p class="mb-2">Bạn sẽ thanh toán:</p>
-          <p class="text-2xl font-bold text-green-600 mb-4">${formatCurrencyVND(amountValue)}</p>
+          <p class="mb-2">Bạn sẽ thanh toán số tiền còn lại:</p>
+          <p class="text-2xl font-bold text-green-600 mb-4">${formatCurrencyVND(remainingAmount)}</p>
           <div class="text-sm text-gray-600 space-y-1">
-            <p>Campaign: <strong>${selectedCase.campaign?.title || 'N/A'}</strong></p>
-            <p>Tổng số tiền cần hoàn: <strong>${formatCurrencyVND(selectedCase.total_amount)}</strong></p>
-            <p>Đã hoàn: <strong>${formatCurrencyVND(selectedCase.recovered_amount)}</strong></p>
-            <p>Còn lại: <strong>${formatCurrencyVND(remainingAmount)}</strong></p>
-            ${amountValue < remainingAmount ? '<p class="text-orange-600 font-semibold mt-2">Bạn đang thanh toán một phần. Cần thanh toán tiếp phần còn lại sau.</p>' : ''}
+            <p>Campaign: <strong>${recoveryCase.campaign?.title || 'N/A'}</strong></p>
+            <p>Tổng số tiền cần hoàn: <strong>${formatCurrencyVND(recoveryCase.total_amount)}</strong></p>
+            <p>Đã hoàn: <strong>${formatCurrencyVND(recoveryCase.recovered_amount)}</strong></p>
+            <p class="font-semibold text-gray-900">Còn lại cần thanh toán: <strong class="text-orange-600">${formatCurrencyVND(remainingAmount)}</strong></p>
           </div>
         </div>
       `,
@@ -219,8 +187,7 @@ export default function CreatorRecoveryCases() {
       try {
         setIsProcessing(true);
         const paymentData = await recoveryService.initSepayRecoveryPayment(
-          selectedCase._id,
-          amountValue,
+          recoveryCase._id,
           'BANK_TRANSFER'
         );
 
@@ -248,7 +215,6 @@ export default function CreatorRecoveryCases() {
           confirmButtonColor: '#dc2626',
         });
         setIsProcessing(false);
-        setShowPaymentModal(false);
       }
     }
   };
@@ -543,88 +509,6 @@ export default function CreatorRecoveryCases() {
                     Thanh toán
                   </button>
                 )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showPaymentModal && selectedCase && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-gray-900">Thanh toán recovery</h2>
-                  <button
-                    onClick={() => {
-                      setShowPaymentModal(false);
-                      setPaymentAmount('');
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <XCircle className="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Số tiền thanh toán
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={paymentAmount}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '');
-                        setPaymentAmount(value);
-                      }}
-                      placeholder={`Tối đa: ${formatCurrencyVND(selectedCase.total_amount - selectedCase.recovered_amount)}`}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">VND</span>
-                  </div>
-                  <p className="mt-2 text-sm text-gray-500">
-                    Để trống để thanh toán toàn bộ số tiền còn lại
-                  </p>
-                  <p className="mt-1 text-sm text-gray-600">
-                    Còn lại: <span className="font-semibold">{formatCurrencyVND(selectedCase.total_amount - selectedCase.recovered_amount)}</span>
-                  </p>
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-blue-800">
-                      <p className="font-semibold mb-1">Lưu ý:</p>
-                      <ul className="list-disc list-inside space-y-1">
-                        <li>Bạn có thể thanh toán toàn bộ hoặc một phần</li>
-                        <li>Tiền sẽ được hoàn lại cho người quyên góp sau khi thanh toán thành công</li>
-                        <li>Nếu thanh toán một phần, bạn cần thanh toán tiếp phần còn lại trước deadline</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    setShowPaymentModal(false);
-                    setPaymentAmount('');
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={handleProcessPayment}
-                  disabled={isProcessing}
-                  className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <Wallet className="w-4 h-4" />
-                  Xác nhận và thanh toán
-                </button>
               </div>
             </div>
           </div>

@@ -132,45 +132,6 @@ export const processProportionalRefund = async (campaignId, adminId, reason = nu
 
     const donorIds = [...new Set(validRefunds.map(r => r.donorId.toString()))];
     
-    const refundMessage = isFullRefund
-        ? `Bạn đã được refund 100% số tiền đã quyên góp cho chiến dịch "${campaign.title}"`
-        : `Bạn đã được refund ${(refundRatio * 100).toFixed(2)}% số tiền đã quyên góp cho chiến dịch "${campaign.title}". Phần còn lại đang được thu hồi từ creator.`;
-
-    const notifications = donorIds.map(donorId => ({
-        receiver: donorId,
-        sender: adminId,
-        type: "refund_processed",
-        campaign: campaignId,
-        message: refundMessage,
-        is_read: false
-    }));
-
-    try {
-        const createdNotifications = await Notification.insertMany(notifications);
-        for (let i = 0; i < createdNotifications.length; i++) {
-            try {
-                await redisClient.publish("notification:new", JSON.stringify({
-                    recipientId: donorIds[i],
-                    notification: {
-                        _id: createdNotifications[i]._id.toString(),
-                        type: "refund_processed",
-                        message: notifications[i].message,
-                        campaign: {
-                            _id: campaign._id.toString(),
-                            title: campaign.title
-                        },
-                        is_read: false,
-                        createdAt: createdNotifications[i].createdAt
-                    }
-                }));
-            } catch (notifError) {
-                console.error("Error publishing refund notification:", notifError);
-            }
-        }
-    } catch (notifError) {
-        console.error("Error creating refund notifications:", notifError);
-    }
-
     for (const refund of validRefunds) {
         try {
             const donation = donations.find(d => d._id.toString() === refund.donationId.toString());
@@ -227,8 +188,19 @@ export const updateRefundStatus = async (refundId, status, transactionData = nul
     if (status === "completed") {
         refund.refunded_at = new Date();
         
-        const donation = await Donation.findById(refund.donation);
+        const donation = await Donation.findById(refund.donation).populate("donor", "username email fullname").populate("campaign", "title");
         if (donation) {
+            const currentRefundedAmount = donation.refunded_amount || 0;
+            const currentRemainingPending = donation.remaining_refund_pending || 0;
+            
+            if (refund.refund_method === "escrow") {
+                donation.refunded_amount = currentRefundedAmount + refund.refunded_amount;
+                donation.remaining_refund_pending = Math.max(0, currentRemainingPending - refund.refunded_amount);
+            } else if (refund.refund_method === "recovery") {
+                donation.refunded_amount = currentRefundedAmount + refund.refunded_amount;
+                donation.remaining_refund_pending = Math.max(0, currentRemainingPending - refund.refunded_amount);
+            }
+            
             if (donation.remaining_refund_pending > 0) {
                 donation.payment_status = "partially_refunded";
                 refund.refund_status = "partial";
@@ -238,6 +210,56 @@ export const updateRefundStatus = async (refundId, status, transactionData = nul
                 refund.refund_status = "completed";
             }
             await donation.save();
+            
+            if (donation.donor && donation.donor.email) {
+                try {
+                    const { default: mailerService } = await import('../utils/mailer.js');
+                    await mailerService.sendRefundEmail(donation.donor.email, {
+                        username: donation.donor.username || donation.donor.fullname || "Bạn",
+                        campaignTitle: donation.campaign?.title || "campaign",
+                        campaignId: refund.campaign.toString(),
+                        originalAmount: donation.amount,
+                        refundedAmount: refund.refunded_amount,
+                        refundRatio: refund.refund_ratio,
+                        remainingRefund: donation.remaining_refund_pending,
+                        reason: refund.notes || "Refund từ recovery case"
+                    });
+                } catch (emailError) {
+                    console.error(`Error sending refund email to ${donation.donor.email}:`, emailError);
+                }
+            }
+            
+            try {
+                const Notification = (await import('../models/notification.js')).default;
+                const notification = await Notification.create({
+                    receiver: donation.donor._id,
+                    sender: refund.created_by,
+                    type: refund.refund_method === "recovery" ? "refund_processed" : "refund_processed",
+                    campaign: refund.campaign,
+                    message: donation.remaining_refund_pending > 0
+                        ? `Bạn đã được refund ${(refund.refund_ratio * 100).toFixed(2)}% số tiền đã quyên góp cho chiến dịch "${donation.campaign?.title || "campaign"}". Phần còn lại đang được xử lý.`
+                        : `Bạn đã được refund 100% số tiền đã quyên góp cho chiến dịch "${donation.campaign?.title || "campaign"}"`,
+                    is_read: false
+                });
+                
+                const { redisClient } = await import('../config/redis.js');
+                await redisClient.publish("notification:new", JSON.stringify({
+                    recipientId: donation.donor._id.toString(),
+                    notification: {
+                        _id: notification._id.toString(),
+                        type: "refund_processed",
+                        message: notification.message,
+                        campaign: {
+                            _id: refund.campaign.toString(),
+                            title: donation.campaign?.title || ""
+                        },
+                        is_read: false,
+                        createdAt: notification.createdAt
+                    }
+                }));
+            } catch (notifError) {
+                console.error("Error creating refund notification:", notifError);
+            }
         } else {
             refund.refund_status = "completed";
         }
