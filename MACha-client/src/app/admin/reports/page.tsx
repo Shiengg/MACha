@@ -38,6 +38,9 @@ export default function AdminReports() {
   const [pendingAction, setPendingAction] = useState<{type: 'batch' | 'single', status: ReportStatus, item?: GroupedReportItem, reportId?: string, reportedType?: ReportedType} | null>(null);
   const [selectedResolution, setSelectedResolution] = useState<'removed' | 'user_warned' | 'user_banned' | 'no_action'>('no_action');
   const [resolutionDetails, setResolutionDetails] = useState('');
+  const [isProcessingResolution, setIsProcessingResolution] = useState(false);
+  const [processingItemKey, setProcessingItemKey] = useState<string | null>(null);
+  const [processingReportId, setProcessingReportId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchGroupedReports();
@@ -105,9 +108,12 @@ export default function AdminReports() {
   };
 
   const handleBatchUpdate = async (item: GroupedReportItem, status: ReportStatus) => {
+    const itemKey = `${item.reported_type}:${item.reported_id}`;
+    
     if (status === 'resolved') {
       // For user reports, auto-handle without showing modal
       if (item.reported_type === 'user') {
+        setProcessingItemKey(itemKey);
         try {
           await batchUpdateReportsByItem(item.reported_type, item.reported_id, {
             status,
@@ -119,6 +125,8 @@ export default function AdminReports() {
           }
         } catch (error: any) {
           Swal.fire('Error', error?.response?.data?.message || 'Failed to batch update reports', 'error');
+        } finally {
+          setProcessingItemKey(null);
         }
         return;
       }
@@ -142,6 +150,7 @@ export default function AdminReports() {
       });
 
       if (result.isConfirmed) {
+        setProcessingItemKey(itemKey);
         try {
           await batchUpdateReportsByItem(item.reported_type, item.reported_id, {
             status,
@@ -154,6 +163,8 @@ export default function AdminReports() {
           }
         } catch (error: any) {
           Swal.fire('Error', error?.response?.data?.message || 'Failed to batch update reports', 'error');
+        } finally {
+          setProcessingItemKey(null);
         }
       }
     }
@@ -167,6 +178,7 @@ export default function AdminReports() {
       
       // For user reports, auto-handle without showing modal
       if (reportedType === 'user') {
+        setProcessingReportId(reportId);
         try {
           await updateReportStatus(reportId, {
             status,
@@ -178,6 +190,8 @@ export default function AdminReports() {
           fetchGroupedReports();
         } catch (error: any) {
           Swal.fire('Error', error?.response?.data?.message || 'Failed to update report status', 'error');
+        } finally {
+          setProcessingReportId(null);
         }
         return;
       }
@@ -201,6 +215,7 @@ export default function AdminReports() {
       });
 
       if (result.isConfirmed) {
+        setProcessingReportId(reportId);
         try {
           await updateReportStatus(reportId, {
             status,
@@ -213,6 +228,8 @@ export default function AdminReports() {
           fetchGroupedReports();
         } catch (error: any) {
           Swal.fire('Error', error?.response?.data?.message || 'Failed to update report status', 'error');
+        } finally {
+          setProcessingReportId(null);
         }
       }
     }
@@ -308,8 +325,9 @@ export default function AdminReports() {
   };
 
   const handleConfirmResolution = async () => {
-    if (!pendingAction) return;
+    if (!pendingAction || isProcessingResolution) return;
 
+    setIsProcessingResolution(true);
     try {
       if (pendingAction.type === 'batch' && pendingAction.item) {
         await batchUpdateReportsByItem(
@@ -345,6 +363,8 @@ export default function AdminReports() {
       setResolutionDetails('');
     } catch (error: any) {
       Swal.fire('Error', error?.response?.data?.message || 'Failed to update reports', 'error');
+    } finally {
+      setIsProcessingResolution(false);
     }
   };
 
@@ -488,7 +508,8 @@ export default function AdminReports() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => handleViewItemDetails(item)}
-                              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
+                              disabled={processingItemKey === `${item.reported_type}:${item.reported_id}`}
+                              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <Eye className="w-4 h-4" />
                               Xem chi tiết
@@ -497,17 +518,49 @@ export default function AdminReports() {
                               <>
                                 <button
                                   onClick={() => handleBatchUpdate(item, 'resolved')}
-                                  className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors flex items-center gap-1"
+                                  disabled={processingItemKey === `${item.reported_type}:${item.reported_id}`}
+                                  className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  <CheckCircle className="w-4 h-4" />
-                                  Phê duyệt
+                                  {processingItemKey === `${item.reported_type}:${item.reported_id}` ? (
+                                    <>
+                                      <div className="w-4 h-4 text-green-700">
+                                        <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                          <path d="M10.72,19.9a8,8,0,0,1-6.5-9.79A7.77,7.77,0,0,1,10.4,4.16a8,8,0,0,1,9.49,6.52A1.54,1.54,0,0,0,21.38,12h.13a1.37,1.37,0,0,0,1.38-1.54,11,11,0,1,0-12.7,12.39A1.54,1.54,0,0,0,12,21.34h0A1.47,1.47,0,0,0,10.72,19.9Z">
+                                            <animateTransform attributeName="transform" type="rotate" dur="0.75s" values="0 12 12;360 12 12" repeatCount="indefinite"></animateTransform>
+                                          </path>
+                                        </svg>
+                                      </div>
+                                      Đang xử lý...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="w-4 h-4" />
+                                      Phê duyệt
+                                    </>
+                                  )}
                                 </button>
                                 <button
                                   onClick={() => handleBatchUpdate(item, 'rejected')}
-                                  className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1"
+                                  disabled={processingItemKey === `${item.reported_type}:${item.reported_id}`}
+                                  className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  <XCircle className="w-4 h-4" />
-                                  Từ chối
+                                  {processingItemKey === `${item.reported_type}:${item.reported_id}` ? (
+                                    <>
+                                      <div className="w-4 h-4 text-red-700">
+                                        <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                          <path d="M10.72,19.9a8,8,0,0,1-6.5-9.79A7.77,7.77,0,0,1,10.4,4.16a8,8,0,0,1,9.49,6.52A1.54,1.54,0,0,0,21.38,12h.13a1.37,1.37,0,0,0,1.38-1.54,11,11,0,1,0-12.7,12.39A1.54,1.54,0,0,0,12,21.34h0A1.47,1.47,0,0,0,10.72,19.9Z">
+                                            <animateTransform attributeName="transform" type="rotate" dur="0.75s" values="0 12 12;360 12 12" repeatCount="indefinite"></animateTransform>
+                                          </path>
+                                        </svg>
+                                      </div>
+                                      Đang xử lý...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <XCircle className="w-4 h-4" />
+                                      Từ chối
+                                    </>
+                                  )}
                                 </button>
                               </>
                             )}
@@ -645,15 +698,43 @@ export default function AdminReports() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleBatchUpdate(selectedItem, 'resolved')}
-                        className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        disabled={processingItemKey === `${selectedItem.reported_type}:${selectedItem.reported_id}`}
+                        className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
-                        Phê duyệt tất cả
+                        {processingItemKey === `${selectedItem.reported_type}:${selectedItem.reported_id}` ? (
+                          <>
+                            <div className="w-4 h-4 text-white">
+                              <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10.72,19.9a8,8,0,0,1-6.5-9.79A7.77,7.77,0,0,1,10.4,4.16a8,8,0,0,1,9.49,6.52A1.54,1.54,0,0,0,21.38,12h.13a1.37,1.37,0,0,0,1.38-1.54,11,11,0,1,0-12.7,12.39A1.54,1.54,0,0,0,12,21.34h0A1.47,1.47,0,0,0,10.72,19.9Z">
+                                  <animateTransform attributeName="transform" type="rotate" dur="0.75s" values="0 12 12;360 12 12" repeatCount="indefinite"></animateTransform>
+                                </path>
+                              </svg>
+                            </div>
+                            Đang xử lý...
+                          </>
+                        ) : (
+                          'Phê duyệt tất cả'
+                        )}
                       </button>
                       <button
                         onClick={() => handleBatchUpdate(selectedItem, 'rejected')}
-                        className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        disabled={processingItemKey === `${selectedItem.reported_type}:${selectedItem.reported_id}`}
+                        className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
-                        Từ chối tất cả
+                        {processingItemKey === `${selectedItem.reported_type}:${selectedItem.reported_id}` ? (
+                          <>
+                            <div className="w-4 h-4 text-white">
+                              <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10.72,19.9a8,8,0,0,1-6.5-9.79A7.77,7.77,0,0,1,10.4,4.16a8,8,0,0,1,9.49,6.52A1.54,1.54,0,0,0,21.38,12h.13a1.37,1.37,0,0,0,1.38-1.54,11,11,0,1,0-12.7,12.39A1.54,1.54,0,0,0,12,21.34h0A1.47,1.47,0,0,0,10.72,19.9Z">
+                                  <animateTransform attributeName="transform" type="rotate" dur="0.75s" values="0 12 12;360 12 12" repeatCount="indefinite"></animateTransform>
+                                </path>
+                              </svg>
+                            </div>
+                            Đang xử lý...
+                          </>
+                        ) : (
+                          'Từ chối tất cả'
+                        )}
                       </button>
                     </div>
                   )}
@@ -696,15 +777,43 @@ export default function AdminReports() {
                           <div className="flex gap-2 mt-3">
                             <button
                               onClick={() => handleUpdateSingleReport(report._id, 'resolved')}
-                              className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                              disabled={processingReportId === report._id}
+                              className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                             >
-                              Phê duyệt
+                              {processingReportId === report._id ? (
+                                <>
+                                  <div className="w-3 h-3 text-green-700">
+                                    <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M10.72,19.9a8,8,0,0,1-6.5-9.79A7.77,7.77,0,0,1,10.4,4.16a8,8,0,0,1,9.49,6.52A1.54,1.54,0,0,0,21.38,12h.13a1.37,1.37,0,0,0,1.38-1.54,11,11,0,1,0-12.7,12.39A1.54,1.54,0,0,0,12,21.34h0A1.47,1.47,0,0,0,10.72,19.9Z">
+                                        <animateTransform attributeName="transform" type="rotate" dur="0.75s" values="0 12 12;360 12 12" repeatCount="indefinite"></animateTransform>
+                                      </path>
+                                    </svg>
+                                  </div>
+                                  Đang xử lý...
+                                </>
+                              ) : (
+                                'Phê duyệt'
+                              )}
                             </button>
                             <button
                               onClick={() => handleUpdateSingleReport(report._id, 'rejected')}
-                              className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                              disabled={processingReportId === report._id}
+                              className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                             >
-                              Từ chối
+                              {processingReportId === report._id ? (
+                                <>
+                                  <div className="w-3 h-3 text-red-700">
+                                    <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M10.72,19.9a8,8,0,0,1-6.5-9.79A7.77,7.77,0,0,1,10.4,4.16a8,8,0,0,1,9.49,6.52A1.54,1.54,0,0,0,21.38,12h.13a1.37,1.37,0,0,0,1.38-1.54,11,11,0,1,0-12.7,12.39A1.54,1.54,0,0,0,12,21.34h0A1.47,1.47,0,0,0,10.72,19.9Z">
+                                        <animateTransform attributeName="transform" type="rotate" dur="0.75s" values="0 12 12;360 12 12" repeatCount="indefinite"></animateTransform>
+                                      </path>
+                                    </svg>
+                                  </div>
+                                  Đang xử lý...
+                                </>
+                              ) : (
+                                'Từ chối'
+                              )}
                             </button>
                           </div>
                         )}
@@ -720,98 +829,138 @@ export default function AdminReports() {
 
       {/* Resolution Selection Modal */}
       {showResolutionModal && pendingAction && pendingAction.reportedType !== 'user' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowResolutionModal(false)}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => {
+          if (!isProcessingResolution) {
+            setShowResolutionModal(false);
+            setPendingAction(null);
+            setSelectedResolution('no_action');
+            setResolutionDetails('');
+            setIsProcessingResolution(false);
+          }
+        }}>
           <div className="bg-white rounded-lg max-w-md w-full m-4" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">Chọn hành động xử lý</h2>
             </div>
             <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Hành động:
-                </label>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-3 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="resolution"
-                      value="no_action"
-                      checked={selectedResolution === 'no_action'}
-                      onChange={(e) => setSelectedResolution(e.target.value as any)}
-                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700">Không làm gì</span>
-                  </label>
-                  <label className="flex items-center space-x-3 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="resolution"
-                      value="removed"
-                      checked={selectedResolution === 'removed'}
-                      onChange={(e) => setSelectedResolution(e.target.value as any)}
-                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700">Xóa/Ẩn item</span>
-                  </label>
-                  {/* Chỉ hiển thị "Cảnh báo user" và "Ban user" nếu không phải post, campaign, event */}
-                  {pendingAction.reportedType && !['post', 'campaign', 'event'].includes(pendingAction.reportedType) && (
-                    <>
-                      <label className="flex items-center space-x-3 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="resolution"
-                          value="user_warned"
-                          checked={selectedResolution === 'user_warned'}
-                          onChange={(e) => setSelectedResolution(e.target.value as any)}
-                          className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">Cảnh báo user</span>
-                      </label>
-                      <label className="flex items-center space-x-3 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="resolution"
-                          value="user_banned"
-                          checked={selectedResolution === 'user_banned'}
-                          onChange={(e) => setSelectedResolution(e.target.value as any)}
-                          className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">Ban user</span>
-                      </label>
-                    </>
-                  )}
+              {isProcessingResolution && (
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-12 text-orange-600">
+                    <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M10.72,19.9a8,8,0,0,1-6.5-9.79A7.77,7.77,0,0,1,10.4,4.16a8,8,0,0,1,9.49,6.52A1.54,1.54,0,0,0,21.38,12h.13a1.37,1.37,0,0,0,1.38-1.54,11,11,0,1,0-12.7,12.39A1.54,1.54,0,0,0,12,21.34h0A1.47,1.47,0,0,0,10.72,19.9Z">
+                        <animateTransform attributeName="transform" type="rotate" dur="0.75s" values="0 12 12;360 12 12" repeatCount="indefinite"></animateTransform>
+                      </path>
+                    </svg>
+                  </div>
+                  <span className="ml-3 text-sm text-gray-600">Đang xử lý...</span>
                 </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Lý do (tùy chọn):
-                </label>
-                <textarea
-                  value={resolutionDetails}
-                  onChange={(e) => setResolutionDetails(e.target.value)}
-                  placeholder="Nhập lý do xử lý..."
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+              )}
+              <div className={isProcessingResolution ? 'opacity-50 pointer-events-none' : ''}>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Hành động:
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center space-x-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="resolution"
+                        value="no_action"
+                        checked={selectedResolution === 'no_action'}
+                        onChange={(e) => setSelectedResolution(e.target.value as any)}
+                        disabled={isProcessingResolution}
+                        className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">Không làm gì</span>
+                    </label>
+                    <label className="flex items-center space-x-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="resolution"
+                        value="removed"
+                        checked={selectedResolution === 'removed'}
+                        onChange={(e) => setSelectedResolution(e.target.value as any)}
+                        disabled={isProcessingResolution}
+                        className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">Xóa/Ẩn item</span>
+                    </label>
+                    {/* Chỉ hiển thị "Cảnh báo user" và "Ban user" nếu không phải post, campaign, event */}
+                    {pendingAction.reportedType && !['post', 'campaign', 'event'].includes(pendingAction.reportedType) && (
+                      <>
+                        <label className="flex items-center space-x-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="resolution"
+                            value="user_warned"
+                            checked={selectedResolution === 'user_warned'}
+                            onChange={(e) => setSelectedResolution(e.target.value as any)}
+                            disabled={isProcessingResolution}
+                            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">Cảnh báo user</span>
+                        </label>
+                        <label className="flex items-center space-x-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="resolution"
+                            value="user_banned"
+                            checked={selectedResolution === 'user_banned'}
+                            onChange={(e) => setSelectedResolution(e.target.value as any)}
+                            disabled={isProcessingResolution}
+                            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">Ban user</span>
+                        </label>
+                      </>
+                    )}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Lý do (tùy chọn):
+                  </label>
+                  <textarea
+                    value={resolutionDetails}
+                    onChange={(e) => setResolutionDetails(e.target.value)}
+                    placeholder="Nhập lý do xử lý..."
+                    rows={3}
+                    disabled={isProcessingResolution}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
               </div>
             </div>
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
               <button
                 onClick={() => {
+                  if (isProcessingResolution) return;
                   setShowResolutionModal(false);
                   setPendingAction(null);
                   setSelectedResolution('no_action');
                   setResolutionDetails('');
+                  setIsProcessingResolution(false);
                 }}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={isProcessingResolution}
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Hủy
               </button>
               <button
                 onClick={handleConfirmResolution}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={isProcessingResolution}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
+                {isProcessingResolution && (
+                  <div className="w-4 h-4 text-white">
+                    <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M10.72,19.9a8,8,0,0,1-6.5-9.79A7.77,7.77,0,0,1,10.4,4.16a8,8,0,0,1,9.49,6.52A1.54,1.54,0,0,0,21.38,12h.13a1.37,1.37,0,0,0,1.38-1.54,11,11,0,1,0-12.7,12.39A1.54,1.54,0,0,0,12,21.34h0A1.47,1.47,0,0,0,10.72,19.9Z">
+                        <animateTransform attributeName="transform" type="rotate" dur="0.75s" values="0 12 12;360 12 12" repeatCount="indefinite"></animateTransform>
+                      </path>
+                    </svg>
+                  </div>
+                )}
                 Xác nhận
               </button>
             </div>
