@@ -8,27 +8,32 @@ interface ProtectedRouteProps {
     children: React.ReactNode;
 }
 
-/**
- * ProtectedRoute component - Bảo vệ routes khỏi truy cập khi chưa đăng nhập
- * Nếu user chưa authenticate, redirect về /login
- */
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-    const { isAuthenticated, loading } = useAuth();
+    const { isAuthenticated, loading, user } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
         if (!loading && !isAuthenticated) {
-            // Lưu lại URL hiện tại để redirect lại sau khi login
-            // ✅ Không lưu returnUrl nếu đang ở profile page (vì sẽ là profile của người khác)
             const isProfilePage = pathname.startsWith('/profile/');
             const shouldSaveReturnUrl = pathname !== '/login' && !isProfilePage;
             const returnUrl = shouldSaveReturnUrl ? `?returnUrl=${encodeURIComponent(pathname)}` : '';
             router.push(`/login${returnUrl}`);
+            return;
         }
-    }, [isAuthenticated, loading, router, pathname]);
 
-    // Show loading state while checking authentication
+        if (
+            !loading &&
+            isAuthenticated &&
+            user &&
+            user.role === 'user' &&
+            user.onboarding_completed === false &&
+            !pathname.startsWith('/onboarding')
+        ) {
+            router.push('/onboarding/topics');
+        }
+    }, [isAuthenticated, loading, router, pathname, user]);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -40,12 +45,10 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
         );
     }
 
-    // If not authenticated, show nothing (will redirect)
     if (!isAuthenticated) {
         return null;
     }
 
-    // If authenticated, render children
     return <>{children}</>;
 }
 

@@ -14,7 +14,7 @@ import PublicRoute from '@/components/guards/PublicRoute';
 import { Suspense } from 'react';
 
 function LoginPageContent() {
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -53,6 +53,15 @@ function LoginPageContent() {
         } else if (userRole === 'admin') {
           router.push(redirectParam || '/admin/dashboard');
         } else {
+          // Nếu user chưa hoàn thành onboarding, ưu tiên đưa vào onboarding
+          const needsOnboarding =
+            res.data.user?.onboarding_completed === false;
+
+          if (needsOnboarding) {
+            router.push('/onboarding/topics');
+            return;
+          }
+
           // ✅ Check if returnUrl is a profile page
           if (returnUrl && returnUrl.startsWith('/profile/')) {
             const profileUserId = returnUrl.split('/profile/')[1];

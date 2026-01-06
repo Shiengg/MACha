@@ -4,7 +4,7 @@ import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as authService from "../services/auth.service.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
-import User from "../models/user.js";
+import User, { ONBOARDING_CATEGORIES } from "../models/user.js";
 import { redisClient } from "../config/redis.js";
 
 const maxAge = 3 * 24 * 60 * 60;
@@ -76,6 +76,8 @@ export const signup = async (req, res) => {
                 username: user.username,
                 role: user.role,
                 is_verified: user.is_verified,
+                onboarding_completed: user.onboarding_completed,
+                onboarding_data: user.onboarding_data,
             }
         })
 
@@ -128,6 +130,8 @@ export const verifyUserAccount = async (req, res) => {
                 username: user.username,
                 role: user.role,
                 is_verified: user.is_verified,
+                onboarding_completed: user.onboarding_completed,
+                onboarding_data: user.onboarding_data,
             }
         });
     } catch (error) {
@@ -208,7 +212,9 @@ export const login = async (req, res) => {
             user: {
                 id: user._id,
                 username: user.username,
-                role: user.role
+                role: user.role,
+                onboarding_completed: user.onboarding_completed,
+                onboarding_data: user.onboarding_data,
             }
         });
 
@@ -301,6 +307,47 @@ export const updateUser = async (req, res) => {
         });
     }
 }
+
+export const completeOnboarding = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { selected_categories } = req.body || {};
+
+        // Authorization: user tự update hoặc admin
+        if (req.user._id.toString() !== id && req.user.role !== "admin") {
+            return res.status(HTTP_STATUS.FORBIDDEN).json({
+                message: HTTP_STATUS_TEXT.FORBIDDEN
+            });
+        }
+
+        if (!Array.isArray(selected_categories) || selected_categories.length === 0) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "selected_categories phải là mảng và không được rỗng"
+            });
+        }
+
+        const invalid = selected_categories.filter(c => !ONBOARDING_CATEGORIES.includes(c));
+        if (invalid.length > 0) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: `Danh mục không hợp lệ: ${invalid.join(", ")}`
+            });
+        }
+
+        const updatedUser = await authService.completeOnboarding(id, selected_categories);
+
+        if (!updatedUser) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                message: HTTP_STATUS_TEXT.NOT_FOUND
+            });
+        }
+
+        return res.status(HTTP_STATUS.OK).json({ user: updatedUser });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message
+        });
+    }
+};
 
 export const sendOtp = async (req, res) => {
     try {

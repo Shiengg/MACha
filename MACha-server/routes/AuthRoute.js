@@ -16,6 +16,7 @@ authRoutes.post('/logout', rateLimitByIP(50, 60), AuthController.logout);
 authRoutes.get('/me', authMiddleware, rateLimitByUserId(20, 60), AuthController.getCurrentUser);
 authRoutes.get('/:id', authMiddleware, rateLimitByUserId(20, 60), AuthController.getUserById);
 authRoutes.patch('/:id', authMiddleware, rateLimitByUserId(10, 60), checkRole("user", "admin"), AuthController.updateUser)
+authRoutes.patch('/:id/onboarding', authMiddleware, rateLimitByUserId(10, 60), checkRole("user", "admin"), AuthController.completeOnboarding)
 authRoutes.post('/otp', authMiddleware, rateLimitByUserId(10, 60), AuthController.sendOtp);
 authRoutes.post('/verify-otp', authMiddleware, rateLimitByUserId(10, 60), AuthController.verifyOtpChangePassword);
 authRoutes.post('/change-password', authMiddleware, rateLimitByUserId(10, 60), AuthController.changePassword);
