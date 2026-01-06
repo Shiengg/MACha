@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import { recoveryService, RecoveryCase } from '@/services/recovery.service';
@@ -76,18 +76,8 @@ function getDaysRemaining(deadline: string): number {
   return diffDays;
 }
 
-export default function CreatorRecoveryCases() {
-  const router = useRouter();
+function PaymentNotificationHandler({ onPaymentSuccess }: { onPaymentSuccess: () => void }) {
   const searchParams = useSearchParams();
-  const [recoveryCases, setRecoveryCases] = useState<RecoveryCase[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedCase, setSelectedCase] = useState<RecoveryCase | null>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  useEffect(() => {
-    fetchRecoveryCases();
-  }, []);
 
   useEffect(() => {
     const payment = searchParams.get('payment');
@@ -102,7 +92,7 @@ export default function CreatorRecoveryCases() {
         toast: true,
         position: 'top-end',
       });
-      fetchRecoveryCases();
+      onPaymentSuccess();
     } else if (payment === 'error') {
       Swal.fire({
         icon: 'error',
@@ -126,7 +116,22 @@ export default function CreatorRecoveryCases() {
         position: 'top-end',
       });
     }
-  }, [searchParams]);
+  }, [searchParams, onPaymentSuccess]);
+
+  return null;
+}
+
+function CreatorRecoveryCasesContent() {
+  const router = useRouter();
+  const [recoveryCases, setRecoveryCases] = useState<RecoveryCase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCase, setSelectedCase] = useState<RecoveryCase | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    fetchRecoveryCases();
+  }, []);
 
   const fetchRecoveryCases = async () => {
     try {
@@ -234,6 +239,9 @@ export default function CreatorRecoveryCases() {
 
   return (
     <ProtectedRoute>
+      <Suspense fallback={null}>
+        <PaymentNotificationHandler onPaymentSuccess={fetchRecoveryCases} />
+      </Suspense>
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-8">
@@ -516,5 +524,9 @@ export default function CreatorRecoveryCases() {
       </div>
     </ProtectedRoute>
   );
+}
+
+export default function CreatorRecoveryCases() {
+  return <CreatorRecoveryCasesContent />;
 }
 
