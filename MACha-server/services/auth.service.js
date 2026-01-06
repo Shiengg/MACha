@@ -1,4 +1,4 @@
-import User from "../models/user.js";
+import User, { ONBOARDING_CATEGORIES } from "../models/user.js";
 import { redisClient } from "../config/redis.js";
 import bcrypt from "bcryptjs";
 
@@ -34,6 +34,8 @@ export const createUser = async (payload) => {
         following: user.following,
         followers_count: user.followers_count,
         following_count: user.following_count,
+        onboarding_data: user.onboarding_data,
+        onboarding_completed: user.onboarding_completed,
     };
 };
 
@@ -113,6 +115,36 @@ export const updateUserById = async (userId, updates) => {
     if (!updatedUser) return null;
 
     // 2. Invalidate cache (xóa cache cũ)
+    const cacheKey = `user:${userId.toString()}`;
+    await redisClient.del(cacheKey);
+
+    return updatedUser;
+};
+
+/**
+ * Hoàn thành onboarding: lưu danh mục quan tâm và set cờ hoàn thành
+ */
+export const completeOnboarding = async (userId, selectedCategories = []) => {
+    // Lọc category hợp lệ + loại trùng
+    const validSet = new Set(
+        (selectedCategories || []).filter((c) => ONBOARDING_CATEGORIES.includes(c))
+    );
+
+    const updates = {
+        onboarding_data: {
+            selected_categories: Array.from(validSet),
+        },
+        onboarding_completed: true,
+    };
+
+    const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        updates,
+        { new: true }
+    ).select("-password");
+
+    if (!updatedUser) return null;
+
     const cacheKey = `user:${userId.toString()}`;
     await redisClient.del(cacheKey);
 

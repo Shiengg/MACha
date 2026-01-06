@@ -76,6 +76,13 @@ function SignupPageContent() {
                 confirmButtonText: 'OK'
             });
 
+            const needsOnboarding = res.data.user?.onboarding_completed === false;
+
+            if (needsOnboarding) {
+                router.push('/onboarding/topics');
+                return;
+            }
+
             const returnUrl = searchParams.get('returnUrl') || '/';
             router.push(returnUrl);
         } catch (error: any) {

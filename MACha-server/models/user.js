@@ -1,6 +1,20 @@
 import mongoose from "mongoose";
 import { genSalt, hash } from "bcryptjs";
 
+export const ONBOARDING_CATEGORIES = [
+    "children",           // Trẻ em
+    "elderly",            // Người già
+    "poverty",            // Người nghèo
+    "disaster",           // Thiên tai (lũ lụt, bão, hạn hán)
+    "medical",            // Y tế, bệnh hiểm nghèo
+    "education",          // Giáo dục
+    "disability",         // Người khuyết tật
+    "animal",             // Động vật
+    "environment",        // Môi trường
+    "hardship",           // Hoàn cảnh khó khăn
+    "other",              // Khác
+];
+
 const userSchema = mongoose.Schema({
     username: {
         type: String,
@@ -86,6 +100,17 @@ const userSchema = mongoose.Schema({
         type: String,
         default: null
     },
+    onboarding_data: {
+        selected_categories: [{
+            type: String,
+            enum: ONBOARDING_CATEGORIES,
+        }]
+    },
+    onboarding_completed: {
+        type: Boolean,
+        default: false,
+        index: true
+    }
 },
     {
         timestamps: true,
