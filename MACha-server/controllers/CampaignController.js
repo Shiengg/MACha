@@ -144,6 +144,24 @@ export const searchCampaignsByTitle = async (req, res) => {
     }
 }
 
+export const getCampaignsForMap = async (req, res) => {
+    try {
+        const campaigns = await campaignService.getCampaignsForMap();
+        return res.status(HTTP_STATUS.OK).json({ campaigns });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
+    }
+}
+
+export const getCampaignMapStatistics = async (req, res) => {
+    try {
+        const statistics = await campaignService.getCampaignMapStatistics();
+        return res.status(HTTP_STATUS.OK).json(statistics);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
+    }
+}
+
 export const createCampaign = async (req, res) => {
     try {
         if (req.user.kyc_status !== 'verified') {

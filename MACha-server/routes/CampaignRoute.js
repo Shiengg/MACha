@@ -14,7 +14,9 @@ import {
     rejectCampaign,
     createWithdrawalRequest,
     searchCampaignsByHashtag,
-    searchCampaignsByTitle
+    searchCampaignsByTitle,
+    getCampaignsForMap,
+    getCampaignMapStatistics
 } from "../controllers/CampaignController.js";
 import { getWithdrawalRequestsByCampaign } from "../controllers/EscrowController.js";
 import {
@@ -29,6 +31,8 @@ import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 const campaignRoutes = Router();
 
 campaignRoutes.get('/', RateLimitMiddleware.rateLimitByIP(100, 60), getAllCampaigns);
+campaignRoutes.get('/map', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignsForMap);
+campaignRoutes.get('/map/statistics', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignMapStatistics);
 campaignRoutes.get('/search/hashtag', RateLimitMiddleware.rateLimitByIP(100, 60), searchCampaignsByHashtag);
 campaignRoutes.get('/search/title', RateLimitMiddleware.rateLimitByIP(100, 60), searchCampaignsByTitle);
 campaignRoutes.get('/categories/active', RateLimitMiddleware.rateLimitByIP(100, 60), getActiveCategories);
