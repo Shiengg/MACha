@@ -30,6 +30,7 @@ interface FormData {
   twitter: string;
   website: string;
   address: string;
+  location_name: string; // Location for map (e.g., "Hốc Môn, HCM")
   // Step 2: Campaign Information (Basic + Detailed Content)
   title: string;
   category: string;
@@ -86,6 +87,7 @@ function CreateCampaignContent() {
     twitter: '',
     website: '',
     address: '',
+    location_name: '',
     // Step 2: Campaign Information
     title: '',
     category: '',
@@ -383,6 +385,10 @@ function CreateCampaignContent() {
         }
         if (!formData.address.trim()) {
           Swal.fire('Thiếu thông tin', 'Vui lòng nhập địa chỉ', 'warning');
+          return false;
+        }
+        if (!formData.location_name.trim()) {
+          Swal.fire('Thiếu thông tin', 'Vui lòng nhập vị trí chiến dịch (cho bản đồ)', 'warning');
           return false;
         }
         return true;
@@ -694,6 +700,7 @@ function CreateCampaignContent() {
         milestones: formData.milestones,
         expected_timeline: formData.expected_timeline.length > 0 ? formData.expected_timeline : undefined,
         hashtag: formData.hashtag.trim() ? formData.hashtag.trim() : undefined,
+        location_name: formData.location_name.trim() || undefined,
       };
 
       await campaignService.createCampaign(payload);
@@ -857,6 +864,22 @@ function CreateCampaignContent() {
                     rows={3}
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Vị trí chiến dịch (cho bản đồ) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.location_name}
+                    onChange={(e) => handleInputChange('location_name', e.target.value)}
+                    placeholder="VD: Hốc Môn, HCM hoặc Quận 1, TP.HCM"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    Nhập tên địa điểm nơi chiến dịch diễn ra. Hệ thống sẽ tự động xác định tọa độ để hiển thị trên bản đồ.
+                  </p>
                 </div>
 
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-6">

@@ -166,6 +166,21 @@ const campaignSchema = new mongoose.Schema({
     hashtag: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Hashtag"
+    },
+    // Location Information for Map
+    location: {
+        location_name: {
+            type: String,
+            required: true
+        },
+        latitude: {
+            type: Number,
+            required: true
+        },
+        longitude: {
+            type: Number,
+            required: true
+        }
     }
 },
     {
@@ -178,6 +193,7 @@ campaignSchema.index({ status: 1, createdAt: -1 });
 campaignSchema.index({ category: 1, status: 1 });
 campaignSchema.index({ creator: 1, status: 1 });
 campaignSchema.index({ hashtag: 1 }); // Index for hashtag search
+campaignSchema.index({ "location.latitude": 1, "location.longitude": 1 }); // Index for geospatial queries
 
 const Campaign = mongoose.model("Campaign", campaignSchema);
 export default Campaign;

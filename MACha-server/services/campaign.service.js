@@ -1,6 +1,7 @@
 import Campaign from "../models/campaign.js";
 import Hashtag from "../models/Hashtag.js";
 import { redisClient } from "../config/redis.js";
+import { geocodeLocation } from "./geocoding.service.js";
 
 export const getCampaigns = async (page = 0, limit = 20) => {
     const campaignKey = `campaigns:all:page:${page}:limit:${limit}`;
@@ -65,8 +66,29 @@ export const getCampaignById = async (campaignId) => {
 
 
 export const createCampaign = async (payload) => {
-    // Extract hashtag from payload if provided
-    const { hashtag: hashtagName, ...campaignData } = payload;
+    // Extract hashtag and location_name from payload if provided
+    const { hashtag: hashtagName, location_name, ...campaignData } = payload;
+    
+    // Geocode location if location_name is provided
+    if (location_name && typeof location_name === 'string' && location_name.trim().length > 0) {
+        try {
+            const geocodeResult = await geocodeLocation(location_name);
+            if (geocodeResult) {
+                campaignData.location = {
+                    location_name: location_name.trim(),
+                    latitude: geocodeResult.latitude,
+                    longitude: geocodeResult.longitude
+                };
+            } else {
+                // If geocoding fails, still create campaign but without location
+                console.warn(`Geocoding failed for location: ${location_name}. Creating campaign without location.`);
+            }
+        } catch (error) {
+            // Log error but don't fail campaign creation
+            console.error(`Error geocoding location "${location_name}":`, error);
+            // Continue without location data
+        }
+    }
     
     // Create campaign first (without hashtag)
     const campaign = new Campaign(campaignData);
@@ -114,8 +136,9 @@ export const createCampaign = async (payload) => {
     }
     await redisClient.del(keySet);
     await redisClient.del('campaigns:all:total');
-    
     await redisClient.del('campaigns:pending');
+    await redisClient.del('campaigns:map'); // Invalidate map cache
+    await redisClient.del('campaigns:map:statistics'); // Invalidate map statistics cache
 
     // Populate hashtag before returning
     await campaign.populate('hashtag', 'name');
@@ -272,6 +295,8 @@ export const updateCampaign = async (campaignId, userId, payload) => {
         if (oldStatus === 'pending') {
             cachesToInvalidate.push(redisClient.del('campaigns:pending'));
         }
+        cachesToInvalidate.push(redisClient.del('campaigns:map')); // Invalidate map cache
+        cachesToInvalidate.push(redisClient.del('campaigns:map:statistics')); // Invalidate map statistics cache
 
         await Promise.all(cachesToInvalidate);
 
@@ -303,6 +328,7 @@ export const updateCampaign = async (campaignId, userId, payload) => {
     if (oldStatus === 'pending' || payload.status === 'pending') {
         cachesToInvalidate.push(redisClient.del('campaigns:pending'));
     }
+    cachesToInvalidate.push(redisClient.del('campaigns:map')); // Invalidate map cache
 
     await Promise.all(cachesToInvalidate);
 
@@ -355,6 +381,7 @@ export const deleteCampaign = async (campaignId, userId) => {
     if (status === 'pending') {
         cachesToInvalidate.push(redisClient.del('campaigns:pending'));
     }
+    cachesToInvalidate.push(redisClient.del('campaigns:map')); // Invalidate map cache
 
     await Promise.all(cachesToInvalidate);
 
@@ -397,6 +424,8 @@ export const cancelCampaign = async (campaignId, userId, reason) => {
     }
         cachesToInvalidate.push(redisClient.del(keySet));
         cachesToInvalidate.push(redisClient.del('campaigns:all:total'));
+        cachesToInvalidate.push(redisClient.del('campaigns:map')); // Invalidate map cache
+        cachesToInvalidate.push(redisClient.del('campaigns:map:statistics')); // Invalidate map statistics cache
         
         await Promise.all(cachesToInvalidate);
 
@@ -453,6 +482,8 @@ export const approveCampaign = async (campaignId, adminId) => {
     }
         cachesToInvalidate.push(redisClient.del(keySet));
         cachesToInvalidate.push(redisClient.del('campaigns:all:total'));
+        cachesToInvalidate.push(redisClient.del('campaigns:map')); // Invalidate map cache
+        cachesToInvalidate.push(redisClient.del('campaigns:map:statistics')); // Invalidate map statistics cache
         
         await Promise.all(cachesToInvalidate);
 
@@ -501,6 +532,8 @@ export const rejectCampaign = async (campaignId, adminId, reason) => {
     }
         cachesToInvalidate.push(redisClient.del(keySet));
         cachesToInvalidate.push(redisClient.del('campaigns:all:total'));
+        cachesToInvalidate.push(redisClient.del('campaigns:map')); // Invalidate map cache
+        cachesToInvalidate.push(redisClient.del('campaigns:map:statistics')); // Invalidate map statistics cache
         
         await Promise.all(cachesToInvalidate);
 
@@ -850,4 +883,75 @@ export const processExpiredCampaigns = async () => {
     }
     
     return results;
+}
+
+/**
+ * Get campaigns with location data for map display
+ * Only returns active campaigns that have location information
+ */
+export const getCampaignsForMap = async () => {
+    const cacheKey = 'campaigns:map';
+
+    // Check cache
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+
+    // Query campaigns with location data and active status
+    const campaigns = await Campaign.find({
+        status: 'active',
+        'location.latitude': { $exists: true, $ne: null },
+        'location.longitude': { $exists: true, $ne: null }
+    })
+        .select('title location category current_amount goal_amount banner_image creator hashtag status')
+        .populate("creator", "username fullname avatar")
+        .populate("hashtag", "name")
+        .lean();
+
+    // Cache for 5 minutes
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(campaigns));
+
+    return campaigns;
+}
+
+/**
+ * Get campaign statistics for map page
+ * Returns counts of campaigns with location by status
+ */
+export const getCampaignMapStatistics = async () => {
+    const cacheKey = 'campaigns:map:statistics';
+
+    // Check cache
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+
+    // Query all campaigns with location (not just active)
+    const campaignsWithLocation = await Campaign.find({
+        'location.latitude': { $exists: true, $ne: null },
+        'location.longitude': { $exists: true, $ne: null }
+    })
+        .select('status current_amount goal_amount')
+        .lean();
+
+    // Calculate statistics
+    const activeCount = campaignsWithLocation.filter(c => c.status === 'active').length;
+    const completedCount = campaignsWithLocation.filter(c => c.current_amount >= c.goal_amount).length;
+    const finishedCount = campaignsWithLocation.filter(c => 
+        c.status === 'completed' || c.status === 'cancelled'
+    ).length;
+
+    const statistics = {
+        active: activeCount,
+        completed: completedCount,
+        finished: finishedCount,
+        total: campaignsWithLocation.length
+    };
+
+    // Cache for 5 minutes
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(statistics));
+
+    return statistics;
 }

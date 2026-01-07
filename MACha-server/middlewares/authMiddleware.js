@@ -51,3 +51,46 @@ export const authMiddleware = async (req, res, next) => {
             .json({ message: "Invalid or expired token" });
     }
 };
+
+/**
+ * Optional authentication middleware
+ * Sets req.user if token is valid, but doesn't fail if token is missing
+ */
+export const optionalAuthMiddleware = async (req, res, next) => {
+    try {
+        let token = null;
+
+        // Try to get token from Authorization header first
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            token = authHeader.split(" ")[1];
+        }
+
+        // If no token in header, try to get from cookie
+        if (!token && req.cookies && req.cookies.jwt) {
+            token = req.cookies.jwt;
+        }
+
+        // If no token, just continue without setting req.user
+        if (!token) {
+            return next();
+        }
+
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const user = await User.findById(decoded.id).select("-password");
+            
+            if (user && !user.is_banned) {
+                req.user = user;
+            }
+        } catch (error) {
+            // Invalid token, but don't fail the request
+            // Just continue without setting req.user
+        }
+
+        next();
+    } catch (error) {
+        // Any other error, just continue without authentication
+        next();
+    }
+};

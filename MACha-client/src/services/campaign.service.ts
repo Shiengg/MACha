@@ -2,6 +2,8 @@ import apiClient from '@/lib/api-client';
 import {
   CREATE_CAMPAIGN_ROUTE,
   GET_ALL_CAMPAIGNS_ROUTE,
+  GET_CAMPAIGNS_FOR_MAP_ROUTE,
+  GET_CAMPAIGN_MAP_STATISTICS_ROUTE,
   GET_CAMPAIGN_BY_ID_ROUTE,
   UPDATE_CAMPAIGN_ROUTE,
   DELETE_CAMPAIGN_ROUTE,
@@ -66,6 +68,12 @@ export interface Campaign {
   available_amount?: number; // Số tiền có thể rút (current_amount - total released amount)
   // Donation-related fields
   completed_donations_count?: number; // Số lượng donation đã hoàn thành
+  // Location for map
+  location?: {
+    location_name: string;
+    latitude: number;
+    longitude: number;
+  };
 }
 
 export interface Milestone {
@@ -104,6 +112,7 @@ export interface CreateCampaignPayload {
   milestones: Milestone[];
   expected_timeline?: TimelineItem[];
   hashtag?: string; // Single hashtag name
+  location_name?: string; // Location name for map (e.g., "Hốc Môn, HCM")
 }
 
 export interface UpdateCampaignPayload {
@@ -161,6 +170,11 @@ export const campaignService = {
     };
   },
 
+  /**
+   * Get campaign by ID
+   * Note: If user is authenticated, this will automatically track the campaign
+   * in their recently_viewed_campaigns (max 10, maintained on server)
+   */
   async getCampaignById(id: string): Promise<Campaign> {
     const response = await apiClient.get(GET_CAMPAIGN_BY_ID_ROUTE(id));
     return response.data.campaign;
@@ -249,6 +263,21 @@ export const campaignService = {
       console.error('Error calculating available amount:', error);
       throw error;
     }
+  },
+
+  async getCampaignsForMap(): Promise<Campaign[]> {
+    const response = await apiClient.get(GET_CAMPAIGNS_FOR_MAP_ROUTE);
+    return response.data.campaigns;
+  },
+
+  async getCampaignMapStatistics(): Promise<{
+    active: number;
+    completed: number;
+    finished: number;
+    total: number;
+  }> {
+    const response = await apiClient.get(GET_CAMPAIGN_MAP_STATISTICS_ROUTE);
+    return response.data;
   },
 };
 

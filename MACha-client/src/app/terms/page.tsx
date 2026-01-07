@@ -352,7 +352,175 @@ export default function TermsPage() {
 
             <section className="mb-10">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-purple-600 pb-2">
-                8. TRÁCH NHIỆM VÀ GIỚI HẠN
+                8. QUYỀN VÀ TRÁCH NHIỆM CỦA QUẢN TRỊ VIÊN (ADMIN)
+              </h2>
+              <div className="space-y-4 text-gray-700">
+                <p>
+                  <strong>8.1. Định nghĩa và bổ nhiệm:</strong>
+                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Quản trị viên (Admin) là những người được chủ sở hữu nền tảng (Owner) bổ nhiệm để quản lý và vận hành nền tảng MACha</li>
+                  <li>Chỉ có chủ sở hữu nền tảng mới có quyền tạo, cập nhật, hoặc thu hồi quyền quản trị viên</li>
+                  <li>Tài khoản quản trị viên được tự động xác minh (verified) khi được tạo</li>
+                  <li>Quản trị viên có thể bị thu hồi quyền hoặc bị khóa tài khoản nếu vi phạm quy định</li>
+                </ul>
+                <p>
+                  <strong>8.2. Quyền hạn của quản trị viên:</strong>
+                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>
+                    <strong>Duyệt xác minh danh tính (KYC):</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Xem danh sách các hồ sơ KYC đang chờ duyệt</li>
+                      <li>Xem chi tiết thông tin và tài liệu KYC của người dùng</li>
+                      <li>Chấp thuận hoặc từ chối hồ sơ KYC với lý do cụ thể</li>
+                      <li>Thời gian xét duyệt tối đa: 7 ngày làm việc kể từ khi nhận hồ sơ</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <strong>Duyệt chiến dịch gây quỹ:</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Xem danh sách các chiến dịch đang chờ duyệt (pending)</li>
+                      <li>Xem chi tiết thông tin, nội dung, và tài liệu của chiến dịch</li>
+                      <li>Chấp thuận chiến dịch để chuyển sang trạng thái "active" (hoạt động)</li>
+                      <li>Từ chối chiến dịch với lý do cụ thể, chuyển sang trạng thái "rejected"</li>
+                      <li>Thời gian xét duyệt tối đa: 7 ngày làm việc kể từ khi chiến dịch được tạo</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <strong>Duyệt sự kiện (Events):</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Xem danh sách các sự kiện đang chờ duyệt</li>
+                      <li>Xem chi tiết thông tin và nội dung sự kiện</li>
+                      <li>Chấp thuận hoặc từ chối sự kiện với lý do cụ thể</li>
+                      <li>Thời gian xét duyệt tối đa: 7 ngày làm việc</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <strong>Quản lý người dùng:</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Xem danh sách tất cả người dùng trên nền tảng</li>
+                      <li>Xem chi tiết thông tin tài khoản, lịch sử hoạt động của người dùng</li>
+                      <li>Xem lịch sử KYC và các chiến dịch của người dùng</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <strong>Quản lý báo cáo:</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Xem danh sách tất cả các báo cáo từ người dùng</li>
+                      <li>Xem chi tiết báo cáo, thông tin người báo cáo và đối tượng bị báo cáo</li>
+                      <li>Cập nhật trạng thái xử lý báo cáo: đang xử lý, đã xử lý, từ chối</li>
+                      <li>Ghi nhận quyết định xử lý và chi tiết giải quyết</li>
+                      <li>Thời gian xử lý báo cáo tối đa: 7 ngày làm việc</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <strong>Duyệt yêu cầu rút tiền:</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Xem danh sách các yêu cầu rút tiền đã hoàn thành giai đoạn bỏ phiếu từ người quyên góp</li>
+                      <li>Xem chi tiết yêu cầu rút tiền: số tiền, lý do, kết quả bỏ phiếu, thông tin chiến dịch</li>
+                      <li>Chấp thuận yêu cầu rút tiền để hệ thống thực hiện giải ngân</li>
+                      <li>Từ chối yêu cầu rút tiền với lý do cụ thể nếu phát hiện vi phạm hoặc không đáp ứng điều kiện</li>
+                      <li>Yêu cầu bổ sung thông tin hoặc tài liệu từ người tạo chiến dịch nếu cần</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <strong>Xem thống kê và báo cáo:</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Truy cập dashboard để xem tổng quan hoạt động của nền tảng</li>
+                      <li>Xem thống kê về số lượng người dùng, chiến dịch, sự kiện</li>
+                      <li>Xem số lượng các hồ sơ đang chờ duyệt</li>
+                    </ul>
+                  </li>
+                </ul>
+                <p>
+                  <strong>8.3. Trách nhiệm của quản trị viên:</strong>
+                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>
+                    <strong>Xét duyệt công bằng và minh bạch:</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Xem xét kỹ lưỡng tất cả hồ sơ, chiến dịch, sự kiện, và báo cáo một cách công bằng</li>
+                      <li>Không được từ chối hoặc chấp thuận dựa trên cảm tính cá nhân</li>
+                      <li>Phải cung cấp lý do cụ thể và rõ ràng khi từ chối bất kỳ yêu cầu nào</li>
+                      <li>Xử lý trong thời gian quy định (tối đa 7 ngày làm việc)</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <strong>Bảo mật thông tin:</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Bảo mật tuyệt đối thông tin cá nhân, tài liệu KYC của người dùng</li>
+                      <li>Không được tiết lộ, chia sẻ, hoặc sử dụng thông tin người dùng cho mục đích khác ngoài công việc quản lý</li>
+                      <li>Tuân thủ các quy định về bảo vệ dữ liệu cá nhân</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <strong>Xử lý báo cáo kịp thời:</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Xem xét và xử lý các báo cáo vi phạm một cách nhanh chóng và công bằng</li>
+                      <li>Áp dụng các biện pháp xử lý phù hợp với mức độ vi phạm</li>
+                      <li>Ghi nhận đầy đủ quyết định và lý do xử lý</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <strong>Kiểm soát chất lượng:</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Đảm bảo các chiến dịch và sự kiện được duyệt đáp ứng đầy đủ tiêu chuẩn về nội dung, tính chân thực, và tuân thủ quy định</li>
+                      <li>Ngăn chặn các chiến dịch lừa đảo, giả mạo, hoặc vi phạm pháp luật</li>
+                      <li>Bảo vệ quyền lợi của người quyên góp và người tạo chiến dịch</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <strong>Giám sát yêu cầu rút tiền:</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Xem xét kỹ lưỡng các yêu cầu rút tiền sau khi đã được người quyên góp bỏ phiếu</li>
+                      <li>Đảm bảo yêu cầu rút tiền hợp lệ, đúng mục đích, và tuân thủ quy định</li>
+                      <li>Yêu cầu bổ sung thông tin hoặc tài liệu nếu cần thiết</li>
+                      <li>Chấp thuận giải ngân chỉ khi đảm bảo tính hợp pháp và minh bạch</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <strong>Tuân thủ quy định:</strong>
+                    <ul className="list-circle pl-6 mt-2 space-y-1">
+                      <li>Tuân thủ nghiêm ngặt các quy định của nền tảng và pháp luật hiện hành</li>
+                      <li>Không được lạm dụng quyền hạn để trục lợi cá nhân</li>
+                      <li>Không được tạo chiến dịch hoặc tham gia các hoạt động có thể gây xung đột lợi ích</li>
+                    </ul>
+                  </li>
+                </ul>
+                <p>
+                  <strong>8.4. Giới hạn quyền hạn:</strong>
+                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Quản trị viên không có quyền tạo, cập nhật, hoặc xóa tài khoản quản trị viên khác</li>
+                  <li>Quản trị viên không có quyền thay đổi cài đặt hệ thống cốt lõi hoặc cấu hình thanh toán</li>
+                  <li>Quản trị viên không có quyền truy cập vào thông tin tài chính chi tiết của chủ sở hữu nền tảng</li>
+                  <li>Quản trị viên không thể tự mình khóa hoặc xóa tài khoản của chính mình</li>
+                </ul>
+                <p>
+                  <strong>8.5. Vi phạm và xử lý:</strong>
+                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Nếu quản trị viên vi phạm quy định, lạm dụng quyền hạn, hoặc có hành vi không phù hợp, chủ sở hữu nền tảng có quyền:</li>
+                  <ul className="list-circle pl-6 mt-2 space-y-1">
+                    <li>Thu hồi quyền quản trị viên (chuyển role về "user")</li>
+                    <li>Khóa tài khoản tạm thời hoặc vĩnh viễn</li>
+                    <li>Yêu cầu bồi thường nếu gây thiệt hại</li>
+                    <li>Áp dụng các biện pháp pháp lý nếu cần thiết</li>
+                  </ul>
+                  <li>Mọi quyết định của quản trị viên đều được ghi nhận và có thể được xem xét lại bởi chủ sở hữu nền tảng</li>
+                </ul>
+                <p>
+                  <strong>8.6. Bảo mật tài khoản:</strong> Quản trị viên có trách nhiệm bảo mật tài khoản của mình. 
+                  Mọi hoạt động từ tài khoản quản trị viên đều được ghi nhận và chịu trách nhiệm. Nếu phát hiện tài khoản 
+                  bị xâm nhập, quản trị viên phải báo cáo ngay lập tức cho chủ sở hữu nền tảng.
+                </p>
+              </div>
+            </section>
+
+            <section className="mb-10">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-purple-600 pb-2">
+                9. TRÁCH NHIỆM VÀ GIỚI HẠN
               </h2>
               <div className="space-y-4 text-gray-700">
                 <p>
@@ -387,7 +555,7 @@ export default function TermsPage() {
 
             <section className="mb-10">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-purple-600 pb-2">
-                9. BẢO MẬT VÀ BẢO VỆ DỮ LIỆU
+                10. BẢO MẬT VÀ BẢO VỆ DỮ LIỆU
               </h2>
               <div className="space-y-4 text-gray-700">
                 <p>
@@ -408,7 +576,7 @@ export default function TermsPage() {
 
             <section className="mb-10">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-purple-600 pb-2">
-                10. THAY ĐỔI ĐIỀU KHOẢN
+                11. THAY ĐỔI ĐIỀU KHOẢN
               </h2>
               <div className="space-y-4 text-gray-700">
                 <p>
@@ -421,7 +589,7 @@ export default function TermsPage() {
 
             <section className="mb-10">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-purple-600 pb-2">
-                11. GIẢI QUYẾT TRANH CHẤP
+                12. GIẢI QUYẾT TRANH CHẤP
               </h2>
               <div className="space-y-4 text-gray-700">
                 <p>
@@ -441,7 +609,7 @@ export default function TermsPage() {
 
             <section className="mb-10">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-purple-600 pb-2">
-                12. LIÊN HỆ
+                13. LIÊN HỆ
               </h2>
               <div className="space-y-4 text-gray-700">
                 <p>

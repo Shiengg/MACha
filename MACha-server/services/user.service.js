@@ -290,3 +290,39 @@ export const updateUser = async (userId, updates) => {
     return updatedUser;
 };
 
+/**
+ * Track recently viewed campaign
+ * Maintains max 10 campaigns, removes duplicates, keeps newest at front
+ */
+export const trackRecentlyViewedCampaign = async (userId, campaignId) => {
+    try {
+        const user = await User.findById(userId);
+        if (!user) {
+            return { success: false, error: 'USER_NOT_FOUND' };
+        }
+
+        // Remove campaign if it already exists (to avoid duplicates)
+        user.recently_viewed_campaigns = user.recently_viewed_campaigns.filter(
+            id => id.toString() !== campaignId.toString()
+        );
+
+        // Add new campaign at the beginning
+        user.recently_viewed_campaigns.unshift(campaignId);
+
+        // Keep only the latest 10 campaigns
+        if (user.recently_viewed_campaigns.length > 10) {
+            user.recently_viewed_campaigns = user.recently_viewed_campaigns.slice(0, 10);
+        }
+
+        await user.save();
+
+        // Invalidate user cache
+        await invalidateUserCaches(userId);
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error tracking recently viewed campaign:', error);
+        return { success: false, error: error.message };
+    }
+};
+

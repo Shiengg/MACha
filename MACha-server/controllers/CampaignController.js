@@ -2,6 +2,7 @@ import * as campaignService from "../services/campaign.service.js";
 import * as escrowService from "../services/escrow.service.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
+import * as userService from "../services/user.service.js";
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 
 export const getAllCampaigns = async (req, res) => {
@@ -28,6 +29,16 @@ export const getCampaignById = async (req, res) => {
 
         if (!campaign) {
             return res.status(HTTP_STATUS.NOT_FOUND).json({ message: "Campaign not found" })
+        }
+
+        // Track recently viewed campaign if user is authenticated
+        if (req.user && req.user._id) {
+            try {
+                await userService.trackRecentlyViewedCampaign(req.user._id, campaignId);
+            } catch (trackingError) {
+                // Don't fail the request if tracking fails
+                console.error('Error tracking recently viewed campaign:', trackingError);
+            }
         }
 
         res.status(HTTP_STATUS.OK).json({ campaign });
@@ -139,6 +150,24 @@ export const searchCampaignsByTitle = async (req, res) => {
             count: campaigns.length,
             campaigns
         });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
+    }
+}
+
+export const getCampaignsForMap = async (req, res) => {
+    try {
+        const campaigns = await campaignService.getCampaignsForMap();
+        return res.status(HTTP_STATUS.OK).json({ campaigns });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
+    }
+}
+
+export const getCampaignMapStatistics = async (req, res) => {
+    try {
+        const statistics = await campaignService.getCampaignMapStatistics();
+        return res.status(HTTP_STATUS.OK).json(statistics);
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
     }

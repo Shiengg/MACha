@@ -49,6 +49,8 @@ export const GET_PUBLIC_ADMINS_ROUTE = `${USER_ROUTE}/public/admins`;
 
 export const CAMPAIGN_ROUTE = "api/campaigns";
 export const GET_ALL_CAMPAIGNS_ROUTE = `${CAMPAIGN_ROUTE}`;
+export const GET_CAMPAIGNS_FOR_MAP_ROUTE = `${CAMPAIGN_ROUTE}/map`;
+export const GET_CAMPAIGN_MAP_STATISTICS_ROUTE = `${CAMPAIGN_ROUTE}/map/statistics`;
 export const GET_CAMPAIGN_BY_ID_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}`;
 export const CREATE_CAMPAIGN_ROUTE = `${CAMPAIGN_ROUTE}`;
 export const UPDATE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}`;
