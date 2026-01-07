@@ -24,7 +24,7 @@ import {
     getCampaignUpdates,
     deleteCampaignUpdate
 } from "../controllers/CampaignUpdateController.js";
-import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { authMiddleware, optionalAuthMiddleware } from "../middlewares/authMiddleware.js";
 import { checkRole } from "../middlewares/checkRole.js";
 import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 
@@ -39,7 +39,7 @@ campaignRoutes.get('/categories/active', RateLimitMiddleware.rateLimitByIP(100, 
 campaignRoutes.get('/category', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignsByCategory);
 campaignRoutes.get('/pending', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), getPendingCampaigns);
 campaignRoutes.get('/creator', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignsByCreator);
-campaignRoutes.get('/:id', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignById);
+campaignRoutes.get('/:id', optionalAuthMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignById);
 campaignRoutes.post('/', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createCampaign);
 campaignRoutes.patch('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), updateCampaign);
 campaignRoutes.delete('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), deleteCampaign);

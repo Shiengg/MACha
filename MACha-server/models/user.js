@@ -110,7 +110,11 @@ const userSchema = mongoose.Schema({
         type: Boolean,
         default: false,
         index: true
-    }
+    },
+    recently_viewed_campaigns: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Campaign",
+    }]
 },
     {
         timestamps: true,

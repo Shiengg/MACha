@@ -170,6 +170,11 @@ export const campaignService = {
     };
   },
 
+  /**
+   * Get campaign by ID
+   * Note: If user is authenticated, this will automatically track the campaign
+   * in their recently_viewed_campaigns (max 10, maintained on server)
+   */
   async getCampaignById(id: string): Promise<Campaign> {
     const response = await apiClient.get(GET_CAMPAIGN_BY_ID_ROUTE(id));
     return response.data.campaign;

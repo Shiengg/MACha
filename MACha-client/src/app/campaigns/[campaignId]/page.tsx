@@ -109,6 +109,8 @@ function CampaignDetails() {
         const fetchCampaign = async () => {
             try {
                 setLoading(true);
+                // This will automatically track the campaign in user's recently_viewed_campaigns
+                // if user is authenticated (handled by server)
                 const data = await campaignService.getCampaignById(campaignId);
                 setCampaign(data);
             } catch (err: any) {
