@@ -100,12 +100,10 @@ const userSchema = mongoose.Schema({
         type: String,
         default: null
     },
-    onboarding_data: {
-        selected_categories: [{
-            type: String,
-            enum: ONBOARDING_CATEGORIES,
-        }]
-    },
+    interests: [{
+        type: String,
+        enum: ONBOARDING_CATEGORIES,
+    }],
     onboarding_completed: {
         type: Boolean,
         default: false,

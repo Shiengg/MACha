@@ -31,11 +31,8 @@ export default function OnboardingTopicsPage() {
   const isCompleted = useMemo(() => {
     if (!user) return false;
     if (user.onboarding_completed) return true;
-    const selectedCategories =
-      user.onboarding_data?.selected_categories ||
-      user.onboarding_data?.selectedCategories ||
-      [];
-    return Array.isArray(selectedCategories) && selectedCategories.length > 0;
+    const interests = user.interests || [];
+    return Array.isArray(interests) && interests.length > 0;
   }, [user]);
 
   useEffect(() => {
@@ -51,10 +48,7 @@ export default function OnboardingTopicsPage() {
       return;
     }
 
-    const existing =
-      user.onboarding_data?.selected_categories ||
-      user.onboarding_data?.selectedCategories ||
-      [];
+    const existing = user.interests || [];
     if (Array.isArray(existing) && existing.length > 0) {
       setSelected(existing.filter((c: string) => ALL_CATEGORY_KEYS.includes(c)));
     }

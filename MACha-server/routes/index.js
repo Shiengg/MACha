@@ -16,6 +16,7 @@ import searchRoutes from "./SearchRoute.js";
 import eventRoutes from "./EventRoute.js";
 import ownerRoutes from "./OwnerRoute.js";
 import recoveryRoutes from "./RecoveryRoute.js";
+import recommendationRoutes from "./RecommendationRoute.js";
 
 export {
     authRoutes,
@@ -36,5 +37,6 @@ export {
     searchRoutes,
     eventRoutes,
     ownerRoutes,
-    recoveryRoutes
+    recoveryRoutes,
+    recommendationRoutes
 }
