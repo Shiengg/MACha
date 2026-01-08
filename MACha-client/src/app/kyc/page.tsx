@@ -23,7 +23,8 @@ import {
   Shield,
   ArrowRight,
   ArrowLeft,
-  AlertCircle
+  AlertCircle,
+  RotateCw
 } from 'lucide-react';
 
 function KYCSubmissionContent() {
@@ -41,6 +42,10 @@ function KYCSubmissionContent() {
   const [identityBackPreview, setIdentityBackPreview] = useState<string | null>(null);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  
+  // Rotation states
+  const [identityFrontRotation, setIdentityFrontRotation] = useState(0);
+  const [selfieRotation, setSelfieRotation] = useState(0);
   
   // Camera states
   const [showCamera, setShowCamera] = useState(false);
@@ -141,11 +146,11 @@ function KYCSubmissionContent() {
     }
 
     // Validate required images
-    if (!identityFrontFile || !identityBackFile || !selfieFile) {
+    if (!identityFrontFile || !selfieFile) {
       Swal.fire({
         icon: 'error',
         title: 'Thiếu ảnh',
-        text: 'Vui lòng upload đầy đủ ảnh CCCD mặt trước, mặt sau và ảnh selfie',
+        text: 'Vui lòng upload đầy đủ ảnh CCCD mặt trước và ảnh selfie',
       });
       return;
     }
@@ -155,14 +160,16 @@ function KYCSubmissionContent() {
 
       Swal.fire({
         title: 'Đang xử lý...',
-        html: 'Đang upload ảnh và gửi yêu cầu',
+        html: 'Đang tải thông tin...',
         allowOutsideClick: false,
+        showConfirmButton: false,
+        allowEscapeKey: false,
         didOpen: () => {
           Swal.showLoading();
         },
       });
 
-      // Upload images first
+      // Upload images first to Cloudinary
       const uploadedUrls = await uploadImages();
       
       // Update formData with uploaded URLs
@@ -178,21 +185,149 @@ function KYCSubmissionContent() {
         },
       };
 
+      // Update loading message for OCR processing (keep loading, no buttons)
+      Swal.update({
+        title: 'Đang xử lý OCR...',
+        html: 'Đang nhận diện thông tin từ ảnh CCCD và xác minh<br/><small>Vui lòng đợi trong giây lát</small>',
+        showConfirmButton: false,
+        allowOutsideClick: false,
+      });
+
       const response = await apiClient.post(SUBMIT_KYC_ROUTE, finalFormData);
 
-      Swal.fire({
-        icon: 'success',
-        title: 'Gửi thành công!',
-        text: response.data.message || 'Yêu cầu KYC của bạn đã được gửi. Vui lòng đợi admin xem xét.',
-      }).then(() => {
-        router.push('/');
-      });
+      // Check if KYC was rejected due to OCR mismatch
+      if (response.data.kyc?.status === 'rejected') {
+        const rejectionReason = response.data.rejection_reason || response.data.message || 'Thông tin OCR không khớp với thông tin đã nhập';
+        
+        // Get comparison details if available
+        const verificationResult = response.data.verification_result;
+        let detailMessage = rejectionReason;
+        
+        if (verificationResult?.comparison) {
+          const { id_number, name } = verificationResult.comparison;
+          detailMessage = `<div style="text-align: left;">
+            <strong>Lý do từ chối:</strong><br/>
+            ${rejectionReason}<br/><br/>
+            ${!id_number.match ? `<strong>Số CCCD:</strong><br/>
+              - Bạn nhập: ${id_number.user_input || 'N/A'}<br/>
+              - OCR nhận diện: ${id_number.ocr_extracted || 'Không nhận diện được'}<br/><br/>
+            ` : ''}
+            ${!name.match ? `<strong>Họ tên:</strong><br/>
+              - Bạn nhập: ${name.user_input || 'N/A'}<br/>
+              - OCR nhận diện: ${name.ocr_extracted || 'Không nhận diện được'}<br/>
+            ` : ''}
+          </div>`;
+        }
+
+        Swal.fire({
+          icon: 'error',
+          title: 'KYC bị từ chối',
+          html: detailMessage,
+          confirmButtonText: 'Đã hiểu',
+          confirmButtonColor: '#dc2626',
+        }).then(() => {
+          // Reload page to reset form
+          router.refresh();
+        });
+      } else {
+        // KYC is pending for admin review
+        // Close loading first
+        Swal.close();
+        
+        // Show success message with better UI
+        Swal.fire({
+          icon: 'success',
+          title: 'Gửi thành công!',
+          html: `
+            <div style="text-align: center; padding: 20px 0;">
+              <div style="margin-bottom: 20px;">
+                <div style="font-size: 18px; font-weight: 700; color: #111827; margin-bottom: 20px; line-height: 1.5;">
+                  Yêu cầu KYC của bạn đã được gửi thành công
+                </div>
+                ${response.data.verification_result?.match ? `
+                  <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border: 2px solid #10b981; border-radius: 12px; padding: 16px 20px; margin: 20px 0; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1);">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                      <svg style="width: 24px; height: 24px; color: #059669;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      <p style="color: #065f46; font-size: 15px; font-weight: 600; margin: 0;">
+                        Thông tin OCR đã được xác minh và khớp với thông tin bạn nhập
+                      </p>
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+              <div style="background: #f3f4f6; border-radius: 8px; padding: 14px; margin-top: 20px;">
+                <p style="font-size: 14px; color: #4b5563; margin: 0; line-height: 1.6;">
+                  Vui lòng chờ admin xem xét và phê duyệt yêu cầu của bạn
+                </p>
+              </div>
+            </div>
+          `,
+          confirmButtonText: 'Đã hiểu',
+          confirmButtonColor: '#2563eb',
+          width: '550px',
+          padding: '2rem',
+          customClass: {
+            popup: 'kyc-success-popup',
+            title: 'kyc-success-title',
+            htmlContainer: 'kyc-success-content',
+            confirmButton: 'kyc-success-button'
+          }
+        }).then(() => {
+          router.push('/');
+        });
+      }
     } catch (error: any) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Lỗi',
-        text: error?.response?.data?.message || error.message || 'Không thể gửi yêu cầu KYC',
-      });
+      // Handle API errors
+      const errorMessage = error?.response?.data?.message || error.message || 'Không thể gửi yêu cầu KYC';
+      const errorData = error?.response?.data;
+      
+      // Check if it's a rejection error
+      if (error?.response?.status === 400 && errorData?.kyc?.status === 'rejected') {
+        const rejectionReason = errorData.rejection_reason || errorMessage;
+        const verificationResult = errorData.verification_result;
+        
+        let detailMessage = rejectionReason;
+        if (verificationResult?.comparison) {
+          const { id_number, name } = verificationResult.comparison;
+          detailMessage = `<div style="text-align: left;">
+            <strong>Lý do từ chối:</strong><br/>
+            ${rejectionReason}<br/><br/>
+            ${!id_number.match ? `<strong>Số CCCD:</strong><br/>
+              - Bạn nhập: ${id_number.user_input || 'N/A'}<br/>
+              - OCR nhận diện: ${id_number.ocr_extracted || 'Không nhận diện được'}<br/><br/>
+            ` : ''}
+            ${!name.match ? `<strong>Họ tên:</strong><br/>
+              - Bạn nhập: ${name.user_input || 'N/A'}<br/>
+              - OCR nhận diện: ${name.ocr_extracted || 'Không nhận diện được'}<br/>
+            ` : ''}
+            <br/>
+            <small style="color: #6b7280;">
+              💡 Vui lòng kiểm tra lại thông tin bạn nhập và đảm bảo ảnh CCCD rõ ràng, không bị mờ hoặc che khuất.
+            </small>
+          </div>`;
+        }
+
+        Swal.fire({
+          icon: 'error',
+          title: 'KYC bị từ chối',
+          html: detailMessage,
+          confirmButtonText: 'Đã hiểu',
+          confirmButtonColor: '#dc2626',
+        }).then(() => {
+          router.refresh();
+        });
+      } else {
+        // Other errors
+        Swal.fire({
+          icon: 'error',
+          title: 'Lỗi',
+          text: errorMessage,
+          confirmButtonText: 'Đã hiểu',
+          confirmButtonColor: '#dc2626',
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -238,8 +373,8 @@ function KYCSubmissionContent() {
       Swal.fire('Lỗi', 'Chỉ chấp nhận file ảnh', 'error');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      Swal.fire('Lỗi', 'File quá lớn (max 5MB)', 'error');
+    if (file.size > 10 * 1024 * 1024) {
+      Swal.fire('Lỗi', 'File quá lớn (max 10MB)', 'error');
       return;
     }
 
@@ -249,6 +384,7 @@ function KYCSubmissionContent() {
 
     setIdentityFrontFile(file);
     setIdentityFrontPreview(URL.createObjectURL(file));
+    setIdentityFrontRotation(0); // Reset rotation when new file is selected
   };
 
   const handleIdentityBackChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,8 +395,8 @@ function KYCSubmissionContent() {
       Swal.fire('Lỗi', 'Chỉ chấp nhận file ảnh', 'error');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      Swal.fire('Lỗi', 'File quá lớn (max 5MB)', 'error');
+    if (file.size > 10 * 1024 * 1024) {
+      Swal.fire('Lỗi', 'File quá lớn (max 10MB)', 'error');
       return;
     }
 
@@ -379,8 +515,113 @@ function KYCSubmissionContent() {
 
       setSelfieFile(file);
       setSelfiePreview(URL.createObjectURL(blob));
+      setSelfieRotation(0); // Reset rotation when new selfie is captured
       stopCamera();
     }, 'image/jpeg', 0.9);
+  };
+
+  // Rotate image function
+  const rotateImage = async (
+    imageUrl: string, 
+    currentRotation: number,
+    setRotation: (angle: number) => void,
+    setFile: (file: File) => void,
+    setPreview: (url: string) => void
+  ): Promise<void> => {
+    const newRotation = (currentRotation + 90) % 360;
+    
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+
+        // Calculate new canvas dimensions based on rotation
+        if (newRotation === 90 || newRotation === 270) {
+          canvas.width = img.height;
+          canvas.height = img.width;
+        } else {
+          canvas.width = img.width;
+          canvas.height = img.height;
+        }
+
+        // Rotate and draw image
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((newRotation * Math.PI) / 180);
+        ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+        // Convert to blob and create file
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Failed to create blob'));
+            return;
+          }
+
+          const file = new File([blob], `image_rotated_${newRotation}.jpg`, { type: 'image/jpeg' });
+          const newPreviewUrl = URL.createObjectURL(blob);
+
+          // Update states
+          setRotation(newRotation);
+          setFile(file);
+          setPreview(newPreviewUrl);
+
+          // Cleanup old preview
+          if (imageUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(imageUrl);
+          }
+
+          resolve();
+        }, 'image/jpeg', 0.9);
+      };
+
+      img.onerror = () => {
+        reject(new Error('Failed to load image'));
+      };
+
+      img.src = imageUrl;
+    });
+  };
+
+  // Rotate handlers
+  const handleRotateIdentityFront = async () => {
+    if (!identityFrontPreview || !identityFrontFile) return;
+    
+    try {
+      await rotateImage(
+        identityFrontPreview,
+        identityFrontRotation,
+        setIdentityFrontRotation,
+        setIdentityFrontFile,
+        setIdentityFrontPreview
+      );
+    } catch (error) {
+      console.error('Error rotating image:', error);
+      Swal.fire('Lỗi', 'Không thể xoay ảnh', 'error');
+    }
+  };
+
+  const handleRotateSelfie = async () => {
+    if (!selfiePreview || !selfieFile) return;
+    
+    try {
+      await rotateImage(
+        selfiePreview,
+        selfieRotation,
+        setSelfieRotation,
+        setSelfieFile,
+        setSelfiePreview
+      );
+    } catch (error) {
+      console.error('Error rotating selfie:', error);
+      Swal.fire('Lỗi', 'Không thể xoay ảnh', 'error');
+    }
   };
 
   // Set video srcObject when camera stream is available
@@ -408,7 +649,6 @@ function KYCSubmissionContent() {
   // Upload images to Cloudinary
   const uploadImages = async (): Promise<{
     identity_front_url?: string;
-    identity_back_url?: string;
     selfie_url?: string;
   }> => {
     setUploading(true);
@@ -419,15 +659,6 @@ function KYCSubmissionContent() {
         uploadPromises.push(
           cloudinaryService.uploadImage(identityFrontFile, 'kyc').then(result => ({
             type: 'identity_front',
-            url: result.secure_url,
-          }))
-        );
-      }
-
-      if (identityBackFile) {
-        uploadPromises.push(
-          cloudinaryService.uploadImage(identityBackFile, 'kyc').then(result => ({
-            type: 'identity_back',
             url: result.secure_url,
           }))
         );
@@ -446,15 +677,12 @@ function KYCSubmissionContent() {
       
       const uploadedUrls: {
         identity_front_url?: string;
-        identity_back_url?: string;
         selfie_url?: string;
       } = {};
 
       results.forEach(result => {
         if (result.type === 'identity_front') {
           uploadedUrls.identity_front_url = result.url;
-        } else if (result.type === 'identity_back') {
-          uploadedUrls.identity_back_url = result.url;
         } else if (result.type === 'selfie') {
           uploadedUrls.selfie_url = result.url;
         }
@@ -773,7 +1001,7 @@ function KYCSubmissionContent() {
                           <p className="mb-2 text-sm text-gray-500 font-medium">
                             <span className="text-blue-600">Click để upload</span> hoặc kéo thả file
                           </p>
-                          <p className="text-xs text-gray-400">PNG, JPG, JPEG (MAX. 5MB)</p>
+                          <p className="text-xs text-gray-400">PNG, JPG, JPEG (MAX. 10MB)</p>
                         </div>
                         <input
                           type="file"
@@ -789,56 +1017,27 @@ function KYCSubmissionContent() {
                             src={identityFrontPreview}
                             alt="CCCD mặt trước"
                             className="w-full h-64 object-contain rounded-lg"
+                            style={{ transform: `rotate(${identityFrontRotation}deg)` }}
                           />
                         </div>
-                        <button
-                          type="button"
-                          onClick={removeIdentityFront}
-                          className="absolute top-6 right-6 bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-red-600 transition-all shadow-lg"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* CCCD Mặt sau */}
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-3 text-sm">
-                      Ảnh CCCD mặt sau <span className="text-red-500">*</span>
-                    </label>
-                    {!identityBackPreview ? (
-                      <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors group">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <Upload className="w-10 h-10 text-gray-400 group-hover:text-blue-600 transition-colors mb-3" />
-                          <p className="mb-2 text-sm text-gray-500 font-medium">
-                            <span className="text-blue-600">Click để upload</span> hoặc kéo thả file
-                          </p>
-                          <p className="text-xs text-gray-400">PNG, JPG, JPEG (MAX. 5MB)</p>
+                        <div className="absolute top-6 right-6 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleRotateIdentityFront}
+                            className="bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-blue-600 transition-all shadow-lg"
+                            title="Xoay ảnh 90°"
+                          >
+                            <RotateCw className="w-5 h-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={removeIdentityFront}
+                            className="bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-red-600 transition-all shadow-lg"
+                            title="Xóa ảnh"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
                         </div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleIdentityBackChange}
-                          className="hidden"
-                        />
-                      </label>
-                    ) : (
-                      <div className="relative group">
-                        <div className="border-2 border-gray-200 rounded-xl p-4 bg-gray-50">
-                          <img
-                            src={identityBackPreview}
-                            alt="CCCD mặt sau"
-                            className="w-full h-64 object-contain rounded-lg"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={removeIdentityBack}
-                          className="absolute top-6 right-6 bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-red-600 transition-all shadow-lg"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
                       </div>
                     )}
                   </div>
@@ -901,15 +1100,27 @@ function KYCSubmissionContent() {
                               src={selfiePreview}
                               alt="Selfie"
                               className="w-full h-64 object-contain rounded-lg"
+                              style={{ transform: `rotate(${selfieRotation}deg)` }}
                             />
                           </div>
-                          <button
-                            type="button"
-                            onClick={removeSelfie}
-                            className="absolute top-6 right-6 bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-red-600 transition-all shadow-lg"
-                          >
-                            <X className="w-5 h-5" />
-                          </button>
+                          <div className="absolute top-6 right-6 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={handleRotateSelfie}
+                              className="bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-blue-600 transition-all shadow-lg"
+                              title="Xoay ảnh 90°"
+                            >
+                              <RotateCw className="w-5 h-5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={removeSelfie}
+                              className="bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-red-600 transition-all shadow-lg"
+                              title="Xóa ảnh"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>

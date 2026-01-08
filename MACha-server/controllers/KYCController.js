@@ -33,10 +33,22 @@ export const submitKYC = async (req, res) => {
             }
         }
 
+        // Check if KYC was rejected due to OCR mismatch
+        if (result.kyc && result.kyc.status === 'rejected') {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: result.message || "KYC đã bị từ chối do thông tin không khớp.",
+                rejection_reason: result.kyc.rejection_reason,
+                kyc: result.kyc,
+                user: result.user,
+                verification_result: result.verification_result
+            });
+        }
+
         return res.status(HTTP_STATUS.OK).json({
-            message: "KYC đã được gửi thành công. Vui lòng chờ admin duyệt.",
+            message: result.message || "KYC đã được gửi thành công. Vui lòng chờ admin duyệt.",
             kyc: result.kyc,
-            user: result.user
+            user: result.user,
+            verification_result: result.verification_result
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
