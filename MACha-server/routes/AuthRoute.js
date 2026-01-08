@@ -13,7 +13,7 @@ authRoutes.post('/verify-user-account', rateLimitByIP(30, 60), AuthController.ve
 authRoutes.post('/logout', rateLimitByIP(50, 60), AuthController.logout);
 
 // Rate limit: 20 requests per 60 seconds per user
-authRoutes.get('/me', authMiddleware, rateLimitByUserId(20, 60), AuthController.getCurrentUser);
+authRoutes.get('/me', authMiddleware, AuthController.getCurrentUser);
 authRoutes.get('/:id', authMiddleware, rateLimitByUserId(20, 60), AuthController.getUserById);
 authRoutes.patch('/:id', authMiddleware, rateLimitByUserId(10, 60), checkRole("user", "admin"), AuthController.updateUser)
 authRoutes.patch('/:id/onboarding', authMiddleware, rateLimitByUserId(10, 60), checkRole("user", "admin"), AuthController.completeOnboarding)
