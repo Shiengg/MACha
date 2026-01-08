@@ -27,9 +27,78 @@ export const connectRedis = async () => {
     }
 }
 
-//3 Create channel
+//3. Create a single shared subscriber client (reused by all subscribers)
+// This ensures all 8 subscribers (campaign, like, notification, comment, donation, user, message, event)
+// share the same Redis connection, minimizing connection usage
+let subscriberClient = null;
+let subscriberConnectionPromise = null; // Prevent race conditions when multiple subscribers init simultaneously
+
+export const getSubscriber = async () => {
+    // Reuse existing subscriber if available and ready
+    if (subscriberClient) {
+        try {
+            // Check if connection is still alive by pinging
+            await subscriberClient.ping();
+            return subscriberClient;
+        } catch (error) {
+            // Connection is dead, reset it
+            console.warn("Subscriber connection lost, recreating...");
+            subscriberClient = null;
+            subscriberConnectionPromise = null;
+        }
+    }
+    
+    // If another subscriber is already creating a connection, wait for it
+    if (subscriberConnectionPromise) {
+        await subscriberConnectionPromise;
+        if (subscriberClient) {
+            return subscriberClient;
+        }
+    }
+    
+    // Create new subscriber only if needed (with promise to prevent race conditions)
+    subscriberConnectionPromise = (async () => {
+        try {
+            subscriberClient = redisClient.duplicate();
+            subscriberClient.on("error", (err) => console.error("Redis Subscriber Error", err));
+            await subscriberClient.connect();
+            console.log("✅ Redis subscriber connection created (shared by all subscribers)");
+            subscriberConnectionPromise = null;
+            return subscriberClient;
+        } catch (error) {
+            subscriberConnectionPromise = null;
+            throw error;
+        }
+    })();
+    
+    return await subscriberConnectionPromise;
+}
+
+// Legacy function for backward compatibility (deprecated)
 export const createSubcriber = async () => {
-    const sub = redisClient.duplicate();
-    await sub.connect();
-    return sub;
+    return getSubscriber();
+}
+
+// Cleanup function to close subscriber when server shuts down
+export const closeSubscriber = async () => {
+    if (subscriberClient) {
+        try {
+            await subscriberClient.quit();
+            console.log("✅ Redis subscriber connection closed");
+        } catch (error) {
+            console.error('Error closing Redis subscriber:', error);
+        } finally {
+            subscriberClient = null;
+            subscriberConnectionPromise = null;
+        }
+    }
+}
+
+// Get connection info for monitoring
+export const getConnectionInfo = () => {
+    return {
+        hasMainClient: !!redisClient,
+        hasSubscriberClient: !!subscriberClient,
+        totalConnections: (redisClient ? 1 : 0) + (subscriberClient ? 1 : 0)
+    };
 }

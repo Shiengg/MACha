@@ -5,6 +5,7 @@ import Hashtag from "../models/Hashtag.js";
 import Notification from "../models/notification.js";
 import Campaign from "../models/campaign.js";
 import { redisClient } from "../config/redis.js";
+import { getRecommendedCampaigns, getAnonymousRecommendations } from "./recommendation.service.js";
 
 const extractHashtags = (content_text) => {
     const hashtagsInText = content_text.match(/#\w+/g) || [];
@@ -80,6 +81,7 @@ const invalidatePostCaches = async (postId) => {
 
 /**
  * Invalidate all post list caches (for feed/pagination)
+ * This includes both old format (without userId) and new format (with userId)
  */
 export const invalidateAllPostListCaches = async () => {
     const keySet = 'posts:all:keys';
@@ -90,6 +92,11 @@ export const invalidateAllPostListCaches = async () => {
     }
 
     await redisClient.del(keySet);
+    
+    // Also invalidate any cached posts that match the pattern
+    // This handles both old format (posts:all:page:*) and new format (posts:all:user:*)
+    // Note: This is a best-effort cleanup, Redis doesn't support pattern deletion efficiently
+    // In production, you might want to use Redis SCAN for pattern matching
 };
 
 /**
@@ -149,18 +156,25 @@ export const createPost = async (userId, postData) => {
     return postWithCounts;
 };
 
+
 export const getPosts = async (userId = null, userRole = null, page = 0, limit = 20) => {
-    const postsKey = `posts:all:page:${page}:limit:${limit}`;
+    // Cache key includes userId because scoring depends on recommendations
+    const userIdStr = userId ? userId.toString() : 'anonymous';
+    const postsKey = `posts:all:user:${userIdStr}:page:${page}:limit:${limit}`;
+    
+    // Try to get from cache
     const cached = await redisClient.get(postsKey);
     if (cached) {
         const posts = JSON.parse(cached);
         
+        // Filter hidden posts
         const filteredPosts = posts.filter(post => {
             if (!post.is_hidden) return true;
             if (userRole === 'admin' || userRole === 'owner') return true;
             return false;
         });
 
+        // Add isLiked status if user is logged in
         if (userId) {
             const enrichedPosts = await Promise.all(
                 filteredPosts.map(async (post) => ({
@@ -174,24 +188,62 @@ export const getPosts = async (userId = null, userRole = null, page = 0, limit =
         return filteredPosts;
     }
 
+    // Build query to filter hidden posts
     const query = {};
     if (userRole !== 'admin' && userRole !== 'owner') {
         query.is_hidden = false;
     }
 
-    const posts = await Post.find(query)
-        .populate("user", "username avatar fullname")
-        .populate("hashtags", "name")
-        .populate("campaign_id", "title")
-        .skip(page * limit)
-        .limit(limit)
-        .sort({ createdAt: -1 });
+    // Step 1: Get recommended campaign IDs
+    const recommendedCampaignIds = await getRecommendedCampaignIds(userId, 50);
 
-    const postsWithCounts = await Promise.all(
-        posts.map(async (post) => await enrichPostWithMetadata(post, userId))
+    // Step 2: Get posts with counts
+    // We fetch a reasonable number of posts to calculate scores and sort
+    // For pagination, we fetch enough posts to cover multiple pages
+    // This is a trade-off: more posts = better sorting but slower query
+    const fetchLimit = Math.max(limit * 10, 500); // Fetch enough for 10 pages or at least 500 posts
+    const allPosts = await getPostsWithCounts(query, 0, fetchLimit);
+
+    // Step 3: Calculate score for each post
+    // Note: posts from getPostsWithCounts are already plain objects (from .lean())
+    const postsWithScores = allPosts.map(post => {
+        const score = calculatePostScore(post, recommendedCampaignIds);
+        
+        return {
+            ...post,
+            score,
+            likesCount: post.likesCount || 0,
+            commentsCount: post.commentsCount || 0
+        };
+    });
+
+    // Step 4: Sort by score (descending), then by createdAt (newer first) if scores are equal
+    postsWithScores.sort((a, b) => {
+        if (b.score !== a.score) {
+            return b.score - a.score;
+        }
+        // If scores are equal, newer posts come first
+        return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+    
+    // Step 5: Apply pagination after sorting
+    const paginatedPosts = postsWithScores.slice(page * limit, (page + 1) * limit);
+
+    // Step 6: Remove score field and enrich with metadata
+    const postsWithoutScore = paginatedPosts.map(({ score, ...post }) => post);
+    
+    const postsWithMetadata = await Promise.all(
+        postsWithoutScore.map(async (post) => {
+            const isLiked = userId ? await checkUserLiked(post._id, userId) : false;
+            return {
+                ...post,
+                isLiked
+            };
+        })
     );
 
-    const postsToCache = postsWithCounts.map(post => ({
+    // Step 7: Cache the results (without isLiked for user-specific data)
+    const postsToCache = postsWithMetadata.map(post => ({
         ...post,
         isLiked: false
     }));
@@ -199,7 +251,7 @@ export const getPosts = async (userId = null, userRole = null, page = 0, limit =
     await redisClient.setEx(postsKey, 120, JSON.stringify(postsToCache));
     await redisClient.sAdd('posts:all:keys', postsKey);
 
-    return postsWithCounts;
+    return postsWithMetadata;
 };
 
 export const getPostById = async (postId, userId = null, userRole = null) => {
@@ -481,6 +533,150 @@ const calculateTimePenalty = (createdAt) => {
     
     // Post > 30 ngày: trừ rất nhiều (20 điểm/ngày)
     return -395 - (diffDays - 30) * 20;
+};
+
+const calculatePostScore = (post, recommendedCampaignIds = new Set()) => {
+    let score = 0;
+
+    // 1. Campaign Boost:
+    //    - Nếu campaign thuộc recommendedCampaignIds: +1000
+    //    - Nếu có campaign nhưng KHÔNG thuộc recommendedCampaignIds: +100
+    if (post.campaign_id) {
+        let campaignIdStr = null;
+        
+        // Handle different campaign_id formats:
+        // - Populated object: { _id: ObjectId, title: "..." }
+        // - ObjectId reference: ObjectId
+        // - String: string
+        if (typeof post.campaign_id === 'object' && post.campaign_id !== null) {
+            if (post.campaign_id._id) {
+                // Populated object: { _id: ObjectId, title: "..." }
+                campaignIdStr = post.campaign_id._id.toString();
+            } else if (post.campaign_id.toString && typeof post.campaign_id.toString === 'function') {
+                // ObjectId
+                campaignIdStr = post.campaign_id.toString();
+            }
+        } else if (typeof post.campaign_id === 'string') {
+            campaignIdStr = post.campaign_id;
+        }
+        
+        if (campaignIdStr) {
+            if (recommendedCampaignIds.has(campaignIdStr)) {
+                score += 1000;
+            } else {
+                score += 100;
+            }
+        }
+    }
+
+    // 2. Engagement Score: 1 like = 5 points, 1 comment = 15 points
+    const likesCount = post.likesCount || 0;
+    const commentsCount = post.commentsCount || 0;
+    score += (likesCount * 5) + (commentsCount * 15);
+
+    // 3. Time Decay: newer posts get bonus, older posts get penalty
+    const timeAdjustment = calculateTimePenalty(post.createdAt);
+    score += timeAdjustment;
+
+    return score;
+};
+
+/**
+ * Get recommended campaign IDs as a Set for fast lookup
+ * @param {string|null} userId - User ID (null for anonymous)
+ * @param {number} limit - Maximum number of campaigns to fetch
+ * @returns {Promise<Set<string>>} Set of recommended campaign IDs
+ */
+const getRecommendedCampaignIds = async (userId = null, limit = 50) => {
+    try {
+        let result;
+        if (userId) {
+            result = await getRecommendedCampaigns(userId, limit);
+        } else {
+            result = await getAnonymousRecommendations(limit);
+        }
+
+        if (!result || !result.campaigns || result.campaigns.length === 0) {
+            return new Set();
+        }
+
+        // Extract campaign IDs and convert to Set for O(1) lookup
+        const campaignIds = result.campaigns
+            .map(campaign => campaign._id.toString())
+            .filter(Boolean);
+
+        return new Set(campaignIds);
+    } catch (error) {
+        console.error("Error getting recommended campaign IDs:", error.message);
+        // Return empty set on error - posts will still be scored without recommendation boost
+        return new Set();
+    }
+};
+
+const getPostsWithCounts = async (query, skip = 0, limit = 20) => {
+    const posts = await Post.aggregate([
+        { $match: query },
+        {
+            $lookup: {
+                from: "likes",
+                localField: "_id",
+                foreignField: "post",
+                as: "likes"
+            }
+        },
+        {
+            $lookup: {
+                from: "comments",
+                localField: "_id",
+                foreignField: "post",
+                as: "comments"
+            }
+        },
+        {
+            $addFields: {
+                likesCount: { $size: "$likes" },
+                commentsCount: { $size: "$comments" }
+            }
+        },
+        {
+            $project: {
+                likes: 0,
+                comments: 0
+            }
+        },
+        { $sort: { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limit }
+    ]);
+
+    // Convert ObjectIds to proper format for population
+    // Note: aggregation returns plain objects, not Mongoose documents
+    // We need to populate manually or use Post.find with the IDs
+    const postIds = posts.map(p => p._id);
+    
+    // Fetch full posts with population
+    const fullPosts = await Post.find({ _id: { $in: postIds } })
+        .populate("user", "username avatar fullname")
+        .populate("hashtags", "name")
+        .populate("campaign_id", "title")
+        .lean();
+
+    // Map counts from aggregation results to full posts
+    const countsMap = new Map(posts.map(p => [p._id.toString(), {
+        likesCount: p.likesCount || 0,
+        commentsCount: p.commentsCount || 0
+    }]));
+
+    // Merge counts into full posts and filter out posts without user (user might be deleted)
+    const postsWithCounts = fullPosts
+        .filter(post => post.user) // Filter out posts where user is null/deleted
+        .map(post => ({
+            ...post,
+            likesCount: countsMap.get(post._id.toString())?.likesCount || 0,
+            commentsCount: countsMap.get(post._id.toString())?.commentsCount || 0
+        }));
+
+    return postsWithCounts;
 };
 
 const calculatePostRelevanceScore = (content, searchTerm, searchWords, createdAt) => {

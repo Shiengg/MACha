@@ -81,6 +81,11 @@ export default function PostCard({ post, onLike, onComment, onShare, onDonate, o
   const router = useRouter();
 
   const currentUserId = (user as any)?._id || user?.id;
+  // Add null check for post.user
+  if (!post.user) {
+    console.warn('Post missing user data:', post._id);
+    return null; // Don't render post if user is missing
+  }
   const isOwner = currentUserId === post.user._id;
 
   useEffect(() => {

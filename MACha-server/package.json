@@ -13,7 +13,9 @@
     "subscriber": "node subscribers/initSubscriber.js",
     "migrate:kyc": "node scripts/migrate-kyc-data.js",
     "migrate:kyc:dry-run": "node scripts/migrate-kyc-data.js --dry-run",
-    "migrate:kyc:cleanup": "node scripts/migrate-kyc-data.js --cleanup"
+    "migrate:kyc:cleanup": "node scripts/migrate-kyc-data.js --cleanup",
+    "seed:posts": "node scripts/seed-posts.js",
+    "seed:users": "node scripts/seed-users.js"
   },
   "keywords": [],
   "author": "",

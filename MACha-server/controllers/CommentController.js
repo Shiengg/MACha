@@ -25,6 +25,7 @@ export const addComment = async (req, res) => {
                 commentId: comment._id,
                 content_text: content_text,
                 username: req.user.username,
+                fullname: req.user.fullname,
                 avatar: req.user.avatar
             });
 

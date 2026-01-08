@@ -214,26 +214,28 @@ export default function EventDetailModal({
             </div>
 
             {/* Creator */}
-            <div className="flex items-start gap-3">
-              <User className="w-5 h-5 text-orange-500 mt-1 flex-shrink-0" />
-              <div>
-                <div className="font-medium text-gray-900 mb-1">Người tạo</div>
-                <div className="flex items-center gap-2">
-                  {event.creator.avatar && (
-                    <Image
-                      src={event.creator.avatar}
-                      alt={event.creator.username}
-                      width={24}
-                      height={24}
-                      className="rounded-full"
-                    />
-                  )}
-                  <span className="text-gray-600">
-                    {event.creator.fullname || event.creator.username}
-                  </span>
+            {event.creator && (
+              <div className="flex items-start gap-3">
+                <User className="w-5 h-5 text-orange-500 mt-1 flex-shrink-0" />
+                <div>
+                  <div className="font-medium text-gray-900 mb-1">Người tạo</div>
+                  <div className="flex items-center gap-2">
+                    {event.creator.avatar && (
+                      <Image
+                        src={event.creator.avatar}
+                        alt={event.creator.username}
+                        width={24}
+                        height={24}
+                        className="rounded-full"
+                      />
+                    )}
+                    <span className="text-gray-600">
+                      {event.creator.fullname || event.creator.username}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Approval Info */}
