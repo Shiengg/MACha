@@ -33,7 +33,10 @@ connectRedis().catch(err => {
     console.error('❌ Redis connection failed:', err.message);
 });
 
-const allowedOrigin = process.env.ORIGIN_URL?.replace(/\/$/, '') || 'http://localhost:3000';
+// Determine allowed origin based on environment
+const allowedOrigin = process.env.NODE_ENV === 'development'
+    ? (process.env.ORIGIN_URL?.replace(/\/$/, '') || 'http://localhost:3000')
+    : (process.env.ORIGIN_PROD?.replace(/\/$/, '') || 'http://localhost:3000');
 
 app.use(cors({
     origin: (origin, callback) => {
