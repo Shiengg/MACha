@@ -10,6 +10,7 @@ import RecommendedCampaignsWidget from "@/components/campaign/RecommendedCampaig
 import { getPosts, Post } from "@/services/post.service";
 import { useAuth } from "@/contexts/AuthContext";
 import { FaSync, FaUser, FaComments, FaShieldAlt, FaFileContract, FaUndo } from "react-icons/fa";
+import { Menu, X } from "lucide-react";
 import Image from "next/image";
 
 function HomeContent() {
@@ -22,6 +23,7 @@ function HomeContent() {
   const [showRefreshButton, setShowRefreshButton] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -123,8 +125,243 @@ function HomeContent() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Mobile Sidebar Drawer */}
+      <aside className={`lg:hidden fixed left-0 top-0 h-screen w-[280px] overflow-y-auto bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 z-50 transition-transform duration-300 ${
+        isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="p-4 pt-20 space-y-1">
+          {/* Close Button - Mobile Only */}
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className="lg:hidden absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {/* Profile Button */}
+          {user && (() => {
+            const userId = (user as any)?._id || (user as any)?.id;
+            const isActive = pathname === `/profile/${userId}`;
+            return (
+              <button
+                onClick={() => {
+                  if (userId) {
+                    router.push(`/profile/${userId}`);
+                    setIsSidebarOpen(false);
+                  }
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+                  isActive
+                    ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
+                }`}
+              >
+                <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-purple-400 to-pink-500 flex-shrink-0">
+                  {user.avatar ? (
+                    <Image
+                      src={user.avatar}
+                      alt={user.username || 'User avatar'}
+                      fill
+                      sizes="40px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-white font-semibold">
+                      {user.username?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                  )}
+                </div>
+                <span className={`text-lg font-semibold truncate ${
+                  isActive
+                    ? 'text-gray-900 dark:text-white'
+                    : 'text-gray-700 dark:text-gray-300'
+                }`}>
+                  {user.fullname || user.username || 'Trang cá nhân'}
+                </span>
+              </button>
+            );
+          })()}
+
+          {/* Messages Button */}
+          <button
+            onClick={() => {
+              router.push('/messages');
+              setIsSidebarOpen(false);
+            }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+              pathname === '/messages'
+                ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
+                : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
+            }`}
+          >
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
+              background: 'linear-gradient(to bottom right, #10b981, #f97316)',
+            }}>
+              <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
+                <FaComments 
+                  className="w-5 h-5"
+                  style={{
+                    color: 'transparent',
+                    background: 'linear-gradient(to bottom right, #10b981, #f97316)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                />
+              </div>
+            </div>
+            <span className={`text-lg font-semibold truncate ${
+              pathname === '/messages'
+                ? 'text-gray-900 dark:text-white'
+                : 'text-gray-700 dark:text-gray-300'
+            }`}>
+              Nhắn tin
+            </span>
+          </button>
+
+          {/* Admin Team Button */}
+          <button
+            onClick={() => {
+              router.push('/admins');
+              setIsSidebarOpen(false);
+            }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+              pathname === '/admins'
+                ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
+                : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
+            }`}
+          >
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
+              background: 'linear-gradient(to bottom right, #10b981, #f97316)',
+            }}>
+              <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
+                <FaShieldAlt 
+                  className="w-5 h-5"
+                  style={{
+                    color: 'transparent',
+                    background: 'linear-gradient(to bottom right, #10b981, #f97316)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                />
+              </div>
+            </div>
+            <span className={`text-lg font-semibold truncate ${
+              pathname === '/admins'
+                ? 'text-gray-900 dark:text-white'
+                : 'text-gray-700 dark:text-gray-300'
+            }`}>
+              Đội ngũ Admin
+            </span>
+          </button>
+
+          {/* Terms Button */}
+          <button
+            onClick={() => {
+              router.push('/terms');
+              setIsSidebarOpen(false);
+            }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+              pathname === '/terms'
+                ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
+                : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
+            }`}
+          >
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
+              background: 'linear-gradient(to bottom right, #667eea, #764ba2)',
+            }}>
+              <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
+                <FaFileContract 
+                  className="w-5 h-5"
+                  style={{
+                    color: 'transparent',
+                    background: 'linear-gradient(to bottom right, #667eea, #764ba2)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                />
+              </div>
+            </div>
+            <span className={`text-lg font-semibold truncate ${
+              pathname === '/terms'
+                ? 'text-gray-900 dark:text-white'
+                : 'text-gray-700 dark:text-gray-300'
+            }`}>
+              Điều khoản
+            </span>
+          </button>
+
+          {/* Recovery Cases Button */}
+          <button
+            onClick={() => {
+              router.push('/creator/recovery-cases');
+              setIsSidebarOpen(false);
+            }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+              pathname === '/creator/recovery-cases'
+                ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
+                : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
+            }`}
+          >
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
+              background: 'linear-gradient(to bottom right, #f97316, #ea580c)',
+            }}>
+              <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
+                <FaUndo 
+                  className="w-5 h-5"
+                  style={{
+                    color: 'transparent',
+                    background: 'linear-gradient(to bottom right, #f97316, #ea580c)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                />
+              </div>
+            </div>
+            <span className={`text-lg font-semibold truncate ${
+              pathname === '/creator/recovery-cases'
+                ? 'text-gray-900 dark:text-white'
+                : 'text-gray-700 dark:text-gray-300'
+            }`}>
+              Hoàn tiền
+            </span>
+          </button>
+
+          {/* Divider */}
+          <div className="my-4 border-t border-gray-200 dark:border-gray-700"></div>
+
+          {/* Trending Hashtags */}
+          <TrendingHashtags onHashtagClick={handleHashtagClick} />
+        </div>
+      </aside>
+
+      {/* Floating Hamburger Button - Mobile Only */}
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        className="lg:hidden fixed bottom-6 left-6 z-50 w-14 h-14 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all flex items-center justify-center"
+        aria-label="Toggle sidebar"
+      >
+        {isSidebarOpen ? (
+          <X className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+        ) : (
+          <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+        )}
+      </button>
+
       <div className="flex max-w-[1920px] mx-auto">
-        {/* Left Sidebar - Navigation Menu */}
+        {/* Left Sidebar - Navigation Menu - Desktop Only */}
         <aside className="hidden lg:block lg:w-[280px] xl:w-[360px] fixed left-0 top-0 h-screen overflow-y-auto bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
           <div className="p-4 pt-20 space-y-1">
             {/* Profile Button */}

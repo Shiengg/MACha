@@ -42,8 +42,6 @@ function KYCMethodContent() {
   const handleSelectMethod = (method: 'traditional' | 'vnpt') => {
     if (method === 'vnpt') {
       router.push('/kyc-vnpt');
-    } else {
-      router.push('/kyc');
     }
   };
 
