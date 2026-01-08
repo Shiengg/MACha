@@ -180,7 +180,7 @@ function HomeContent() {
                     </div>
                   )}
                 </div>
-                <span className={`text-lg font-semibold truncate ${
+                <span className={`text-2xl font-semibold truncate ${
                   isActive
                     ? 'text-gray-900 dark:text-white'
                     : 'text-gray-700 dark:text-gray-300'
@@ -197,29 +197,16 @@ function HomeContent() {
               router.push('/messages');
               setIsSidebarOpen(false);
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left ${
               pathname === '/messages'
                 ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
                 : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
             }`}
           >
-            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
-              background: 'linear-gradient(to bottom right, #10b981, #f97316)',
-            }}>
-              <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
-                <FaComments 
-                  className="w-5 h-5"
-                  style={{
-                    color: 'transparent',
-                    background: 'linear-gradient(to bottom right, #10b981, #f97316)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  }}
-                />
-              </div>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-white dark:bg-gray-900 shadow-sm">
+              <FaComments className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <span className={`text-lg font-semibold truncate ${
+            <span className={`text-sm font-semibold truncate ${
               pathname === '/messages'
                 ? 'text-gray-900 dark:text-white'
                 : 'text-gray-700 dark:text-gray-300'
@@ -234,29 +221,16 @@ function HomeContent() {
               router.push('/admins');
               setIsSidebarOpen(false);
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left ${
               pathname === '/admins'
                 ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
                 : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
             }`}
           >
-            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
-              background: 'linear-gradient(to bottom right, #10b981, #f97316)',
-            }}>
-              <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
-                <FaShieldAlt 
-                  className="w-5 h-5"
-                  style={{
-                    color: 'transparent',
-                    background: 'linear-gradient(to bottom right, #10b981, #f97316)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  }}
-                />
-              </div>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-white dark:bg-gray-900 shadow-sm">
+              <FaShieldAlt className="w-4 h-4 text-orange-500 dark:text-orange-400" />
             </div>
-            <span className={`text-lg font-semibold truncate ${
+            <span className={`text-sm font-semibold truncate ${
               pathname === '/admins'
                 ? 'text-gray-900 dark:text-white'
                 : 'text-gray-700 dark:text-gray-300'
@@ -271,29 +245,16 @@ function HomeContent() {
               router.push('/terms');
               setIsSidebarOpen(false);
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left ${
               pathname === '/terms'
                 ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
                 : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
             }`}
           >
-            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
-              background: 'linear-gradient(to bottom right, #667eea, #764ba2)',
-            }}>
-              <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
-                <FaFileContract 
-                  className="w-5 h-5"
-                  style={{
-                    color: 'transparent',
-                    background: 'linear-gradient(to bottom right, #667eea, #764ba2)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  }}
-                />
-              </div>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-white dark:bg-gray-900 shadow-sm">
+              <FaFileContract className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
             </div>
-            <span className={`text-lg font-semibold truncate ${
+            <span className={`text-sm font-semibold truncate ${
               pathname === '/terms'
                 ? 'text-gray-900 dark:text-white'
                 : 'text-gray-700 dark:text-gray-300'
@@ -308,29 +269,16 @@ function HomeContent() {
               router.push('/creator/recovery-cases');
               setIsSidebarOpen(false);
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left ${
               pathname === '/creator/recovery-cases'
                 ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
                 : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
             }`}
           >
-            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
-              background: 'linear-gradient(to bottom right, #f97316, #ea580c)',
-            }}>
-              <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
-                <FaUndo 
-                  className="w-5 h-5"
-                  style={{
-                    color: 'transparent',
-                    background: 'linear-gradient(to bottom right, #f97316, #ea580c)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  }}
-                />
-              </div>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-white dark:bg-gray-900 shadow-sm">
+              <FaUndo className="w-4 h-4 text-orange-500 dark:text-orange-400" />
             </div>
-            <span className={`text-lg font-semibold truncate ${
+            <span className={`text-sm font-semibold truncate ${
               pathname === '/creator/recovery-cases'
                 ? 'text-gray-900 dark:text-white'
                 : 'text-gray-700 dark:text-gray-300'
@@ -410,29 +358,25 @@ function HomeContent() {
             {/* Messages Button */}
             <button
               onClick={() => router.push('/messages')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-left ${
                 pathname === '/messages'
                   ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
                   : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
               }`}
             >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
+              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
                 background: 'linear-gradient(to bottom right, #10b981, #f97316)',
               }}>
-                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
+                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-1.5">
                   <FaComments 
-                    className="w-5 h-5"
+                    className="w-4 h-4"
                     style={{
-                      color: 'transparent',
-                      background: 'linear-gradient(to bottom right, #10b981, #f97316)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
+                      color: '#10b981',
                     }}
                   />
                 </div>
               </div>
-              <span className={`text-lg font-semibold truncate ${
+              <span className={`text-sm font-semibold truncate ${
                 pathname === '/messages'
                   ? 'text-gray-900 dark:text-white'
                   : 'text-gray-700 dark:text-gray-300'
@@ -444,29 +388,25 @@ function HomeContent() {
             {/* Admin Team Button */}
             <button
               onClick={() => router.push('/admins')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-left ${
                 pathname === '/admins'
                   ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
                   : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
               }`}
             >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
+              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
                 background: 'linear-gradient(to bottom right, #10b981, #f97316)',
               }}>
-                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
+                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-1.5">
                   <FaShieldAlt 
-                    className="w-5 h-5"
+                    className="w-4 h-4"
                     style={{
-                      color: 'transparent',
-                      background: 'linear-gradient(to bottom right, #10b981, #f97316)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
+                      color: '#10b981',
                     }}
                   />
                 </div>
               </div>
-              <span className={`text-lg font-semibold truncate ${
+              <span className={`text-sm font-semibold truncate ${
                 pathname === '/admins'
                   ? 'text-gray-900 dark:text-white'
                   : 'text-gray-700 dark:text-gray-300'
@@ -478,29 +418,25 @@ function HomeContent() {
             {/* Terms Button */}
             <button
               onClick={() => router.push('/terms')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-left ${
                 pathname === '/terms'
                   ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
                   : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
               }`}
             >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
+              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
                 background: 'linear-gradient(to bottom right, #667eea, #764ba2)',
               }}>
-                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
+                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-1.5">
                   <FaFileContract 
-                    className="w-5 h-5"
+                    className="w-4 h-4"
                     style={{
-                      color: 'transparent',
-                      background: 'linear-gradient(to bottom right, #667eea, #764ba2)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
+                      color: '#667eea',
                     }}
                   />
                 </div>
               </div>
-              <span className={`text-lg font-semibold truncate ${
+              <span className={`text-sm font-semibold truncate ${
                 pathname === '/terms'
                   ? 'text-gray-900 dark:text-white'
                   : 'text-gray-700 dark:text-gray-300'
@@ -512,29 +448,25 @@ function HomeContent() {
             {/* Recovery Cases Button */}
             <button
               onClick={() => router.push('/creator/recovery-cases')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-left ${
                 pathname === '/creator/recovery-cases'
                   ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
                   : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium'
               }`}
             >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
+              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{
                 background: 'linear-gradient(to bottom right, #f97316, #ea580c)',
               }}>
-                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-2">
+                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 flex items-center justify-center p-1.5">
                   <FaUndo 
-                    className="w-5 h-5"
+                    className="w-4 h-4"
                     style={{
-                      color: 'transparent',
-                      background: 'linear-gradient(to bottom right, #f97316, #ea580c)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
+                      color: '#f97316',
                     }}
                   />
                 </div>
               </div>
-              <span className={`text-lg font-semibold truncate ${
+              <span className={`text-sm font-semibold truncate ${
                 pathname === '/creator/recovery-cases'
                   ? 'text-gray-900 dark:text-white'
                   : 'text-gray-700 dark:text-gray-300'
