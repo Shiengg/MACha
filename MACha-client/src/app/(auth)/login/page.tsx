@@ -14,7 +14,7 @@ import PublicRoute from '@/components/guards/PublicRoute';
 import { Suspense } from 'react';
 
 function LoginPageContent() {
-  const { login, user } = useAuth();
+  const { login, user, setUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -35,7 +35,21 @@ function LoginPageContent() {
         { withCredentials: true }
       );
       if (res.data.success || res.data.user?.id) {
-        await login();
+        // Set user state directly from login response to avoid race condition
+        if (res.data.user && setUser) {
+          setUser({
+            id: res.data.user.id,
+            _id: res.data.user.id,
+            ...res.data.user
+          });
+        }
+        
+        // Small delay to ensure cookie is set before redirect
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Fetch full user data in background (non-blocking) to sync with server
+        login().catch(err => console.error('Background user fetch failed:', err));
+        
         Swal.fire({
           title: 'Đăng nhập thành công!',
           text: 'Bạn đã đăng nhập thành công',
