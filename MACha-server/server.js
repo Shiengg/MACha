@@ -111,7 +111,7 @@ io.use(async (socket, next) => {
         socket.userId = user._id.toString();
         socket.user = user;
 
-        console.log(`🔐 Socket authenticated: ${user.username} (${socket.userId})`);
+        //console.log(`🔐 Socket authenticated: ${user.username} (${socket.userId})`);
         next();
     } catch (err) {
         console.error('❌ Socket auth failed:', err.message);
@@ -124,12 +124,12 @@ io.on('connection', async (socket) => {
     const userId = socket.userId;
     const username = socket.user?.username;
 
-    console.log(`✅ Socket connected: ${socket.id} (User: ${username})`);
+    //console.log(`✅ Socket connected: ${socket.id} (User: ${username})`);
 
     if (userId) {
         const userRoom = `user:${userId}`;
         socket.join(userRoom);
-        console.log(`🏠 User ${username} joined room: ${userRoom}`);
+        //console.log(`🏠 User ${username} joined room: ${userRoom}`);
 
         socket.emit('room-joined', { room: userRoom, userId });
 
@@ -144,17 +144,17 @@ io.on('connection', async (socket) => {
     // Handle join-room event
     socket.on('join-room', (room) => {
         socket.join(room);
-        console.log(`🏠 Socket ${socket.id} joined room: ${room}`);
+        //console.log(`🏠 Socket ${socket.id} joined room: ${room}`);
     });
 
     // Handle leave-room event
     socket.on('leave-room', (room) => {
         socket.leave(room);
-        console.log(`🚪 Socket ${socket.id} left room: ${room}`);
+        //console.log(`🚪 Socket ${socket.id} left room: ${room}`);
     });
 
     socket.on('disconnect', async () => {
-        console.log(`❌ Socket disconnected: ${socket.id} (User: ${username})`);
+        //console.log(`❌ Socket disconnected: ${socket.id} (User: ${username})`);
 
         if (userId) {
             // Set user offline khi socket disconnect

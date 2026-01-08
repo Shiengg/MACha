@@ -1,6 +1,7 @@
 import KYC from "../models/kyc.js";
 import User from "../models/user.js";
 import { redisClient } from "../config/redis.js";
+import { verifyKYCWithOCR } from "./kyc-verification.service.js";
 
 // ==================== HELPER FUNCTIONS ====================
 
@@ -111,25 +112,171 @@ export const submitKYC = async (userId, kycData) => {
         }
     };
     
+    // Get documents
+    const documents = kycData.kyc_documents || kycData.documents || {};
+    const cccdImageUrl = documents.identity_front_url;
+    
+    // Perform OCR verification if CCCD image is available
+    let verificationResult = null;
+    let kycStatus = 'pending';
+    let rejectionReason = null;
+    let aiProcessingData = null;
+    
+    if (cccdImageUrl) {
+        try {
+            console.log('🔵 [KYC Service] Starting OCR verification...');
+            console.log('📋 [KYC Service] User data:');
+            console.log('  - Identity Card Number:', extractedData.identity_card_number);
+            console.log('  - Name:', extractedData.identity_verified_name);
+            console.log('  - CCCD Image URL:', cccdImageUrl);
+            
+            // Perform OCR verification
+            verificationResult = await verifyKYCWithOCR(cccdImageUrl, {
+                identity_card_number: extractedData.identity_card_number,
+                identity_verified_name: extractedData.identity_verified_name
+            });
+            
+            console.log('📊 [KYC Service] Verification result:', verificationResult.success ? 'SUCCESS' : 'FAILED');
+            console.log('📦 [KYC Service] Full verification result:', JSON.stringify(verificationResult, null, 2));
+            
+            if (verificationResult.success) {
+                // Update extracted data with OCR results if available
+                if (verificationResult.ocr_data) {
+                    // Parse date_of_birth from OCR (FPT AI returns "DD/MM/YYYY" format)
+                    const ocrDob = verificationResult.ocr_data.date_of_birth;
+                    if (ocrDob) {
+                        try {
+                            // Parse "DD/MM/YYYY" format to Date
+                            const [day, month, year] = ocrDob.split('/');
+                            if (day && month && year) {
+                                extractedData.date_of_birth = new Date(`${year}-${month}-${day}`);
+                            }
+                        } catch (error) {
+                            console.warn('⚠️ [KYC Service] Failed to parse date_of_birth:', ocrDob, error);
+                        }
+                    }
+                    
+                    // Parse address from OCR (FPT AI returns address as string, but model expects Object)
+                    const ocrAddress = verificationResult.ocr_data.address;
+                    if (ocrAddress) {
+                        // FPT AI also provides address_entities with structured data
+                        const addressEntities = verificationResult.ocr_data.address_entities;
+                        if (addressEntities) {
+                            extractedData.address = {
+                                city: addressEntities.province || extractedData.address?.city || '',
+                                district: addressEntities.district || extractedData.address?.district || '',
+                                full_address: ocrAddress || extractedData.address?.full_address || ''
+                            };
+                        } else {
+                            // Fallback: parse from string format "street, ward, district, province"
+                            // For now, put the full address in full_address field
+                            extractedData.address = {
+                                ...(extractedData.address || {}),
+                                full_address: ocrAddress,
+                                city: extractedData.address?.city || '',
+                                district: extractedData.address?.district || ''
+                            };
+                        }
+                    }
+                }
+                
+                // Set AI processing data
+                aiProcessingData = {
+                    model_version: 'FPT-AI-OCR',
+                    processing_method: 'ai_auto',
+                    confidence_scores: {
+                        identity_match: verificationResult.comparison?.id_number?.confidence || 0,
+                        face_match: 0, // Not available from OCR
+                        document_validity: verificationResult.confidence || 0,
+                        overall_confidence: verificationResult.confidence || 0
+                    },
+                    extracted_fields: verificationResult.ocr_data,
+                    ai_notes: verificationResult.match 
+                        ? 'Thông tin OCR khớp với thông tin người dùng nhập' 
+                        : 'Thông tin OCR không khớp với thông tin người dùng nhập'
+                };
+                
+                // Determine status based on verification result
+                if (verificationResult.match) {
+                    // Information matches - set to pending for admin review
+                    kycStatus = 'pending';
+                } else {
+                    // Information doesn't match - reject automatically
+                    kycStatus = 'rejected';
+                    rejectionReason = verificationResult.rejection_reason || 'Thông tin OCR không khớp với thông tin đã nhập';
+                }
+            } else {
+                // OCR failed, but still process the KYC as pending for manual review
+                console.warn('OCR verification failed, setting KYC to pending for manual review:', verificationResult.error);
+                kycStatus = 'pending';
+                aiProcessingData = {
+                    model_version: 'FPT-AI-OCR',
+                    processing_method: 'ai_manual_review',
+                    processing_errors: [{
+                        field: 'ocr_verification',
+                        error: verificationResult.message || verificationResult.error,
+                        timestamp: new Date()
+                    }],
+                    ai_notes: 'OCR verification thất bại, cần review thủ công'
+                };
+            }
+        } catch (error) {
+            // OCR error, but still process the KYC as pending for manual review
+            console.error('Error during OCR verification:', error);
+            kycStatus = 'pending';
+            aiProcessingData = {
+                model_version: 'FPT-AI-OCR',
+                processing_method: 'ai_manual_review',
+                processing_errors: [{
+                    field: 'ocr_verification',
+                    error: error.message || 'Unknown error during OCR verification',
+                    timestamp: new Date()
+                }],
+                ai_notes: 'Lỗi trong quá trình OCR verification, cần review thủ công'
+            };
+        }
+    }
+    
     // Create new KYC submission
     const kyc = await KYC.create({
         user: userId,
-        status: 'pending',
-        documents: kycData.kyc_documents || kycData.documents || {},
+        status: kycStatus,
+        documents: documents,
         extracted_data: extractedData,
+        ai_processing: aiProcessingData,
         submission_number: submissionNumber,
         previous_kyc_id: previousKYCId,
-        submitted_at: new Date()
+        submitted_at: new Date(),
+        processed_at: verificationResult ? new Date() : null,
+        ...(kycStatus === 'rejected' ? {
+            rejected_at: new Date(),
+            rejection_reason: rejectionReason
+        } : {})
     });
     
     // Update user's current KYC reference and status
     user.current_kyc_id = kyc._id;
-    user.kyc_status = 'pending';
+    // If KYC is rejected (OCR mismatch), set user status to unverified (not rejected)
+    // This allows user to retry KYC submission
+    if (kycStatus === 'rejected') {
+        user.kyc_status = 'unverified';
+    } else {
+        // For pending or verified, use the same status as KYC
+        user.kyc_status = kycStatus;
+    }
     await user.save();
     
     await invalidateKYCCaches(userId);
     
-    return { success: true, kyc, user };
+    return { 
+        success: true, 
+        kyc, 
+        user,
+        verification_result: verificationResult,
+        message: kycStatus === 'pending' 
+            ? 'KYC đã được gửi thành công. Vui lòng chờ admin duyệt.'
+            : 'KYC đã bị từ chối do thông tin không khớp.'
+    };
 };
 
 /**
@@ -310,8 +457,7 @@ export const rejectKYC = async (userId, adminId, reason) => {
     kyc.processed_at = new Date();
     await kyc.save();
     
-    // Update user status
-    user.kyc_status = 'rejected';
+    user.kyc_status = 'unverified';
     await user.save();
     
     await invalidateKYCCaches(userId);

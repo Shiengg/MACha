@@ -15,7 +15,8 @@ import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 const kycRoutes = Router();
 
 // User routes
-kycRoutes.post('/submit', authMiddleware, RateLimitMiddleware.rateLimitByIP(5, 3600), submitKYC);
+// Rate limit: 10 submissions per hour per user (more lenient for testing/retrying with image rotation)
+kycRoutes.post('/submit', authMiddleware, RateLimitMiddleware.rateLimitByUserId(10, 3600), submitKYC);
 kycRoutes.get('/status', authMiddleware, getKYCStatus);
 kycRoutes.get('/history', authMiddleware, getKYCHistory);
 kycRoutes.get('/history/:id', authMiddleware, getKYCHistory); // Admin can view any user's history
