@@ -11,11 +11,19 @@ redisClient.on("error", (err) => console.error("Redis Client Error", err));
 //2. Connect to Redis
 export const connectRedis = async () => {
     try {
+        if (!redisUrl) {
+            throw new Error("REDIS_URL environment variable is not defined");
+        }
         await redisClient.connect();
         console.log("Redis connected successfully");
     } catch (error) {
-        console.error("Failue to connect with Redis", error);
-        process.exit(1);
+        console.error("Failed to connect with Redis:", error.message);
+        // In production (Railway), throw error instead of exit to allow retries
+        if (process.env.NODE_ENV === 'production') {
+            throw error;
+        } else {
+            process.exit(1);
+        }
     }
 }
 
