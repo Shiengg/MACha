@@ -33,7 +33,7 @@ export interface Event {
     username: string;
     fullname?: string;
     avatar?: string;
-  };
+  } | null;
   title: string;
   description?: string;
   banner_image: string;

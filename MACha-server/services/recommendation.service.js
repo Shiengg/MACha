@@ -3,12 +3,7 @@ import axios from "axios";
 
 const RECOMMENDED_URL = process.env.RECOMMENDED_URL;
 
-/**
- * Get recommended campaigns for a user
- * @param {string} userId - User ID to get recommendations for
- * @param {number} limit - Number of recommendations to return (default: 10)
- * @returns {Promise<Object>} Object with campaigns array, strategy, and count
- */
+
 export const getRecommendedCampaigns = async (userId, limit = 10) => {
     try {
         // Validate inputs

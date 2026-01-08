@@ -268,8 +268,8 @@ export default function MapPage() {
       type: 'geojson',
       data: geojson as any,
       cluster: true,
-      clusterMaxZoom: 15,
-      clusterRadius: 60,
+      clusterMaxZoom: 16, // Increase max zoom so events don't cluster as much
+      clusterRadius: 50, // Smaller radius to reduce clustering
     });
 
     map.current.addLayer({
@@ -320,7 +320,7 @@ export default function MapPage() {
       },
     });
 
-    // Campaign points (red)
+    // Campaign points (red) - Add first so events appear on top
     map.current.addLayer({
       id: 'campaign-point',
       type: 'circle',
@@ -334,7 +334,8 @@ export default function MapPage() {
       },
     });
 
-    // Event points (blue/green)
+    // Event points (blue/green) - Add after campaigns to appear on top
+    // Make events more visible with larger size and different color
     map.current.addLayer({
       id: 'event-point',
       type: 'circle',
@@ -342,9 +343,10 @@ export default function MapPage() {
       filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'type'], 'event']],
       paint: {
         'circle-color': '#22c55e',
-        'circle-radius': 8,
-        'circle-stroke-width': 3,
+        'circle-radius': 10, // Larger than campaigns (10 vs 8)
+        'circle-stroke-width': 4,
         'circle-stroke-color': '#fff',
+        'circle-opacity': 1,
       },
     });
 
@@ -561,9 +563,11 @@ export default function MapPage() {
                       <h4 className="font-semibold text-sm text-gray-900 dark:text-white mb-1 line-clamp-2">
                         {event.title}
                       </h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                        {event.creator.fullname || event.creator.username}
-                      </p>
+                      {event.creator && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          {event.creator.fullname || event.creator.username}
+                        </p>
+                      )}
                       {event.location && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                           📍 {event.location.location_name}

@@ -6,7 +6,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import connectDB from './config/db.js';
-import { connectRedis } from './config/redis.js';
+import { connectRedis, closeSubscriber, getConnectionInfo } from './config/redis.js';
 import { setupSwagger } from './docs/swagger.js';
 import * as routes from './routes/index.js';
 import './jobs/cleanupUnverifiedUsers.job.js';
@@ -33,7 +33,7 @@ connectRedis().catch(err => {
     console.error('❌ Redis connection failed:', err.message);
 });
 
-const allowedOrigin = process.env.ORIGIN_PROD?.replace(/\/$/, '') || 'http://localhost:3000';
+const allowedOrigin = process.env.ORIGIN_URL?.replace(/\/$/, '') || 'http://localhost:3000';
 
 app.use(cors({
     origin: (origin, callback) => {
@@ -198,7 +198,16 @@ app.get('/health', (req, res) => {
 });
 
 // Init subscribers (pass Socket.IO instance)
-initSubscribers(io);
+initSubscribers(io).then(() => {
+    // Log connection info after all subscribers are initialized
+    const connInfo = getConnectionInfo();
+    console.log('\n📊 Redis Connection Summary:');
+    console.log(`   - Main client: ${connInfo.hasMainClient ? '✅ Connected' : '❌ Not connected'}`);
+    console.log(`   - Subscriber client: ${connInfo.hasSubscriberClient ? '✅ Connected (shared by 8 subscribers)' : '❌ Not connected'}`);
+    console.log(`   - Total connections: ${connInfo.totalConnections}/2 (optimal: 2 per server instance)\n`);
+}).catch(err => {
+    console.error('❌ Error initializing subscribers:', err);
+});
 
 // Export io để worker có thể dùng
 export { io };
@@ -228,4 +237,23 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`- Local:    ${cyan}http://localhost:${PORT}${reset}`);
     console.log(`- Time:     ${new Date().toLocaleString()}`);
     console.log('====================================================');
+});
+
+// Graceful shutdown - cleanup Redis connections
+process.on('SIGTERM', async () => {
+    console.log('🛑 SIGTERM received, closing server...');
+    await closeSubscriber();
+    server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', async () => {
+    console.log('🛑 SIGINT received, closing server...');
+    await closeSubscriber();
+    server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+    });
 });

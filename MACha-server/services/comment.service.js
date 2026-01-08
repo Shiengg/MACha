@@ -6,7 +6,7 @@ export const addComment = async (payload) => {
     await comment.save();
     
     // Populate user information
-    await comment.populate("user", "username avatar");
+    await comment.populate("user", "username avatar fullname");
     
     // Invalidate related caches
     await Promise.all([
@@ -25,7 +25,7 @@ export const getComments = async (postId) => {
     }
 
     const comments = await Comment.find({ post: postId })
-                .populate("user", "username avatar")    
+                .populate("user", "username avatar fullname")    
                 .sort({ createdAt: -1 });
 
     await redisClient.setEx(commentKey, 3600, JSON.stringify(comments));

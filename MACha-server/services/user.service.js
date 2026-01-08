@@ -293,28 +293,54 @@ export const updateUser = async (userId, updates) => {
 /**
  * Track recently viewed campaign
  * Maintains max 10 campaigns, removes duplicates, keeps newest at front
+ * Uses atomic operations to prevent race conditions
  */
 export const trackRecentlyViewedCampaign = async (userId, campaignId) => {
     try {
-        const user = await User.findById(userId);
-        if (!user) {
-            return { success: false, error: 'USER_NOT_FOUND' };
-        }
-
-        // Remove campaign if it already exists (to avoid duplicates)
-        user.recently_viewed_campaigns = user.recently_viewed_campaigns.filter(
-            id => id.toString() !== campaignId.toString()
+        // Use atomic operation to avoid race conditions with Mongoose versioning
+        // This approach:
+        // 1. Removes the campaign if it already exists (to avoid duplicates)
+        // 2. Adds it to the beginning of the array
+        // 3. Keeps only the latest 10 campaigns
+        // All in a single atomic operation
+        const result = await User.findOneAndUpdate(
+            { _id: userId },
+            [
+                // Step 1: Remove campaign if it exists, then add to front
+                {
+                    $set: {
+                        recently_viewed_campaigns: {
+                            $concatArrays: [
+                                [campaignId], // Add new campaign at front
+                                {
+                                    $filter: {
+                                        input: "$recently_viewed_campaigns",
+                                        as: "campaign",
+                                        cond: { $ne: ["$$campaign", campaignId] } // Remove duplicate
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                // Step 2: Keep only first 10 items
+                {
+                    $set: {
+                        recently_viewed_campaigns: {
+                            $slice: ["$recently_viewed_campaigns", 10]
+                        }
+                    }
+                }
+            ],
+            {
+                new: true,
+                runValidators: true
+            }
         );
 
-        // Add new campaign at the beginning
-        user.recently_viewed_campaigns.unshift(campaignId);
-
-        // Keep only the latest 10 campaigns
-        if (user.recently_viewed_campaigns.length > 10) {
-            user.recently_viewed_campaigns = user.recently_viewed_campaigns.slice(0, 10);
+        if (!result) {
+            return { success: false, error: 'USER_NOT_FOUND' };
         }
-
-        await user.save();
 
         // Invalidate user cache
         await invalidateUserCaches(userId);

@@ -124,26 +124,28 @@ export default function EventCard({ event, onClick, disableNavigation = false }:
         </div>
 
         {/* Creator Info */}
-        <div className="flex items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
-          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
-            {event.creator.avatar ? (
-              <Image
-                src={event.creator.avatar}
-                alt={event.creator.username}
-                width={32}
-                height={32}
-                className="rounded-full object-cover w-full h-full"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs font-semibold">
-                {event.creator.username?.charAt(0).toUpperCase() || 'U'}
-              </div>
-            )}
+        {event.creator && (
+          <div className="flex items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+              {event.creator.avatar ? (
+                <Image
+                  src={event.creator.avatar}
+                  alt={event.creator.username}
+                  width={32}
+                  height={32}
+                  className="rounded-full object-cover w-full h-full"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs font-semibold">
+                  {event.creator.username?.charAt(0).toUpperCase() || 'U'}
+                </div>
+              )}
+            </div>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {event.creator.fullname || event.creator.username}
+            </span>
           </div>
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            {event.creator.fullname || event.creator.username}
-          </span>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -341,7 +341,7 @@ function EventDetails() {
 
   const isPast = new Date(event.start_date) < new Date();
   const totalAttendees = (event.rsvpStats?.going.count || 0) + (event.rsvpStats?.going.guests || 0);
-  const isCreator = user && (user._id === event.creator._id || user.id === event.creator._id);
+  const isCreator = user && event.creator && (user._id === event.creator._id || user.id === event.creator._id);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -386,10 +386,12 @@ function EventDetails() {
                   {event.title}
                 </h1>
                 <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    <span>{event.creator.fullname || event.creator.username}</span>
-                  </div>
+                  {event.creator && (
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      <span>{event.creator.fullname || event.creator.username}</span>
+                    </div>
+                  )}
                   <span className="px-3 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium">
                     {getCategoryLabel(event.category)}
                   </span>

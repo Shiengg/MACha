@@ -55,6 +55,7 @@ export default function CommentModal({ postId, isOpen, onClose, onCommentAdded, 
         user: {
           _id: event.userId,
           username: event.username || 'Unknown',
+          fullname: event.fullname,
           avatar: event.avatar,
         },
         content_text: event.content_text,
@@ -190,7 +191,7 @@ export default function CommentModal({ postId, isOpen, onClose, onCommentAdded, 
                   <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1">
                       <h4 className="font-semibold text-sm text-gray-900 dark:text-white">
-                        {comment.user.username}
+                        {comment.user.fullname || comment.user.username}
                       </h4>
                       {user && (user.id === comment.user._id || user._id === comment.user._id) && (
                         <button
