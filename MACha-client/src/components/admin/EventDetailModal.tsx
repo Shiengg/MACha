@@ -190,13 +190,9 @@ export default function EventDetailModal({
               <div>
                 <div className="font-medium text-gray-900 mb-1">Địa điểm</div>
                 <div className="text-gray-600">
-                  {event.location.venue_name && (
-                    <div className="font-medium">{event.location.venue_name}</div>
+                  {event.location.location_name && (
+                    <div>{event.location.location_name}</div>
                   )}
-                  {event.location.address && <div>{event.location.address}</div>}
-                  {event.location.district && <div>{event.location.district}</div>}
-                  {event.location.city && <div>{event.location.city}</div>}
-                  {event.location.country && <div>{event.location.country}</div>}
                 </div>
               </div>
             </div>

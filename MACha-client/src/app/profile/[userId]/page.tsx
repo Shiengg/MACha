@@ -424,7 +424,7 @@ function ProfileContent() {
                     <div className="flex items-center gap-3 w-full sm:w-auto">
                       {user.kyc_status === 'unverified' && (
                         <button
-                          onClick={() => router.push('/kyc')}
+                          onClick={() => router.push('/kyc-vnpt')}
                           className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-full border border-emerald-500 text-emerald-600 text-sm font-medium bg-white hover:bg-emerald-50 shadow-sm transition-colors w-full sm:w-auto"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

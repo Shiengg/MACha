@@ -156,9 +156,10 @@ export default function NotificationDropdown() {
       {/* Bell Icon Button */}
       <button
         onClick={toggleDropdown}
-        className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+        className="relative w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all flex-shrink-0"
+        aria-label="Notifications"
       >
-        <Bell className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+        <Bell className="w-5 h-5 text-gray-700 dark:text-gray-300" />
 
         {/* Unread Badge */}
         {unreadCount > 0 && (
@@ -170,7 +171,7 @@ export default function NotificationDropdown() {
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[600px] overflow-hidden flex flex-col">
+        <div className="absolute right-0 mt-2 w-[calc(100vw-3rem)] sm:w-96 max-w-sm bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[600px] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">

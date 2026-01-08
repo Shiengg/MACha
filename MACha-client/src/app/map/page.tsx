@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { campaignService, Campaign } from '@/services/campaign.service';
+import { eventService, Event } from '@/services/event.service';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -15,7 +16,9 @@ export default function MapPage() {
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [filteredCampaigns, setFilteredCampaigns] = useState<Campaign[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,6 +27,12 @@ export default function MapPage() {
     active: 0,
     completed: 0,
     finished: 0,
+    total: 0,
+  });
+  const [eventStatistics, setEventStatistics] = useState({
+    upcoming: 0,
+    ongoing: 0,
+    completed: 0,
     total: 0,
   });
   const router = useRouter();
@@ -76,32 +85,63 @@ export default function MapPage() {
         document.head.appendChild(style);
       }
 
-      const loadCampaigns = async () => {
+      const loadData = async () => {
         try {
-          const [campaignsData, statisticsData] = await Promise.all([
+          const [campaignsData, eventsData, statisticsData] = await Promise.all([
             campaignService.getCampaignsForMap(),
+            eventService.getEventsForMap(),
             campaignService.getCampaignMapStatistics(),
           ]);
           
           setCampaigns(campaignsData);
+          setEvents(eventsData);
           setFilteredCampaigns(campaignsData);
+          setFilteredEvents(eventsData);
           setStatistics(statisticsData);
           
-          if (map.current && campaignsData.length > 0) {
-            addMarkersToMap(campaignsData);
+          // Calculate event statistics
+          const now = new Date();
+          const eventStats = {
+            upcoming: eventsData.filter(e => {
+              if (!e.start_date) return false;
+              return new Date(e.start_date) > now;
+            }).length,
+            ongoing: eventsData.filter(e => {
+              if (!e.start_date) return false;
+              const startDate = new Date(e.start_date);
+              if (startDate > now) return false; // Chưa bắt đầu
+              if (e.end_date) {
+                const endDate = new Date(e.end_date);
+                return endDate >= now; // Đang diễn ra nếu end_date >= now
+              }
+              return true; // Không có end_date thì coi như đang diễn ra nếu đã bắt đầu
+            }).length,
+            completed: eventsData.filter(e => {
+              if (e.status === 'completed' || e.status === 'cancelled') return true;
+              if (e.end_date) {
+                return new Date(e.end_date) < now;
+              }
+              return false;
+            }).length,
+            total: eventsData.length,
+          };
+          setEventStatistics(eventStats);
+          
+          if (map.current && (campaignsData.length > 0 || eventsData.length > 0)) {
+            addMarkersToMap(campaignsData, eventsData);
           }
         } catch (error) {
-          console.error('Error loading campaigns:', error);
+          console.error('Error loading data:', error);
         } finally {
           setLoading(false);
         }
       };
 
       if (map.current.loaded()) {
-        loadCampaigns();
+        loadData();
       } else {
         map.current.once('load', () => {
-          loadCampaigns();
+          loadData();
         });
       }
     }
@@ -115,84 +155,116 @@ export default function MapPage() {
   }, []);
 
   useEffect(() => {
-    let filtered = campaigns;
+    let filteredC = campaigns;
+    let filteredE = events;
 
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(c => c.category === selectedCategory);
+      filteredC = filteredC.filter(c => c.category === selectedCategory);
+      filteredE = filteredE.filter(e => e.category === selectedCategory);
     }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(c => 
+      filteredC = filteredC.filter(c => 
         c.title.toLowerCase().includes(query) ||
         c.location?.location_name.toLowerCase().includes(query)
       );
+      filteredE = filteredE.filter(e => 
+        e.title.toLowerCase().includes(query) ||
+        e.location?.location_name.toLowerCase().includes(query)
+      );
     }
 
-    setFilteredCampaigns(filtered);
+    setFilteredCampaigns(filteredC);
+    setFilteredEvents(filteredE);
     
     if (map.current && map.current.loaded() && !loading) {
       clearMarkers();
-      if (filtered.length > 0) {
-        addMarkersToMap(filtered);
+      if (filteredC.length > 0 || filteredE.length > 0) {
+        addMarkersToMap(filteredC, filteredE);
       }
     }
-  }, [selectedCategory, searchQuery, campaigns, loading]);
+  }, [selectedCategory, searchQuery, campaigns, events, loading]);
 
   const clearMarkers = () => {
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
   };
 
-  const addMarkersToMap = (campaignsToShow: Campaign[]) => {
+  const addMarkersToMap = (campaignsToShow: Campaign[], eventsToShow: Event[] = []) => {
     if (!map.current || !map.current.loaded()) {
       if (map.current) {
         map.current.once('load', () => {
-          addMarkersToMap(campaignsToShow);
+          addMarkersToMap(campaignsToShow, eventsToShow);
         });
       }
       return;
     }
 
+    const campaignFeatures = campaignsToShow
+      .filter(c => c.location?.latitude && c.location?.longitude)
+      .map(campaign => ({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [campaign.location!.longitude, campaign.location!.latitude],
+        },
+        properties: {
+          type: 'campaign',
+          id: campaign._id,
+          title: campaign.title,
+          locationName: campaign.location!.location_name,
+          progress: ((campaign.current_amount / campaign.goal_amount) * 100).toFixed(1),
+          bannerImage: campaign.banner_image,
+          category: campaign.category,
+        },
+      }));
+
+    const eventFeatures = eventsToShow
+      .filter(e => e.location?.latitude && e.location?.longitude)
+      .map(event => ({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [event.location!.longitude, event.location!.latitude],
+        },
+        properties: {
+          type: 'event',
+          id: event._id,
+          title: event.title,
+          locationName: event.location!.location_name,
+          bannerImage: event.banner_image,
+          category: event.category,
+          startDate: event.start_date,
+        },
+      }));
+
     const geojson = {
       type: 'FeatureCollection' as const,
-      features: campaignsToShow
-        .filter(c => c.location?.latitude && c.location?.longitude)
-        .map(campaign => ({
-          type: 'Feature' as const,
-          geometry: {
-            type: 'Point' as const,
-            coordinates: [campaign.location!.longitude, campaign.location!.latitude],
-          },
-          properties: {
-            campaignId: campaign._id,
-            title: campaign.title,
-            locationName: campaign.location!.location_name,
-            progress: ((campaign.current_amount / campaign.goal_amount) * 100).toFixed(1),
-            bannerImage: campaign.banner_image,
-            category: campaign.category,
-          },
-        })),
+      features: [...campaignFeatures, ...eventFeatures],
     };
 
     try {
-      if (map.current.getSource('campaigns')) {
+      if (map.current.getSource('mapPoints')) {
         if (map.current.getLayer('clusters')) {
           map.current.removeLayer('clusters');
         }
         if (map.current.getLayer('cluster-count')) {
           map.current.removeLayer('cluster-count');
         }
-        if (map.current.getLayer('unclustered-point')) {
-          map.current.removeLayer('unclustered-point');
+        if (map.current.getLayer('campaign-point')) {
+          map.current.removeLayer('campaign-point');
         }
-        map.current.removeSource('campaigns');
+        if (map.current.getLayer('event-point')) {
+          map.current.removeLayer('event-point');
+        }
+        map.current.removeSource('mapPoints');
       }
     } catch (error) {
       console.log('Error removing existing source/layers:', error);
     }
 
-    map.current.addSource('campaigns', {
+    map.current.addSource('mapPoints', {
       type: 'geojson',
       data: geojson as any,
       cluster: true,
@@ -203,7 +275,7 @@ export default function MapPage() {
     map.current.addLayer({
       id: 'clusters',
       type: 'circle',
-      source: 'campaigns',
+      source: 'mapPoints',
       filter: ['has', 'point_count'],
       paint: {
         'circle-color': '#f97316',
@@ -226,7 +298,7 @@ export default function MapPage() {
     map.current.addLayer({
       id: 'cluster-count',
       type: 'symbol',
-      source: 'campaigns',
+      source: 'mapPoints',
       filter: ['has', 'point_count'],
       layout: {
         'text-field': '{point_count}',
@@ -248,11 +320,12 @@ export default function MapPage() {
       },
     });
 
+    // Campaign points (red)
     map.current.addLayer({
-      id: 'unclustered-point',
+      id: 'campaign-point',
       type: 'circle',
-      source: 'campaigns',
-      filter: ['!', ['has', 'point_count']],
+      source: 'mapPoints',
+      filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'type'], 'campaign']],
       paint: {
         'circle-color': '#ef4444',
         'circle-radius': 8,
@@ -261,9 +334,24 @@ export default function MapPage() {
       },
     });
 
-    map.current.on('click', 'unclustered-point', (e) => {
+    // Event points (blue/green)
+    map.current.addLayer({
+      id: 'event-point',
+      type: 'circle',
+      source: 'mapPoints',
+      filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'type'], 'event']],
+      paint: {
+        'circle-color': '#22c55e',
+        'circle-radius': 8,
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#fff',
+      },
+    });
+
+    const handlePointClick = (e: any) => {
       const coordinates = (e.features![0].geometry as any).coordinates.slice();
       const props = e.features![0].properties!;
+      const isEvent = props.type === 'event';
       
       new mapboxgl.Popup({ maxWidth: '300px' })
         .setLngLat(coordinates)
@@ -282,14 +370,23 @@ export default function MapPage() {
               </svg>
               <span style="word-break: break-word;">${props.locationName}</span>
             </p>
-            <p style="font-size: 12px; margin-bottom: 12px;">
-              <strong>Tiến độ:</strong> ${props.progress}%
-            </p>
-            <a href="/campaigns/${props.campaignId}" style="display: inline-block; padding: 8px 16px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-size: 12px; text-align: center; width: 100%; box-sizing: border-box;">Xem chi tiết →</a>
+            ${isEvent ? `
+              <p style="font-size: 12px; margin-bottom: 12px;">
+                <strong>Ngày:</strong> ${new Date(props.startDate).toLocaleDateString('vi-VN')}
+              </p>
+            ` : `
+              <p style="font-size: 12px; margin-bottom: 12px;">
+                <strong>Tiến độ:</strong> ${props.progress}%
+              </p>
+            `}
+            <a href="${isEvent ? '/events' : '/campaigns'}/${props.id}" style="display: inline-block; padding: 8px 16px; background-color: ${isEvent ? '#22c55e' : '#3b82f6'}; color: white; text-decoration: none; border-radius: 6px; font-size: 12px; text-align: center; width: 100%; box-sizing: border-box;">Xem chi tiết →</a>
           </div>
         `)
         .addTo(map.current!);
-    });
+    };
+
+    map.current.on('click', 'campaign-point', handlePointClick);
+    map.current.on('click', 'event-point', handlePointClick);
 
     map.current.on('mouseenter', 'clusters', () => {
       map.current!.getCanvas().style.cursor = 'pointer';
@@ -298,10 +395,16 @@ export default function MapPage() {
       map.current!.getCanvas().style.cursor = '';
     });
 
-    map.current.on('mouseenter', 'unclustered-point', () => {
+    map.current.on('mouseenter', 'campaign-point', () => {
       map.current!.getCanvas().style.cursor = 'pointer';
     });
-    map.current.on('mouseleave', 'unclustered-point', () => {
+    map.current.on('mouseleave', 'campaign-point', () => {
+      map.current!.getCanvas().style.cursor = '';
+    });
+    map.current.on('mouseenter', 'event-point', () => {
+      map.current!.getCanvas().style.cursor = 'pointer';
+    });
+    map.current.on('mouseleave', 'event-point', () => {
       map.current!.getCanvas().style.cursor = '';
     });
   };
@@ -337,7 +440,7 @@ export default function MapPage() {
         <div className={`p-4 space-y-6 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Tìm kiếm theo tên chiến dịch, địa điểm
+              Tìm kiếm theo tên chiến dịch, sự kiện, địa điểm
             </label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -345,7 +448,7 @@ export default function MapPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Nhập tên chiến dịch hoặc địa điểm..."
+                placeholder="Nhập tên chiến dịch, sự kiện hoặc địa điểm..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -371,10 +474,30 @@ export default function MapPage() {
             </div>
           </div>
 
-          {searchQuery.trim() && filteredCampaigns.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+              Sự kiện thiện nguyện
+            </h3>
+            <div className="space-y-3">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{eventStatistics.upcoming}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Sắp diễn ra</div>
+              </div>
+              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{eventStatistics.ongoing}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Đang diễn ra</div>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{eventStatistics.completed}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Đã kết thúc</div>
+              </div>
+            </div>
+          </div>
+
+          {searchQuery.trim() && (filteredCampaigns.length > 0 || filteredEvents.length > 0) && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                Kết quả tìm kiếm ({filteredCampaigns.length})
+                Kết quả tìm kiếm ({filteredCampaigns.length + filteredEvents.length})
               </h3>
               <div className="space-y-3 max-h-[400px] overflow-y-auto">
                 {filteredCampaigns.map((campaign) => (
@@ -421,14 +544,50 @@ export default function MapPage() {
                     </div>
                   </Link>
                 ))}
+                {filteredEvents.map((event) => (
+                  <Link
+                    key={event._id}
+                    href={`/events/${event._id}`}
+                    className="block bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                  >
+                    {event.banner_image && (
+                      <img
+                        src={event.banner_image}
+                        alt={event.title}
+                        className="w-full h-32 object-cover"
+                      />
+                    )}
+                    <div className="p-3">
+                      <h4 className="font-semibold text-sm text-gray-900 dark:text-white mb-1 line-clamp-2">
+                        {event.title}
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        {event.creator.fullname || event.creator.username}
+                      </p>
+                      {event.location && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          📍 {event.location.location_name}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded">
+                          {event.category}
+                        </span>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                          {new Date(event.start_date).toLocaleDateString('vi-VN')}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
               </div>
             </div>
           )}
 
-          {searchQuery.trim() && filteredCampaigns.length === 0 && (
+          {searchQuery.trim() && filteredCampaigns.length === 0 && filteredEvents.length === 0 && (
             <div className="text-center py-8">
               <p className="text-gray-500 dark:text-gray-400">
-                Không tìm thấy chiến dịch nào phù hợp
+                Không tìm thấy chiến dịch hoặc sự kiện nào phù hợp
               </p>
             </div>
           )}

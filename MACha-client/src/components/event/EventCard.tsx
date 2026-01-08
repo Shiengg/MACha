@@ -111,10 +111,7 @@ export default function EventCard({ event, onClick, disableNavigation = false }:
           <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
             <MapPin className="w-4 h-4 text-orange-500" />
             <span className="line-clamp-1">
-              {event.location.venue_name && `${event.location.venue_name}, `}
-              {event.location.address}
-              {event.location.district && `, ${event.location.district}`}
-              {event.location.city && `, ${event.location.city}`}
+              {event.location.location_name}
             </span>
           </div>
           

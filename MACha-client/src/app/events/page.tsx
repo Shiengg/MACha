@@ -107,7 +107,9 @@ function EventsContent() {
 
     // Filter by city
     if (selectedCity !== 'all') {
-      filtered = filtered.filter(e => e.location.city === selectedCity);
+      filtered = filtered.filter(e => 
+        e.location.location_name?.toLowerCase().includes(selectedCity.toLowerCase())
+      );
     }
 
     // Filter by search query
@@ -116,8 +118,7 @@ function EventsContent() {
       filtered = filtered.filter(e =>
         e.title.toLowerCase().includes(query) ||
         e.description?.toLowerCase().includes(query) ||
-        e.location.address?.toLowerCase().includes(query) ||
-        e.location.city?.toLowerCase().includes(query)
+        e.location.location_name?.toLowerCase().includes(query)
       );
     }
 
@@ -167,8 +168,18 @@ function EventsContent() {
     loadEvents();
   };
 
-  // Get unique cities from events
-  const cities = Array.from(new Set(events.map(e => e.location.city).filter(Boolean)));
+  // Get unique cities from events (extract from location_name or address)
+  const cities = Array.from(new Set(
+    events
+      .map(e => {
+        // Try to extract city name from location_name or address
+        const loc = e.location.location_name || '';
+        // Simple extraction: take the last part after comma or last word
+        const parts = loc.split(',').map(s => s.trim()).filter(Boolean);
+        return parts.length > 0 ? parts[parts.length - 1] : null;
+      })
+      .filter(Boolean)
+  ));
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -219,8 +230,8 @@ function EventsContent() {
               className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
             >
               <option value="all">Tất cả thành phố</option>
-              {cities.map(city => (
-                <option key={city} value={city}>{city}</option>
+              {cities.filter(city => city).map(city => (
+                <option key={city!} value={city!}>{city}</option>
               ))}
             </select>
 
