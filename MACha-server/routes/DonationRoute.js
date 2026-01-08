@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { createDonation, getDonationsByCampaign } from "../controllers/DonationController.js";
-import { initSepayPayment, sepayCallback, sepaySuccess, sepayError, sepayCancel } from "../controllers/SepayController.js";
+import { initSepayPayment, sepayCallback, sepaySuccess, sepayError, sepayCancel } from "../controllers/SePayController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 
 const donationRoutes = Router();

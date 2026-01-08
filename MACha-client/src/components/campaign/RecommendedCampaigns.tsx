@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { recommendationService, type Campaign } from '@/services/recommendation.service';
-import { toast } from 'react-hot-toast';
+import Swal from 'sweetalert2';
 
 interface RecommendedCampaignsProps {
   limit?: number;
@@ -42,7 +42,16 @@ export default function RecommendedCampaigns({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load recommendations';
       setError(errorMessage);
-      toast.error(errorMessage);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMessage,
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+      });
       console.error('Error fetching recommendations:', err);
     } finally {
       setLoading(false);
