@@ -85,21 +85,33 @@ function DiscoverContent() {
       
       // Load categories only on initial load (when page is 1)
       if (page === 1) {
-        const categoriesData = await campaignService.getActiveCategories();
-        
         // Get total count for "all" category
         const allCampaignsResult = await campaignService.getAllCampaigns(0, 1);
         const allCampaignsTotal = allCampaignsResult.total;
         
-        // Map categories with config - use count from server
+        // Get count for each category from API (if available)
+        let categoriesData: CategoryWithCount[] = [];
+        try {
+          categoriesData = await campaignService.getActiveCategories();
+        } catch (error) {
+          console.warn('Failed to load category counts:', error);
+        }
+        
+        // Create a map of category counts from API
+        const categoryCountMap = new Map<string, number>();
+        categoriesData.forEach((cat: CategoryWithCount) => {
+          categoryCountMap.set(cat.category, cat.count);
+        });
+        
+        // Build categories from config (all categories), merge with counts from API
         const mappedCategories = [
           { id: 'all', label: 'Tất cả', icon: Heart, count: allCampaignsTotal },
-          ...categoriesData.map((cat: CategoryWithCount) => {
+          ...Object.entries(categoryConfig).map(([categoryId, config]) => {
             return {
-              id: cat.category,
-              label: categoryConfig[cat.category]?.label || cat.category,
-              icon: categoryConfig[cat.category]?.icon || Heart,
-              count: cat.count
+              id: categoryId,
+              label: config.label,
+              icon: config.icon,
+              count: categoryCountMap.get(categoryId) || 0 // Use count from API, or 0 if not found
             };
           })
         ];
