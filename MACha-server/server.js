@@ -25,7 +25,7 @@ connectDB();
 setupSwagger(app);
 connectRedis();
 
-const allowedOrigin = process.env.ORIGIN_URL?.replace(/\/$/, '') || 'http://localhost:3000';
+const allowedOrigin = process.env.ORIGIN_PROD?.replace(/\/$/, '') || 'http://localhost:3000';
 
 app.use(cors({
     origin: (origin, callback) => {
