@@ -21,14 +21,24 @@ import * as onlineService from './services/online.service.js';
 const app = express();
 dotenv.config();
 
-connectDB();
+// Connect to databases with error handling
+connectDB().catch(err => {
+    console.error('❌ MongoDB connection failed:', err.message);
+    // Don't exit immediately, allow Railway to restart
+});
+
 setupSwagger(app);
-connectRedis();
+
+connectRedis().catch(err => {
+    console.error('❌ Redis connection failed:', err.message);
+    // Continue without Redis - app can still function partially
+});
 
 const allowedOrigin = process.env.ORIGIN_PROD?.replace(/\/$/, '') || 'http://localhost:3000';
 
 app.use(cors({
     origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, Postman, health checks)
         if (!origin) {
             return callback(null, true);
         }
@@ -36,6 +46,7 @@ app.use(cors({
         if (normalizedOrigin === allowedOrigin) {
             callback(null, true);
         } else {
+            console.warn(`⚠️  CORS blocked origin: ${origin}, expected: ${allowedOrigin}`);
             callback(new Error(`CORS: Origin ${origin} not allowed. Expected: ${allowedOrigin}`));
         }
     },
@@ -168,9 +179,23 @@ io.on('connection', async (socket) => {
     });
 });
 
+// Health check endpoint for Railway and monitoring
 app.get('/', (req, res) => {
-    res.send("MACha API is running");
-})
+    res.status(200).json({
+        status: 'ok',
+        message: 'MACha API is running',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
+// Dedicated health check endpoint
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString()
+    });
+});
 
 // Init subscribers (pass Socket.IO instance)
 initSubscribers(io);
@@ -179,7 +204,17 @@ initSubscribers(io);
 export { io };
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+
+// Add startup logging
+console.log('🚀 Starting MACha Server...');
+console.log('📋 Environment:', process.env.NODE_ENV || 'development');
+console.log('🔌 Port:', PORT);
+console.log('🗄️  Database URL:', process.env.DATABASE_URL ? '✓ Set' : '✗ Not set');
+console.log('🔴 Redis URL:', process.env.REDIS_URL ? '✓ Set' : '✗ Not set');
+console.log('🔑 JWT Secret:', process.env.JWT_SECRET ? '✓ Set' : '✗ Not set');
+console.log('🌐 Allowed Origin:', allowedOrigin);
+
+server.listen(PORT, '0.0.0.0', () => {
     const cyan = '\x1b[36m';
     const green = '\x1b[32m';
     const reset = '\x1b[0m';
@@ -189,6 +224,7 @@ server.listen(PORT, () => {
     console.log(`${green}${bold}⚡  SERVER IS RUNNING!${reset}`);
     console.log('====================================================');
     console.log(`- Port:     ${bold}${PORT}${reset}`);
+    console.log(`- Host:     ${bold}0.0.0.0${reset}`);
     console.log(`- Local:    ${cyan}http://localhost:${PORT}${reset}`);
     console.log(`- Time:     ${new Date().toLocaleString()}`);
     console.log('====================================================');
