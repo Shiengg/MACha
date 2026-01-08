@@ -29,9 +29,23 @@ const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-    const cookie = document.cookie;
-
-    const token = cookie.split("; ").find(row => row.startsWith("jwt="))?.split("=")[1];
+    // Priority: localStorage token > cookie token
+    // This handles cross-site cookie issues where browser blocks third-party cookies
+    let token = null;
+    
+    // Try localStorage first (for cross-site scenarios)
+    if (typeof window !== 'undefined') {
+        token = localStorage.getItem('auth_token');
+    }
+    
+    // Fallback to cookie (for same-site scenarios)
+    if (!token && typeof document !== 'undefined') {
+        const cookie = document.cookie;
+        const cookieToken = cookie.split("; ").find(row => row.startsWith("jwt="))?.split("=")[1];
+        if (cookieToken) {
+            token = cookieToken;
+        }
+    }
 
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -50,8 +64,13 @@ apiClient.interceptors.response.use(
                     const authPages = ['/login', '/register', '/forgot-password'];
                     
                     if (!authPages.includes(currentPath)) {
-                        // Xóa cookie JWT
-                        document.cookie = 'jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                        // Xóa token từ localStorage và cookie
+                        if (typeof window !== 'undefined') {
+                            localStorage.removeItem('auth_token');
+                        }
+                        if (typeof document !== 'undefined') {
+                            document.cookie = 'jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                        }
                         
                         // Redirect về login với returnUrl
                         const returnUrl = encodeURIComponent(currentPath);

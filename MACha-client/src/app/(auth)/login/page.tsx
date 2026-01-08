@@ -35,6 +35,12 @@ function LoginPageContent() {
         { withCredentials: true }
       );
       if (res.data.success || res.data.user?.id) {
+        // Store token in localStorage for cross-site cookie issues
+        // Browser may block third-party cookies, so we use localStorage as primary auth
+        if (res.data.token && typeof window !== 'undefined') {
+          localStorage.setItem('auth_token', res.data.token);
+        }
+        
         // Set user state directly from login response to avoid race condition
         if (res.data.user && setUser) {
           setUser({
@@ -44,23 +50,15 @@ function LoginPageContent() {
           });
         }
         
-        // Wait for cookie to be set and verify it's available
-        // In production, cookies may take a moment to be set by the browser
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Verify cookie is set before proceeding
-        const cookieSet = document.cookie.includes('jwt=');
-        if (!cookieSet) {
-          console.warn('⚠️ Cookie not set after login, retrying...');
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
-        
         // Fetch full user data to ensure authentication is working
         try {
           await login();
         } catch (err) {
           console.error('Failed to verify login:', err);
-          // Don't block redirect if this fails, cookie might still be set
+          // If this fails, token might be invalid - clear it
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('auth_token');
+          }
         }
         
         Swal.fire({

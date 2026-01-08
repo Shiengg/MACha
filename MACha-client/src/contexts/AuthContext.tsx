@@ -88,11 +88,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const logout = async () => {
         try {
             await apiClient.post(LOGOUT_ROUTE, {}, { withCredentials: true });
-            setUser(null);
         } catch (error) {
             console.error("Logout failed:", error);
-            // Even if the API call fails, clear the user locally
+        } finally {
+            // Always clear user and token, even if API call fails
             setUser(null);
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('auth_token');
+            }
         }
     }
 

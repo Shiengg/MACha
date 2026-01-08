@@ -121,11 +121,13 @@ export const verifyUserAccount = async (req, res) => {
             user.is_verified = true;
         }
 
-        res.cookie("jwt", createToken(user._id, user.username, user.role, user.fullname), getCookieOptions());
+        const token = createToken(user._id, user.username, user.role, user.fullname);
+        res.cookie("jwt", token, getCookieOptions());
 
         return res.status(HTTP_STATUS.OK).json({
             success: true,
             message: "Tài khoản đã được xác thực thành công.",
+            token: token, // Return token for cross-site cookie issues
             user: {
                 id: user._id,
                 username: user.username,
@@ -224,6 +226,8 @@ export const login = async (req, res) => {
         res.cookie("jwt", token, cookieOptions);
 
         return res.status(HTTP_STATUS.OK).json({
+            success: true,
+            token: token, // Return token in response for cross-site cookie issues
             user: {
                 id: user._id,
                 username: user.username,
