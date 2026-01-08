@@ -6,6 +6,7 @@ import ProtectedRoute from "@/components/guards/ProtectedRoute";
 import PostCard from "@/components/shared/PostCard";
 import TrendingHashtags from "@/components/shared/TrendingHashtags";
 import CreatePostModal from "@/components/shared/CreatePostModal";
+import RecommendedCampaignsWidget from "@/components/campaign/RecommendedCampaignsWidget";
 import { getPosts, Post } from "@/services/post.service";
 import { useAuth } from "@/contexts/AuthContext";
 import { FaSync, FaUser, FaComments, FaShieldAlt, FaFileContract, FaUndo } from "react-icons/fa";
@@ -399,17 +400,10 @@ function HomeContent() {
         {/* Right Sidebar - Trending & Suggestions */}
         <aside className="hidden lg:block lg:w-[280px] xl:w-[360px] fixed right-0 top-0 h-screen overflow-y-auto bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700">
           <div className="p-4 pt-20 space-y-4">
+            {/* Recommended Campaigns Widget */}
+            <RecommendedCampaignsWidget limit={7} />
             
             
-            {/* Placeholder cho các widget khác */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-                Gợi ý theo dõi
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                (Sẽ làm sau)
-              </p>
-            </div>
           </div>
         </aside>
       </div>

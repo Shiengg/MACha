@@ -30,27 +30,27 @@ import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
 
 const campaignRoutes = Router();
 
-campaignRoutes.get('/', RateLimitMiddleware.rateLimitByIP(100, 60), getAllCampaigns);
-campaignRoutes.get('/map', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignsForMap);
-campaignRoutes.get('/map/statistics', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignMapStatistics);
-campaignRoutes.get('/search/hashtag', RateLimitMiddleware.rateLimitByIP(100, 60), searchCampaignsByHashtag);
-campaignRoutes.get('/search/title', RateLimitMiddleware.rateLimitByIP(100, 60), searchCampaignsByTitle);
-campaignRoutes.get('/categories/active', RateLimitMiddleware.rateLimitByIP(100, 60), getActiveCategories);
-campaignRoutes.get('/category', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignsByCategory);
-campaignRoutes.get('/pending', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), getPendingCampaigns);
-campaignRoutes.get('/creator', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignsByCreator);
-campaignRoutes.get('/:id', optionalAuthMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignById);
-campaignRoutes.post('/', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createCampaign);
-campaignRoutes.patch('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), updateCampaign);
-campaignRoutes.delete('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), deleteCampaign);
-campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), cancelCampaign);
-campaignRoutes.post('/:id/approve', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), approveCampaign);
-campaignRoutes.post('/:id/reject', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), rejectCampaign);
+campaignRoutes.get('/', optionalAuthMiddleware, RateLimitMiddleware.rateLimitByIP(100, 5), getAllCampaigns);
+campaignRoutes.get('/map', RateLimitMiddleware.rateLimitByIP(100, 5), getCampaignsForMap);
+campaignRoutes.get('/map/statistics', RateLimitMiddleware.rateLimitByIP(100,5), getCampaignMapStatistics);
+campaignRoutes.get('/search/hashtag', RateLimitMiddleware.rateLimitByIP(100, 5), searchCampaignsByHashtag);
+campaignRoutes.get('/search/title', RateLimitMiddleware.rateLimitByIP(100, 5), searchCampaignsByTitle);
+campaignRoutes.get('/categories/active', RateLimitMiddleware.rateLimitByIP(100, 5), getActiveCategories);
+campaignRoutes.get('/category', RateLimitMiddleware.rateLimitByIP(100, 5), getCampaignsByCategory);
+campaignRoutes.get('/pending', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 5), getPendingCampaigns);
+campaignRoutes.get('/creator', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 5), getCampaignsByCreator);
+campaignRoutes.get('/:id', optionalAuthMiddleware, RateLimitMiddleware.rateLimitByIP(100, 5), getCampaignById);
+campaignRoutes.post('/', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 5), createCampaign);
+campaignRoutes.patch('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 5), updateCampaign);
+campaignRoutes.delete('/:id', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 5), deleteCampaign);
+campaignRoutes.post('/:id/cancel', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 5), cancelCampaign);
+campaignRoutes.post('/:id/approve', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 5), approveCampaign);
+campaignRoutes.post('/:id/reject', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 5), rejectCampaign);
 
 // Campaign Updates routes
 campaignRoutes.post('/:campaignId/updates', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), createCampaignUpdate);
-campaignRoutes.get('/:campaignId/updates', RateLimitMiddleware.rateLimitByIP(100, 60), getCampaignUpdates);
-campaignRoutes.delete('/updates/:updateId', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), deleteCampaignUpdate);
+campaignRoutes.get('/:campaignId/updates', RateLimitMiddleware.rateLimitByIP(100, 5), getCampaignUpdates);
+campaignRoutes.delete('/updates/:updateId', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 5), deleteCampaignUpdate);
 
 // Withdrawal Requests routes
 campaignRoutes.get('/:campaignId/withdrawal-requests', RateLimitMiddleware.rateLimitByIP(100, 60), getWithdrawalRequestsByCampaign);

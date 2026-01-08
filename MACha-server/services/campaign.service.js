@@ -3,7 +3,25 @@ import Hashtag from "../models/Hashtag.js";
 import { redisClient } from "../config/redis.js";
 import { geocodeLocation } from "./geocoding.service.js";
 
-export const getCampaigns = async (page = 0, limit = 20) => {
+export const getTotalCampaignsCount = async () => {
+    const totalKey = `campaigns:all:total`;
+    
+    // Check cache first
+    const cachedTotal = await redisClient.get(totalKey);
+    if (cachedTotal) {
+        return parseInt(cachedTotal);
+    }
+    
+    // Cache miss - Query database
+    const total = await Campaign.countDocuments();
+    
+    // Cache for 5 minutes
+    await redisClient.setEx(totalKey, 300, total.toString());
+    
+    return total;
+}
+
+export const getCampaigns = async (page = 0, limit = 20, userId = null) => {
     const campaignKey = `campaigns:all:page:${page}:limit:${limit}`;
     const totalKey = `campaigns:all:total`;
 

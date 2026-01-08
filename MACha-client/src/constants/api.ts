@@ -183,3 +183,7 @@ export const RECOVERY_ROUTE = "api/recovery";
 export const GET_RECOVERY_CASES_BY_CREATOR_ROUTE = `${RECOVERY_ROUTE}/creator`;
 export const GET_RECOVERY_CASE_BY_ID_ROUTE = (recoveryCaseId: string) => `${RECOVERY_ROUTE}/${recoveryCaseId}`;
 export const INIT_SEPAY_RECOVERY_PAYMENT_ROUTE = (recoveryCaseId: string) => `${RECOVERY_ROUTE}/${recoveryCaseId}/sepay/init`;
+
+export const RECOMMENDATION_ROUTE = "api/recommendations";
+export const GET_RECOMMENDED_CAMPAIGNS_ROUTE = `${RECOMMENDATION_ROUTE}`;
+export const GET_ANONYMOUS_RECOMMENDATIONS_ROUTE = `${RECOMMENDATION_ROUTE}/anonymous`;
