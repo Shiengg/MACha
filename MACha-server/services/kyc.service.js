@@ -2,8 +2,38 @@ import KYC from "../models/kyc.js";
 import User from "../models/user.js";
 import { redisClient } from "../config/redis.js";
 import { verifyKYCWithOCR } from "./kyc-verification.service.js";
+import * as vnptEKYC from "./vnpt-ekyc.service.js";
 
 // ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Parse date from VNPT format (DD/MM/YYYY) to Date object
+ */
+const parseDateFromVNPT = (dateString) => {
+    if (!dateString) return null;
+    
+    try {
+        if (dateString.includes('/')) {
+            const [day, month, year] = dateString.split('/');
+            if (day && month && year) {
+                const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+                if (!isNaN(date.valueOf())) {
+                    return date;
+                }
+            }
+        }
+        
+        const date = new Date(dateString);
+        if (!isNaN(date.valueOf())) {
+            return date;
+        }
+        
+        return null;
+    } catch (error) {
+        console.warn('⚠️ [KYC Service] Failed to parse date:', dateString, error);
+        return null;
+    }
+};
 
 /**
  * Invalidate KYC-related caches
@@ -51,6 +81,173 @@ const updateUserKYCStatus = async (userId) => {
 /**
  * Submit KYC for verification
  */
+export const submitKYCWithVNPT = async (userId, kycData) => {
+    const startTime = Date.now();
+    const user = await User.findById(userId);
+    
+    if (!user) {
+        return { success: false, error: 'USER_NOT_FOUND' };
+    }
+    
+    if (user.kyc_status === 'verified') {
+        return { success: false, error: 'ALREADY_VERIFIED' };
+    }
+    
+    if (user.kyc_status === 'pending') {
+        return { success: false, error: 'PENDING_REVIEW' };
+    }
+
+    const documents = kycData.kyc_documents || kycData.documents || {};
+    const frontImageUrl = documents.identity_front_url;
+    const backImageUrl = documents.identity_back_url;
+    const selfieUrl = documents.selfie_url;
+
+    if (!frontImageUrl) {
+        return {
+            success: false,
+            error: 'MISSING_REQUIRED_FIELDS',
+            message: 'Identity front image is required for VNPT eKYC verification'
+        };
+    }
+
+    console.log('🔵 [KYC Service - VNPT] Starting VNPT eKYC verification...');
+    
+    const vnptResult = await vnptEKYC.verifyFullKYC(frontImageUrl, backImageUrl, selfieUrl, {
+        userInput: {
+            identity_card_number: kycData.identity_card_number || kycData.extracted_data?.identity_card_number,
+            identity_verified_name: kycData.identity_verified_name || kycData.extracted_data?.identity_verified_name
+        }
+    });
+
+    console.log('📊 [KYC Service - VNPT] VNPT eKYC result:', vnptResult.success ? 'SUCCESS' : 'FAILED');
+
+    if (!vnptResult.success) {
+        return {
+            success: false,
+            error: 'VNPT_EKYC_FAILED',
+            message: vnptResult.message || 'VNPT eKYC verification failed',
+            details: vnptResult
+        };
+    }
+
+    let submissionNumber = 1;
+    let previousKYCId = null;
+    
+    if (user.current_kyc_id) {
+        const previousKYC = await KYC.findById(user.current_kyc_id);
+        if (previousKYC) {
+            submissionNumber = previousKYC.submission_number + 1;
+            previousKYCId = previousKYC._id;
+        }
+    }
+
+    const extractedData = {
+        identity_verified_name: vnptResult.extracted_data.identity_verified_name || kycData.identity_verified_name,
+        identity_card_number: vnptResult.extracted_data.identity_card_number || kycData.identity_card_number,
+        date_of_birth: parseDateFromVNPT(vnptResult.extracted_data.date_of_birth),
+        gender: vnptResult.extracted_data.gender,
+        nationality: vnptResult.extracted_data.nationality,
+        ethnicity: vnptResult.extracted_data.ethnicity,
+        religion: vnptResult.extracted_data.religion,
+        home_town: vnptResult.extracted_data.home_town,
+        issue_date: parseDateFromVNPT(vnptResult.extracted_data.issue_date),
+        issue_location: vnptResult.extracted_data.issue_location,
+        expiry_date: parseDateFromVNPT(vnptResult.extracted_data.expiry_date),
+        characteristics: vnptResult.extracted_data.characteristics,
+        mrz_code: vnptResult.extracted_data.mrz_code,
+        tax_code: kycData.tax_code || kycData.extracted_data?.tax_code,
+        address: {
+            full_address: vnptResult.extracted_data.address || kycData.address?.full_address,
+            city: kycData.address?.city || '',
+            district: kycData.address?.district || '',
+            ward: kycData.address?.ward || '',
+            address_entities: vnptResult.extracted_data.address_entities
+        },
+        bank_account: {
+            ...(kycData.bank_account || kycData.extracted_data?.bank_account || {}),
+            account_number: kycData.bank_account?.account_number || kycData.extracted_data?.bank_account?.account_number
+        }
+    };
+
+    let kycStatus = 'pending';
+    let rejectionReason = null;
+
+    if (vnptResult.recommendation === 'REJECT') {
+        kycStatus = 'rejected';
+        rejectionReason = vnptResult.mismatch_reasons?.join(', ') || 'Thông tin xác thực không khớp với dữ liệu từ VNPT eKYC';
+    } else if (vnptResult.recommendation === 'APPROVE') {
+        kycStatus = 'verified';
+    } else {
+        kycStatus = 'pending';
+    }
+
+    const processingTimeMs = Date.now() - startTime;
+
+    const aiProcessingData = {
+        provider: 'VNPT-eKYC',
+        model_version: 'VNPT-eKYC-v3',
+        processing_method: 'ai_auto',
+        confidence_scores: {
+            identity_match: vnptResult.ocr_result?.confidence || 0,
+            face_match: vnptResult.face_compare_result?.similarity || 0,
+            document_validity: vnptResult.ocr_result?.confidence || 0,
+            overall_confidence: vnptResult.confidence || 0
+        },
+        face_comparison: vnptResult.face_compare_result ? {
+            similarity: vnptResult.face_compare_result.similarity,
+            is_match: vnptResult.face_compare_result.is_match,
+            threshold: vnptResult.face_compare_result.threshold
+        } : undefined,
+        mismatch_reasons: vnptResult.mismatch_reasons || [],
+        warnings: vnptResult.warnings || [],
+        extracted_fields: vnptResult.extracted_data._raw_data,
+        ai_notes: vnptResult.recommendation === 'APPROVE' 
+            ? 'VNPT eKYC xác thực thành công tự động' 
+            : vnptResult.recommendation === 'MANUAL_REVIEW'
+            ? `VNPT eKYC yêu cầu xem xét thủ công. ${vnptResult.warnings?.length > 0 ? 'Cảnh báo: ' + vnptResult.warnings.join('; ') : ''}`
+            : `VNPT eKYC từ chối: ${vnptResult.mismatch_reasons?.join(', ')}`,
+        recommendation: vnptResult.recommendation,
+        processing_time_ms: processingTimeMs
+    };
+
+    const kyc = await KYC.create({
+        user: userId,
+        status: kycStatus,
+        documents: documents,
+        extracted_data: extractedData,
+        ai_processing: aiProcessingData,
+        submission_number: submissionNumber,
+        previous_kyc_id: previousKYCId,
+        submitted_at: new Date(),
+        processed_at: new Date(),
+        ...(kycStatus === 'verified' ? {
+            verified_at: new Date()
+        } : {}),
+        ...(kycStatus === 'rejected' ? {
+            rejected_at: new Date(),
+            rejection_reason: rejectionReason
+        } : {})
+    });
+
+    user.current_kyc_id = kyc._id;
+    user.kyc_status = kycStatus === 'rejected' ? 'unverified' : kycStatus;
+    await user.save();
+    
+    await invalidateKYCCaches(userId);
+    
+    return { 
+        success: true, 
+        kyc, 
+        user,
+        vnpt_result: vnptResult,
+        message: kycStatus === 'verified'
+            ? 'KYC đã được xác thực thành công bởi VNPT eKYC'
+            : kycStatus === 'pending' 
+            ? 'KYC đã được gửi thành công. Vui lòng chờ admin duyệt.'
+            : 'KYC đã bị từ chối do thông tin không khớp.'
+    };
+};
+
 export const submitKYC = async (userId, kycData) => {
     const user = await User.findById(userId);
     
@@ -58,12 +255,10 @@ export const submitKYC = async (userId, kycData) => {
         return { success: false, error: 'USER_NOT_FOUND' };
     }
     
-    // Check if user already has verified KYC
     if (user.kyc_status === 'verified') {
         return { success: false, error: 'ALREADY_VERIFIED' };
     }
     
-    // Check if user has pending KYC
     if (user.kyc_status === 'pending') {
         return { success: false, error: 'PENDING_REVIEW' };
     }
@@ -474,5 +669,159 @@ export const getKYCHistory = async (userId) => {
         .select('status submitted_at verified_at rejected_at rejection_reason submission_number');
     
     return kycs;
+};
+
+export const verifyDocumentQuality = async (userId, imageUrl) => {
+    try {
+        console.log('🔵 [KYC Service] Upload và kiểm tra loại giấy tờ...');
+        
+        const uploadResult = await vnptEKYC.uploadImage(imageUrl, 'quality-check', 'Kiểm tra chất lượng');
+        
+        if (!uploadResult.success) {
+            return {
+                success: false,
+                message: uploadResult.message
+            };
+        }
+
+        const classifyResult = await vnptEKYC.classifyCardType(uploadResult.hash);
+        const livenessResult = await vnptEKYC.verifyCardLiveness(uploadResult.hash);
+        
+        // STRICT MODE: Bật để chặn cứng nếu phát hiện không phải ảnh gốc
+        const STRICT_MODE = process.env.VNPT_EKYC_STRICT_MODE === 'true';
+        
+        if (STRICT_MODE && !livenessResult.is_real) {
+            return {
+                success: false,
+                card_type: classifyResult.type_name,
+                is_real: false,
+                liveness_msg: livenessResult.liveness_msg,
+                message: 'Ảnh không đạt chuẩn. VNPT phát hiện ảnh này có thể: (1) Chụp từ màn hình/thiết bị khác, (2) Là bản photocopy/scan, (3) Chụp qua lớp bảo vệ, (4) Chất lượng kém. Vui lòng chụp ảnh trực tiếp từ CCCD gốc với ánh sáng tốt.'
+            };
+        }
+        
+        // Message giải thích rõ ràng hơn
+        let message = '';
+        if (livenessResult.is_real) {
+            message = `✅ Ảnh đạt chuẩn - ${classifyResult.type_name}`;
+        } else {
+            message = `⚠️ Ảnh chưa đạt chuẩn VNPT:\n` +
+                     `• Có thể: chụp từ màn hình, photocopy, scan, hoặc chụp qua lớp nhựa\n` +
+                     `• Chi tiết: ${livenessResult.liveness_msg}\n` +
+                     `• OCR vẫn hoạt động nhưng KYC sẽ được admin xem xét thủ công`;
+        }
+        
+        return {
+            success: true,
+            card_type: classifyResult.type_name,
+            is_real: livenessResult.is_real,
+            liveness_msg: livenessResult.liveness_msg,
+            liveness_status: livenessResult.liveness,
+            message: message
+        };
+    } catch (error) {
+        console.error('❌ [KYC Service] Lỗi kiểm tra:', error);
+        return {
+            success: false,
+            error: error.message,
+            message: 'Lỗi khi kiểm tra giấy tờ'
+        };
+    }
+};
+
+export const ocrDocument = async (userId, frontImageUrl, backImageUrl = null) => {
+    try {
+        console.log('🔵 [KYC Service] Upload ảnh và thực hiện OCR...');
+        
+        const frontUpload = await vnptEKYC.uploadImage(frontImageUrl, 'cccd-front', 'OCR mặt trước');
+        if (!frontUpload.success) {
+            return {
+                success: false,
+                message: 'Upload ảnh mặt trước thất bại: ' + frontUpload.message
+            };
+        }
+
+        let backUpload = null;
+        if (backImageUrl) {
+            backUpload = await vnptEKYC.uploadImage(backImageUrl, 'cccd-back', 'OCR mặt sau');
+        }
+
+        const result = await vnptEKYC.ocrDocument(
+            frontUpload.hash,
+            backUpload?.success ? backUpload.hash : null
+        );
+        
+        if (!result.success) {
+            return {
+                success: false,
+                error: result.error,
+                message: result.message
+            };
+        }
+        
+        return {
+            success: true,
+            extracted_data: result.extracted_data,
+            confidence: result.confidence,
+            warnings: result.warnings,
+            warning_messages: result.warning_messages,
+            message: 'OCR thành công'
+        };
+    } catch (error) {
+        console.error('❌ [KYC Service] Lỗi OCR:', error);
+        return {
+            success: false,
+            error: error.message,
+            message: 'Lỗi khi thực hiện OCR'
+        };
+    }
+};
+
+export const compareFaces = async (userId, cardImage, faceImage) => {
+    try {
+        console.log('🔵 [KYC Service] Upload ảnh và so sánh khuôn mặt...');
+        
+        const cardUpload = await vnptEKYC.uploadImage(cardImage, 'card-face', 'Khuôn mặt trên giấy tờ');
+        if (!cardUpload.success) {
+            return {
+                success: false,
+                message: 'Upload ảnh giấy tờ thất bại: ' + cardUpload.message
+            };
+        }
+
+        const faceUpload = await vnptEKYC.uploadImage(faceImage, 'selfie', 'Ảnh chân dung');
+        if (!faceUpload.success) {
+            return {
+                success: false,
+                message: 'Upload ảnh chân dung thất bại: ' + faceUpload.message
+            };
+        }
+
+        const result = await vnptEKYC.compareFace(cardUpload.hash, faceUpload.hash);
+        
+        if (!result.success) {
+            return {
+                success: false,
+                error: result.error,
+                message: result.message
+            };
+        }
+        
+        return {
+            success: true,
+            similarity: result.similarity,
+            probability: result.probability,
+            is_match: result.is_match,
+            result_text: result.result,
+            message: result.result
+        };
+    } catch (error) {
+        console.error('❌ [KYC Service] Lỗi so sánh khuôn mặt:', error);
+        return {
+            success: false,
+            error: error.message,
+            message: 'Lỗi khi so sánh khuôn mặt'
+        };
+    }
 };
 

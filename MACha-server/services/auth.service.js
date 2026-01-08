@@ -34,7 +34,7 @@ export const createUser = async (payload) => {
         following: user.following,
         followers_count: user.followers_count,
         following_count: user.following_count,
-        onboarding_data: user.onboarding_data,
+        interests: user.interests,
         onboarding_completed: user.onboarding_completed,
     };
 };
@@ -131,9 +131,7 @@ export const completeOnboarding = async (userId, selectedCategories = []) => {
     );
 
     const updates = {
-        onboarding_data: {
-            selected_categories: Array.from(validSet),
-        },
+        interests: Array.from(validSet),
         onboarding_completed: true,
     };
 

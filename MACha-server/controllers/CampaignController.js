@@ -3,19 +3,47 @@ import * as escrowService from "../services/escrow.service.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
 import * as userService from "../services/user.service.js";
+import * as recommendationService from "../services/recommendation.service.js";
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 
 export const getAllCampaigns = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 0;
         const limit = parseInt(req.query.limit) || 20;
-        const result = await campaignService.getCampaigns(page, limit);
+        const userId = req.user?._id;
+        
+        if (page === 0 && userId) {
+            try {
+                const recommendationResult = await recommendationService.getRecommendedCampaigns(
+                    userId.toString(),
+                    limit
+                );
+                
+                const total = await campaignService.getTotalCampaignsCount();
+                
+                return res.status(HTTP_STATUS.OK).json({ 
+                    campaigns: recommendationResult.campaigns,
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit),
+                    isRecommended: true,
+                    strategy: recommendationResult.strategy
+                });
+            } catch (recError) {
+                console.error('Recommendation service failed, fallback to normal:', recError);
+            }
+        }
+        
+        // Các trang sau hoặc user chưa login: get bình thường
+        const result = await campaignService.getCampaigns(page, limit, userId);
         res.status(HTTP_STATUS.OK).json({ 
             campaigns: result.campaigns,
             total: result.total,
             page,
             limit,
-            totalPages: Math.ceil(result.total / limit)
+            totalPages: Math.ceil(result.total / limit),
+            isRecommended: false
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })

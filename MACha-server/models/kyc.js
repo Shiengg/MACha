@@ -31,10 +31,22 @@ const kycSchema = new mongoose.Schema({
         identity_card_last4: String,
         tax_code: String,
         date_of_birth: Date,
+        gender: String,
+        nationality: String,
+        ethnicity: String,
+        religion: String,
+        home_town: String,
+        issue_date: Date,
+        issue_location: String,
+        expiry_date: Date,
+        characteristics: String,
+        mrz_code: String,
         address: {
             city: String,
             district: String,
-            full_address: String
+            ward: String,
+            full_address: String,
+            address_entities: mongoose.Schema.Types.Mixed
         },
         bank_account: {
             bank_name: String,
@@ -46,6 +58,11 @@ const kycSchema = new mongoose.Schema({
     },
     
     ai_processing: {
+        provider: {
+            type: String,
+            enum: ["FPT-AI", "VNPT-eKYC", "Manual"],
+            default: "Manual"
+        },
         model_version: String,
         processing_method: {
             type: String,
@@ -58,6 +75,20 @@ const kycSchema = new mongoose.Schema({
             document_validity: Number,
             overall_confidence: Number
         },
+        face_comparison: {
+            similarity: Number,
+            is_match: Boolean,
+            threshold: Number
+        },
+        liveness_check: {
+            is_live: Boolean,
+            confidence: Number
+        },
+        document_quality: {
+            is_valid: Boolean,
+            quality_score: Number,
+            issues: [String]
+        },
         extracted_fields: {
             type: mongoose.Schema.Types.Mixed,
             default: null
@@ -67,7 +98,13 @@ const kycSchema = new mongoose.Schema({
             error: String,
             timestamp: Date
         }],
+        mismatch_reasons: [String],
         ai_notes: String,
+        recommendation: {
+            type: String,
+            enum: ["APPROVE", "REJECT", "MANUAL_REVIEW"],
+            default: "MANUAL_REVIEW"
+        },
         processing_time_ms: Number
     },
     

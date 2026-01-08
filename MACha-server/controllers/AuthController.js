@@ -77,7 +77,7 @@ export const signup = async (req, res) => {
                 role: user.role,
                 is_verified: user.is_verified,
                 onboarding_completed: user.onboarding_completed,
-                onboarding_data: user.onboarding_data,
+                interests: user.interests,
             }
         })
 
@@ -131,7 +131,7 @@ export const verifyUserAccount = async (req, res) => {
                 role: user.role,
                 is_verified: user.is_verified,
                 onboarding_completed: user.onboarding_completed,
-                onboarding_data: user.onboarding_data,
+                interests: user.interests,
             }
         });
     } catch (error) {
@@ -214,7 +214,7 @@ export const login = async (req, res) => {
                 username: user.username,
                 role: user.role,
                 onboarding_completed: user.onboarding_completed,
-                onboarding_data: user.onboarding_data,
+                interests: user.interests,
             }
         });
 

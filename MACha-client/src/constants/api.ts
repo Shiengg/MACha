@@ -74,9 +74,13 @@ export const GET_KYC_DETAILS_ROUTE = (userId: string) => `${KYC_ROUTE}/${userId}
 export const APPROVE_KYC_ROUTE = (userId: string) => `${KYC_ROUTE}/${userId}/approve`;
 export const REJECT_KYC_ROUTE = (userId: string) => `${KYC_ROUTE}/${userId}/reject`;
 export const SUBMIT_KYC_ROUTE = `${KYC_ROUTE}/submit`;
+export const SUBMIT_KYC_VNPT_ROUTE = `${KYC_ROUTE}/submit-vnpt`;
 export const GET_KYC_STATUS_ROUTE = `${KYC_ROUTE}/status`;
 export const GET_KYC_HISTORY_ROUTE = `${KYC_ROUTE}/history`;
 export const GET_KYC_HISTORY_BY_USER_ROUTE = (userId: string) => `${KYC_ROUTE}/history/${userId}`;
+export const VNPT_VERIFY_QUALITY_ROUTE = `${KYC_ROUTE}/vnpt/verify-quality`;
+export const VNPT_OCR_ROUTE = `${KYC_ROUTE}/vnpt/ocr`;
+export const VNPT_COMPARE_FACES_ROUTE = `${KYC_ROUTE}/vnpt/compare-faces`;
 
 export const DONATION_ROUTE = "api/donations";
 export const GET_DONATIONS_BY_CAMPAIGN_ROUTE = (campaignId: string) => `${DONATION_ROUTE}/${campaignId}/donations`;
@@ -179,3 +183,7 @@ export const RECOVERY_ROUTE = "api/recovery";
 export const GET_RECOVERY_CASES_BY_CREATOR_ROUTE = `${RECOVERY_ROUTE}/creator`;
 export const GET_RECOVERY_CASE_BY_ID_ROUTE = (recoveryCaseId: string) => `${RECOVERY_ROUTE}/${recoveryCaseId}`;
 export const INIT_SEPAY_RECOVERY_PAYMENT_ROUTE = (recoveryCaseId: string) => `${RECOVERY_ROUTE}/${recoveryCaseId}/sepay/init`;
+
+export const RECOMMENDATION_ROUTE = "api/recommendations";
+export const GET_RECOMMENDED_CAMPAIGNS_ROUTE = `${RECOMMENDATION_ROUTE}`;
+export const GET_ANONYMOUS_RECOMMENDATIONS_ROUTE = `${RECOMMENDATION_ROUTE}/anonymous`;
