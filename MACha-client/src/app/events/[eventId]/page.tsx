@@ -495,11 +495,7 @@ function EventDetails() {
                 <div>
                   <div className="font-medium text-gray-900 dark:text-white">Địa điểm</div>
                   <div className="text-gray-600 dark:text-gray-400">
-                    {event.location.venue_name && <div className="font-medium">{event.location.venue_name}</div>}
-                    {event.location.address && <div>{event.location.address}</div>}
-                    {event.location.district && <div>{event.location.district}</div>}
-                    {event.location.city && <div>{event.location.city}</div>}
-                    {event.location.country && <div>{event.location.country}</div>}
+                    {event.location.location_name && <div>{event.location.location_name}</div>}
                   </div>
                 </div>
               </div>

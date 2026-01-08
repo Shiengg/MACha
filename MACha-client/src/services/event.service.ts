@@ -9,6 +9,7 @@ import {
   GET_EVENTS_BY_CATEGORY_ROUTE,
   GET_UPCOMING_EVENTS_ROUTE,
   GET_PAST_EVENTS_ROUTE,
+  GET_EVENTS_FOR_MAP_ROUTE,
   SEARCH_EVENTS_ROUTE,
   GET_EVENTS_BY_CREATOR_ROUTE,
   GET_MY_EVENTS_ROUTE,
@@ -41,13 +42,9 @@ export interface Event {
   end_date?: string;
   timezone?: string;
   location: {
-    venue_name?: string;
-    address: string;
-    city: string;
-    district?: string;
-    country?: string;
-    latitude?: number;
-    longitude?: number;
+    location_name: string;
+    latitude: number;
+    longitude: number;
   };
   category: 'volunteering' | 'fundraising' | 'charity_event' | 'donation_drive';
   status: 'pending' | 'published' | 'rejected' | 'cancelled' | 'completed';
@@ -109,15 +106,7 @@ export interface CreateEventPayload {
   start_date: string;
   end_date?: string;
   timezone?: string;
-  location: {
-    venue_name?: string;
-    address: string;
-    city: string;
-    district?: string;
-    country?: string;
-    latitude?: number;
-    longitude?: number;
-  };
+  location_name?: string;
   category: 'volunteering' | 'fundraising' | 'charity_event' | 'donation_drive';
   status?: 'pending' | 'published' | 'rejected' | 'cancelled' | 'completed';
   capacity?: number;
@@ -132,11 +121,7 @@ export interface UpdateEventPayload {
   end_date?: string;
   timezone?: string;
   location?: {
-    venue_name?: string;
-    address?: string;
-    city?: string;
-    district?: string;
-    country?: string;
+    location_name?: string;
     latitude?: number;
     longitude?: number;
   };
@@ -193,6 +178,11 @@ export const eventService = {
 
   async getPastEvents(): Promise<Event[]> {
     const response = await apiClient.get(GET_PAST_EVENTS_ROUTE);
+    return response.data.events;
+  },
+
+  async getEventsForMap(): Promise<Event[]> {
+    const response = await apiClient.get(GET_EVENTS_FOR_MAP_ROUTE);
     return response.data.events;
   },
 

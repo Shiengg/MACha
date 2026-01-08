@@ -138,6 +138,7 @@ export const CANCEL_EVENT_ROUTE = (id: string) => `${EVENT_ROUTE}/${id}/cancel`;
 export const GET_EVENTS_BY_CATEGORY_ROUTE = `${EVENT_ROUTE}/category`;
 export const GET_UPCOMING_EVENTS_ROUTE = `${EVENT_ROUTE}/upcoming`;
 export const GET_PAST_EVENTS_ROUTE = `${EVENT_ROUTE}/past`;
+export const GET_EVENTS_FOR_MAP_ROUTE = `${EVENT_ROUTE}/map`;
 export const SEARCH_EVENTS_ROUTE = `${EVENT_ROUTE}/search`;
 export const GET_EVENTS_BY_CREATOR_ROUTE = `${EVENT_ROUTE}/creator`;
 export const GET_MY_EVENTS_ROUTE = `${EVENT_ROUTE}/my-events`;

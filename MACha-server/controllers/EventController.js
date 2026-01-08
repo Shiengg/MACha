@@ -467,3 +467,12 @@ export const getUpcomingRSVPs = async (req, res) => {
     }
 };
 
+export const getEventsForMap = async (req, res) => {
+    try {
+        const events = await eventService.getEventsForMap();
+        return res.status(HTTP_STATUS.OK).json({ events });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+

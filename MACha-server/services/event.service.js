@@ -5,6 +5,7 @@ import EventUpdate from "../models/eventUpdate.js";
 import { redisClient } from "../config/redis.js";
 import { publishEvent } from "./tracking.service.js";
 import * as queueService from "./queue.service.js";
+import { geocodeLocation } from "./geocoding.service.js";
 
 const invalidateEventCaches = async (eventId, category = null, status = null) => {
     const keys = [
@@ -12,7 +13,8 @@ const invalidateEventCaches = async (eventId, category = null, status = null) =>
         'events:all',
         'events:pending',
         'events:upcoming',
-        'events:past'
+        'events:past',
+        'events:map'
     ];
     
     if (category) {
@@ -114,10 +116,34 @@ export const getEventById = async (eventId, userId = null) => {
 };
 
 export const createEvent = async (payload) => {
-    const event = new Event(payload);
+    // Extract location_name from payload if provided
+    const { location_name, ...eventData } = payload;
+    
+    // Geocode location if location_name is provided (similar to campaign)
+    if (location_name && typeof location_name === 'string' && location_name.trim().length > 0) {
+        try {
+            const geocodeResult = await geocodeLocation(location_name);
+            if (geocodeResult) {
+                eventData.location = {
+                    location_name: location_name.trim(),
+                    latitude: geocodeResult.latitude,
+                    longitude: geocodeResult.longitude
+                };
+            } else {
+                // If geocoding fails, still create event but without location
+                console.warn(`Geocoding failed for location: ${location_name}. Creating event without location.`);
+            }
+        } catch (error) {
+            // Log error but don't fail event creation
+            console.error(`Error geocoding location "${location_name}":`, error);
+            // Continue without location data
+        }
+    }
+    
+    const event = new Event(eventData);
     await event.save();
     
-    await invalidateEventCaches(null, payload.category, payload.status);
+    await invalidateEventCaches(null, eventData.category, eventData.status);
     
     await event.populate("creator", "username fullname avatar");
     return event;
@@ -137,12 +163,36 @@ export const updateEvent = async (eventId, userId, payload) => {
         return { success: false, error: 'CANNOT_UPDATE', message: 'Cannot update completed or cancelled event' };
     }
     
+    // Extract location_name from payload if provided
+    const { location_name, ...updateData } = payload;
+    
+    // Geocode location if location_name is being updated
+    if (location_name && typeof location_name === 'string' && location_name.trim().length > 0) {
+        try {
+            const geocodeResult = await geocodeLocation(location_name);
+            if (geocodeResult) {
+                updateData.location = {
+                    location_name: location_name.trim(),
+                    latitude: geocodeResult.latitude,
+                    longitude: geocodeResult.longitude
+                };
+            } else {
+                // If geocoding fails, still update event but without location
+                console.warn(`Geocoding failed for location: ${location_name}. Updating event without location.`);
+            }
+        } catch (error) {
+            // Log error but don't fail event update
+            console.error(`Error geocoding location "${location_name}":`, error);
+            // Continue without location data
+        }
+    }
+    
     const oldCategory = event.category;
     const oldStatus = event.status;
     
     const updatedEvent = await Event.findByIdAndUpdate(
         eventId,
-        payload,
+        updateData,
         { new: true, runValidators: true }
     );
     
@@ -716,5 +766,30 @@ export const processExpiredEvents = async () => {
     }
     
     return results;
+};
+
+export const getEventsForMap = async () => {
+    const cacheKey = 'events:map';
+
+    // Check cache
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+
+    // Query events with location data and published status
+    const events = await Event.find({
+        status: 'published',
+        'location.latitude': { $exists: true, $ne: null },
+        'location.longitude': { $exists: true, $ne: null }
+    })
+        .select('title location category banner_image creator start_date end_date status')
+        .populate("creator", "username fullname avatar")
+        .lean();
+
+    // Cache for 5 minutes
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(events));
+
+    return events;
 };
 

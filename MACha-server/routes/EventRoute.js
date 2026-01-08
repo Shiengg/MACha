@@ -25,7 +25,8 @@ import {
     deleteEventUpdate,
     getMyEvents,
     getMyRSVPs,
-    getUpcomingRSVPs
+    getUpcomingRSVPs,
+    getEventsForMap
 } from "../controllers/EventController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { checkRole } from "../middlewares/checkRole.js";
@@ -38,6 +39,7 @@ eventRoutes.get('/search', RateLimitMiddleware.rateLimitByIP(100, 60), searchEve
 eventRoutes.get('/category', RateLimitMiddleware.rateLimitByIP(100, 60), getEventsByCategory);
 eventRoutes.get('/upcoming', RateLimitMiddleware.rateLimitByIP(100, 60), getUpcomingEvents);
 eventRoutes.get('/past', RateLimitMiddleware.rateLimitByIP(100, 60), getPastEvents);
+eventRoutes.get('/map', RateLimitMiddleware.rateLimitByIP(100, 5), getEventsForMap);
 eventRoutes.get('/pending', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), getPendingEvents);
 eventRoutes.get('/creator', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), getEventsByCreator);
 eventRoutes.get('/my-events', authMiddleware, RateLimitMiddleware.rateLimitByIP(100, 60), getMyEvents);

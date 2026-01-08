@@ -28,13 +28,7 @@ export default function CreateEventModal({
     start_date: '',
     end_date: '',
     timezone: 'Asia/Ho_Chi_Minh',
-    location: {
-      venue_name: '',
-      address: '',
-      city: '',
-      district: '',
-      country: 'Vietnam',
-    },
+    location_name: '',
     category: 'charity_event',
     capacity: undefined,
   });
@@ -133,13 +127,8 @@ export default function CreateEventModal({
       return;
     }
 
-    if (!formData.location.address.trim()) {
-      setError('Vui lòng nhập địa chỉ');
-      return;
-    }
-
-    if (!formData.location.city.trim()) {
-      setError('Vui lòng nhập thành phố');
+    if (!formData.location_name || !formData.location_name.trim()) {
+      setError('Vui lòng nhập vị trí sự kiện (cho bản đồ)');
       return;
     }
 
@@ -154,6 +143,7 @@ export default function CreateEventModal({
       // Create event with pending status for admin approval
       const event = await eventService.createEvent({
         ...formData,
+        location_name: formData.location_name?.trim() || undefined,
         status: 'pending',
       });
 
@@ -174,13 +164,7 @@ export default function CreateEventModal({
         start_date: '',
         end_date: '',
         timezone: 'Asia/Ho_Chi_Minh',
-        location: {
-          venue_name: '',
-          address: '',
-          city: '',
-          district: '',
-          country: 'Vietnam',
-        },
+        location_name: '',
         category: 'charity_event',
         capacity: undefined,
       });
@@ -383,62 +367,24 @@ export default function CreateEventModal({
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               <FaMapMarkerAlt className="inline mr-2" />
-              Địa điểm
+              Vị trí sự kiện (cho bản đồ) <span className="text-red-500">*</span>
             </label>
-            <div className="space-y-2">
-              <input
-                type="text"
-                placeholder="Tên địa điểm (tùy chọn)"
-                value={formData.location.venue_name}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    location: { ...formData.location, venue_name: e.target.value },
-                  })
-                }
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              />
-              <input
-                type="text"
-                placeholder="Địa chỉ *"
-                value={formData.location.address}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    location: { ...formData.location, address: e.target.value },
-                  })
-                }
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                required
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  placeholder="Quận/Huyện (tùy chọn)"
-                  value={formData.location.district}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      location: { ...formData.location, district: e.target.value },
-                    })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-                <input
-                  type="text"
-                  placeholder="Thành phố *"
-                  value={formData.location.city}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      location: { ...formData.location, city: e.target.value },
-                    })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  required
-                />
-              </div>
-            </div>
+            <input
+              type="text"
+              value={formData.location_name}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  location_name: e.target.value,
+                })
+              }
+              placeholder="VD: Hốc Môn, HCM hoặc Quận 1, TP.HCM"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              required
+            />
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Nhập tên địa điểm nơi sự kiện diễn ra. Hệ thống sẽ tự động xác định tọa độ để hiển thị trên bản đồ.
+            </p>
           </div>
 
           {/* Capacity */}

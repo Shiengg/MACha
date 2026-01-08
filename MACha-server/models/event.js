@@ -37,34 +37,17 @@ const eventSchema = new mongoose.Schema({
         default: "Asia/Ho_Chi_Minh"
     },
     location: {
-        venue_name: {
-            type: String,
-            default: null
-        },
-        address: {
+        location_name: {
             type: String,
             required: true
         },
-        city: {
-            type: String,
-            required: true,
-            index: true
-        },
-        district: {
-            type: String,
-            default: null
-        },
-        country: {
-            type: String,
-            default: "Vietnam"
-        },
         latitude: {
             type: Number,
-            default: null
+            required: true
         },
         longitude: {
             type: Number,
-            default: null
+            required: true
         }
     },
     category: {
@@ -140,7 +123,7 @@ const eventSchema = new mongoose.Schema({
 eventSchema.index({ creator: 1, status: 1 });
 eventSchema.index({ status: 1, start_date: 1 });
 eventSchema.index({ category: 1, status: 1 });
-eventSchema.index({ "location.city": 1, status: 1 });
+eventSchema.index({ "location.latitude": 1, "location.longitude": 1 }); // Index for geospatial queries
 
 const Event = mongoose.model("Event", eventSchema)
 export default Event;
