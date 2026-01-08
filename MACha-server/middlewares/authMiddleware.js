@@ -17,6 +17,17 @@ export const authMiddleware = async (req, res, next) => {
             token = req.cookies.jwt;
         }
 
+        // Debug logging for production
+        if (process.env.NODE_ENV === 'production' && !token) {
+            console.log('🔐 Auth failed - no token found:', {
+                hasAuthHeader: !!authHeader,
+                hasCookies: !!req.cookies,
+                cookieKeys: req.cookies ? Object.keys(req.cookies) : [],
+                path: req.path,
+                origin: req.headers.origin,
+            });
+        }
+
         if (!token) {
             return res
                 .status(HTTP_STATUS.UNAUTHORIZED)

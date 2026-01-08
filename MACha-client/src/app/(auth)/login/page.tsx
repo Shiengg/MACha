@@ -44,11 +44,24 @@ function LoginPageContent() {
           });
         }
         
-        // Small delay to ensure cookie is set before redirect
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait for cookie to be set and verify it's available
+        // In production, cookies may take a moment to be set by the browser
+        await new Promise(resolve => setTimeout(resolve, 300));
         
-        // Fetch full user data in background (non-blocking) to sync with server
-        login().catch(err => console.error('Background user fetch failed:', err));
+        // Verify cookie is set before proceeding
+        const cookieSet = document.cookie.includes('jwt=');
+        if (!cookieSet) {
+          console.warn('⚠️ Cookie not set after login, retrying...');
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        
+        // Fetch full user data to ensure authentication is working
+        try {
+          await login();
+        } catch (err) {
+          console.error('Failed to verify login:', err);
+          // Don't block redirect if this fails, cookie might still be set
+        }
         
         Swal.fire({
           title: 'Đăng nhập thành công!',

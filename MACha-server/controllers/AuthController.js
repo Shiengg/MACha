@@ -25,7 +25,8 @@ const getCookieOptions = () => {
         maxAge: maxAgeMili,
         httpOnly: true,
         secure: isSecure,
-        sameSite: isSecure ? "None" : "Lax"
+        sameSite: isSecure ? "None" : "Lax",
+        path: '/', 
     };
 }
 
@@ -206,7 +207,21 @@ export const login = async (req, res) => {
         // Reset failed login attempts khi đăng nhập thành công
         await authService.resetFailedLoginAttempts(email);
 
-        res.cookie("jwt", createToken(user._id, user.username, user.role, user.fullname), getCookieOptions());
+        const token = createToken(user._id, user.username, user.role, user.fullname);
+        const cookieOptions = getCookieOptions();
+        
+        // Log cookie options in production for debugging
+        if (process.env.NODE_ENV === 'production') {
+            console.log('🍪 Setting cookie with options:', {
+                secure: cookieOptions.secure,
+                sameSite: cookieOptions.sameSite,
+                httpOnly: cookieOptions.httpOnly,
+                path: cookieOptions.path,
+                maxAge: cookieOptions.maxAge,
+            });
+        }
+        
+        res.cookie("jwt", token, cookieOptions);
 
         return res.status(HTTP_STATUS.OK).json({
             user: {

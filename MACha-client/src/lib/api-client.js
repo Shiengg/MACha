@@ -1,6 +1,24 @@
 import axios from "axios";
 
-const HOST = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+// Normalize API URL to avoid double host or missing protocol issues
+const normalizeApiUrl = (url) => {
+    const fallback = "http://localhost:5000";
+    if (!url) return fallback;
+
+    // Remove trailing slash
+    let normalized = url.replace(/\/$/, "");
+
+    // Add protocol if missing
+    if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
+        normalized = normalized.includes("localhost")
+            ? `http://${normalized}`
+            : `https://${normalized}`;
+    }
+
+    return normalized;
+};
+
+const HOST = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
 
 const apiClient = axios.create({
     baseURL: HOST,

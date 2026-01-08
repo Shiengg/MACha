@@ -21,17 +21,16 @@ import * as onlineService from './services/online.service.js';
 const app = express();
 dotenv.config();
 
-// Connect to databases with error handling
+app.set('trust proxy', 1);
+
 connectDB().catch(err => {
     console.error('❌ MongoDB connection failed:', err.message);
-    // Don't exit immediately, allow Railway to restart
 });
 
 setupSwagger(app);
 
 connectRedis().catch(err => {
     console.error('❌ Redis connection failed:', err.message);
-    // Continue without Redis - app can still function partially
 });
 
 const allowedOrigin = process.env.ORIGIN_PROD?.replace(/\/$/, '') || 'http://localhost:3000';
@@ -53,6 +52,7 @@ app.use(cors({
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Set-Cookie'], // Expose Set-Cookie header for debugging
 }));
 
 app.use(express.json({ limit: '50mb' }));
