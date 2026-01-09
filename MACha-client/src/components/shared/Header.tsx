@@ -134,14 +134,14 @@ export default function Header() {
                         <div className="hidden md:flex flex-1 max-w-lg relative z-10">
                             <form onSubmit={handleSearchSubmit} className="w-full">
                                 <div className="relative">
-                                    <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 md:w-5 md:h-5" />
+                                    <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-400 w-4 h-4 md:w-5 md:h-5" />
                                     <input
                                         type="text"
                                         placeholder="Tìm kiếm chiến dịch, quỹ..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         onFocus={() => isAuthenticated && setIsSearchDropdownOpen(true)}
-                                        className="w-full pl-10 md:pl-12 pr-4 py-2 md:py-2.5 bg-gray-50 border border-gray-400 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all"
+                                        className="w-full pl-10 md:pl-12 pr-4 py-2 md:py-2.5 bg-gray-50 border border-gray-400 rounded-full text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all"
                                     />
                                 </div>
                             </form>
@@ -317,14 +317,14 @@ export default function Header() {
                     <div className="md:hidden mt-3 pb-2 relative">
                         <form onSubmit={handleSearchSubmit}>
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-400 w-5 h-5" />
                                 <input
                                     type="text"
                                     placeholder="Tìm kiếm chiến dịch, quỹ..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onFocus={() => isAuthenticated && setIsSearchDropdownOpen(true)}
-                                    className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-400 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all"
+                                    className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-400 rounded-full text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all"
                                     autoFocus
                                 />
                                 {searchQuery && (

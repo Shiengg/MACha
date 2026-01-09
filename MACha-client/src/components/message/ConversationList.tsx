@@ -180,13 +180,13 @@ export default function ConversationList({
                 
                 {/* Search Bar */}
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-black-400 w-4 h-4" />
                     <input
                         type="text"
                         placeholder="Tìm kiếm cuộc trò chuyện..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 bg-gray-50 border border-gray-400 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all"
+                        className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 bg-gray-50 border border-gray-400 rounded-full text-sm text-gray-900 placeholder:text-gray-400 dark:text-black dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all"
                     />
                 </div>
             </div>

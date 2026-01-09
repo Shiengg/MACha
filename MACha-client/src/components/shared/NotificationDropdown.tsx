@@ -175,7 +175,8 @@ export default function NotificationDropdown() {
         className="relative w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all flex-shrink-0"
         aria-label="Notifications"
       >
-        <Bell className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+        {/* Để icon chuông rõ hơn và đồng bộ với icon nhắn tin, không override màu, cho kế thừa từ button */}
+        <Bell className="w-5 h-5" />
 
         {/* Unread Badge */}
         {unreadCount > 0 && (

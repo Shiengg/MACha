@@ -99,8 +99,12 @@ export default function DonatePage() {
                 inputMode="numeric"
                 placeholder="Ví dụ: 500000"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              onChange={(e) => {
+                // Chỉ cho phép nhập số: loại bỏ mọi ký tự không phải chữ số
+                const numericValue = e.target.value.replace(/\D/g, '');
+                setAmount(numericValue);
+              }}
+              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 dark:text-black dark:placeholder:text-gray-400"
               />
             </div>
 

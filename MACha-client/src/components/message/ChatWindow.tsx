@@ -701,7 +701,7 @@ export default function ChatWindow({ conversation, onToggleInfoPanel, onBackToLi
                             }}
                             placeholder={sending || uploadingImage ? "Đang gửi..." : "Nhập tin nhắn..."}
                             rows={1}
-                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-50 border border-gray-200 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 focus:bg-white transition-all text-sm sm:text-base self-end"
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-50 border border-gray-200 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 focus:bg-white transition-all text-sm sm:text-base self-end text-gray-900 placeholder:text-gray-400 dark:text-black dark:placeholder:text-gray-400"
                             style={{
                                 maxHeight: '120px',
                                 minHeight: '44px',
