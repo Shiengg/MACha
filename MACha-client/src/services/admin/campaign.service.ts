@@ -42,9 +42,13 @@ export interface GetCampaignsResponse {
   count?: number;
 }
 
-export const getAllCampaigns = async (): Promise<Campaign[]> => {
+export const getAllCampaigns = async (limit: number = 10000): Promise<Campaign[]> => {
   try {
-    const response = await apiClient.get(GET_ALL_CAMPAIGNS_ROUTE, { withCredentials: true });
+    // Fetch with a large limit to get all campaigns for admin dashboard
+    const response = await apiClient.get(GET_ALL_CAMPAIGNS_ROUTE, { 
+      params: { page: 0, limit },
+      withCredentials: true 
+    });
     return response.data.campaigns || [];
   } catch (error) {
     console.error('Error fetching campaigns:', error);

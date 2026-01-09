@@ -345,16 +345,16 @@ function EventDetails() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
         <button
           onClick={() => router.push('/events')}
-          className="mb-4 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+          className="mb-3 sm:mb-4 text-sm sm:text-base text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
         >
           ← Quay lại
         </button>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="relative h-64 md:h-96 w-full">
+          <div className="relative h-48 sm:h-64 md:h-96 w-full">
             {event.banner_image ? (
               <Image
                 src={event.banner_image}
@@ -379,94 +379,96 @@ function EventDetails() {
             )}
           </div>
 
-          <div className="p-6">
-            <div className="flex items-start justify-between mb-4">
+          <div className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-4">
               <div className="flex-1">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                   {event.title}
                 </h1>
-                <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-3 sm:mb-4">
                   {event.creator && (
                     <div className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
+                      <User className="w-3 h-3 sm:w-4 sm:h-4" />
                       <span>{event.creator.fullname || event.creator.username}</span>
                     </div>
                   )}
-                  <span className="px-3 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium">
+                  <span className="px-2 sm:px-3 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium w-fit">
                     {getCategoryLabel(event.category)}
                   </span>
                 </div>
               </div>
-              {user && isCreator && (event.status === 'published' || event.status === 'pending') && (
-                <button
-                  onClick={() => setShowEditModal(true)}
-                  className="ml-4 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors flex items-center gap-2"
-                >
-                  <Edit className="w-4 h-4" />
-                  Chỉnh sửa
-                </button>
-              )}
-              {user && !isCreator && (
-                <div className="relative ml-4 dropdown-container">
+              <div className="flex items-center gap-2 sm:ml-4">
+                {user && isCreator && (event.status === 'published' || event.status === 'pending') && (
                   <button
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className="w-10 h-10 flex items-center justify-center bg-gray-200 hover:bg-gray-300 dark:hover:bg-gray-700 rounded-full transition-colors"
-                    aria-label="More options"
+                    onClick={() => setShowEditModal(true)}
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors flex items-center gap-1.5 sm:gap-2"
                   >
-                    <MoreHorizontal className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Chỉnh sửa</span>
+                    <span className="sm:hidden">Sửa</span>
                   </button>
-                  {isDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
-                      <button
-                        onClick={async () => {
-                          setIsDropdownOpen(false);
-                          
-                          if (hasReported) {
-                            Swal.fire({
-                              icon: 'info',
-                              title: 'Đã báo cáo',
-                              text: 'Bạn đã báo cáo sự kiện này rồi. Vui lòng chờ admin xử lý.',
-                            });
-                            return;
-                          }
-
-                          setIsCheckingReport(true);
-                          try {
-                            const { reports } = await getReportsByItem('event', eventId);
-                            const currentUserId = (user as any)?._id || user?.id;
-                            const userReport = reports.find(
-                              (report) => report.reporter._id === currentUserId
-                            );
+                )}
+                {user && !isCreator && (
+                  <div className="relative dropdown-container">
+                    <button
+                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                      className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center bg-gray-200 hover:bg-gray-300 dark:hover:bg-gray-700 rounded-full transition-colors"
+                      aria-label="More options"
+                    >
+                      <MoreHorizontal className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
+                    </button>
+                    {isDropdownOpen && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                        <button
+                          onClick={async () => {
+                            setIsDropdownOpen(false);
                             
-                            if (userReport) {
-                              setHasReported(true);
+                            if (hasReported) {
                               Swal.fire({
                                 icon: 'info',
                                 title: 'Đã báo cáo',
                                 text: 'Bạn đã báo cáo sự kiện này rồi. Vui lòng chờ admin xử lý.',
                               });
-                            } else {
-                              setShowReportModal(true);
+                              return;
                             }
-                          } catch (error) {
-                            console.error('Error checking report:', error);
-                            setShowReportModal(true);
-                          } finally {
-                            setIsCheckingReport(false);
-                          }
-                        }}
-                        disabled={isCheckingReport || hasReported}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <FaFlag className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                        <span className="text-sm font-medium">
-                          {hasReported ? 'Đã báo cáo' : 'Báo cáo sự kiện'}
-                        </span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+
+                            setIsCheckingReport(true);
+                            try {
+                              const { reports } = await getReportsByItem('event', eventId);
+                              const currentUserId = (user as any)?._id || user?.id;
+                              const userReport = reports.find(
+                                (report) => report.reporter._id === currentUserId
+                              );
+                              
+                              if (userReport) {
+                                setHasReported(true);
+                                Swal.fire({
+                                  icon: 'info',
+                                  title: 'Đã báo cáo',
+                                  text: 'Bạn đã báo cáo sự kiện này rồi. Vui lòng chờ admin xử lý.',
+                                });
+                              } else {
+                                setShowReportModal(true);
+                              }
+                            } catch (error) {
+                              console.error('Error checking report:', error);
+                              setShowReportModal(true);
+                            } finally {
+                              setIsCheckingReport(false);
+                            }
+                          }}
+                          disabled={isCheckingReport || hasReported}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <FaFlag className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                          <span className="text-sm font-medium">
+                            {hasReported ? 'Đã báo cáo' : 'Báo cáo sự kiện'}
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
             </div>
 
             {event.description && (
@@ -477,39 +479,39 @@ function EventDetails() {
               </div>
             )}
 
-            <div className="grid md:grid-cols-2 gap-4 mb-6">
-              <div className="flex items-start gap-3">
-                <Calendar className="w-5 h-5 text-orange-500 mt-1" />
-                <div>
-                  <div className="font-medium text-gray-900 dark:text-white">Ngày bắt đầu</div>
-                  <div className="text-gray-600 dark:text-gray-400">{formatDate(event.start_date)}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+              <div className="flex items-start gap-2 sm:gap-3">
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500 mt-1 flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Ngày bắt đầu</div>
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">{formatDate(event.start_date)}</div>
                   {event.end_date && (
                     <>
-                      <div className="font-medium text-gray-900 dark:text-white mt-2">Ngày kết thúc</div>
-                      <div className="text-gray-600 dark:text-gray-400">{formatDate(event.end_date)}</div>
+                      <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white mt-2">Ngày kết thúc</div>
+                      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">{formatDate(event.end_date)}</div>
                     </>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-orange-500 mt-1" />
-                <div>
-                  <div className="font-medium text-gray-900 dark:text-white">Địa điểm</div>
-                  <div className="text-gray-600 dark:text-gray-400">
+              <div className="flex items-start gap-2 sm:gap-3">
+                <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500 mt-1 flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Địa điểm</div>
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
                     {event.location.location_name && <div>{event.location.location_name}</div>}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <Users className="w-5 h-5 text-orange-500 mt-1" />
-                <div>
-                  <div className="font-medium text-gray-900 dark:text-white">Người tham gia</div>
-                  <div className="text-gray-600 dark:text-gray-400">
+              <div className="flex items-start gap-2 sm:gap-3 sm:col-span-2">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500 mt-1 flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Người tham gia</div>
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                     {totalAttendees} {event.capacity ? `/ ${event.capacity}` : ''} người
                   </div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {event.rsvpStats?.going.count || 0} tham gia, {event.rsvpStats?.interested.count || 0} quan tâm
                   </div>
                 </div>
@@ -517,11 +519,11 @@ function EventDetails() {
             </div>
 
             {user && !isPast && event.status === 'published' && (
-              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                <div className="font-medium text-gray-900 dark:text-white mb-3">Bạn có tham gia không?</div>
+              <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <div className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-3">Bạn có tham gia không?</div>
                 {rsvp ? (
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-700 dark:text-gray-300">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                    <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                       Bạn đã chọn: <strong>
                         {rsvp.status === 'going' ? 'Tham gia' : 
                          rsvp.status === 'interested' ? 'Quan tâm' : 'Không tham gia'}
@@ -529,32 +531,32 @@ function EventDetails() {
                     </span>
                     <button
                       onClick={handleCancelRSVP}
-                      className="text-sm text-red-500 hover:text-red-600"
+                      className="text-xs sm:text-sm text-red-500 hover:text-red-600 w-fit"
                     >
                       Hủy
                     </button>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                     <button
                       onClick={() => handleRSVP('going')}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+                      className="flex items-center justify-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
                     >
-                      <CheckCircle className="w-4 h-4" />
+                      <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
                       Tham gia
                     </button>
                     <button
                       onClick={() => handleRSVP('interested')}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                      className="flex items-center justify-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
                     >
-                      <Users className="w-4 h-4" />
+                      <Users className="w-3 h-3 sm:w-4 sm:h-4" />
                       Quan tâm
                     </button>
                     <button
                       onClick={() => handleRSVP('not_going')}
-                      className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                      className="flex items-center justify-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
                     >
-                      <XCircle className="w-4 h-4" />
+                      <XCircle className="w-3 h-3 sm:w-4 sm:h-4" />
                       Không tham gia
                     </button>
                   </div>
@@ -563,9 +565,9 @@ function EventDetails() {
             )}
 
             {event.gallery_images && event.gallery_images.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Hình ảnh</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              <div className="mb-4 sm:mb-6">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">Hình ảnh</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {event.gallery_images.map((img, index) => (
                     <div key={index} className="relative aspect-square">
                       <Image
@@ -581,8 +583,8 @@ function EventDetails() {
             )}
 
             {updates.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Cập nhật</h3>
+              <div className="mb-4 sm:mb-6">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">Cập nhật</h3>
                 <div className="space-y-4">
                   {updates.map((update) => (
                     <div key={update._id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">

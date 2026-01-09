@@ -154,25 +154,25 @@ export default function SearchHistoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-3 sm:py-6">
         <div className="bg-white rounded-lg shadow-sm">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+          <div className="p-3 sm:p-4 md:p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 sm:gap-3 md:gap-4 flex-1 min-w-0">
                 <button
                   onClick={() => router.back()}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
                 >
-                  <ArrowLeft className="w-5 h-5 text-gray-600" />
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
                 </button>
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 truncate">
                   Lịch sử tìm kiếm của bạn
                 </h1>
               </div>
               {history.length > 0 && (
                 <button
                   onClick={() => setShowDeleteAll(true)}
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap flex-shrink-0 px-2"
                 >
                   Xóa các tìm kiếm
                 </button>
@@ -180,61 +180,62 @@ export default function SearchHistoryPage() {
             </div>
           </div>
 
-          <div className="p-6">
+          <div className="p-3 sm:p-4 md:p-6">
             {groupedHistory.length === 0 ? (
-              <div className="text-center py-12">
-                <Clock className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500 text-lg">Chưa có lịch sử tìm kiếm</p>
+              <div className="text-center py-8 sm:py-12">
+                <Clock className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-gray-300 mb-3 sm:mb-4" />
+                <p className="text-gray-500 text-base sm:text-lg">Chưa có lịch sử tìm kiếm</p>
               </div>
             ) : (
-              <div className="space-y-8">
+              <div className="space-y-6 sm:space-y-8">
                 {groupedHistory.map((group) => (
                   <div key={group.date}>
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                    <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
                       {formatDate(group.date)}
                     </h2>
                     <div className="space-y-1">
                       {group.items.map((item) => (
                         <div
                           key={item._id}
-                          className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors group"
+                          className="flex items-center gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 hover:bg-gray-50 rounded-lg transition-colors group"
                         >
                           <div className="flex-shrink-0">
                             {item.type === 'hashtag' ? (
-                              <Hash className="w-5 h-5 text-gray-400" />
+                              <Hash className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                             ) : (
-                              <Clock className="w-5 h-5 text-gray-400" />
+                              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                             )}
                           </div>
                           <div 
                             className="flex-1 min-w-0 cursor-pointer"
                             onClick={() => handleItemClick(item)}
                           >
-                            <p className="text-sm text-gray-900">
+                            <p className="text-xs sm:text-sm text-gray-900">
                               Bạn đã tìm kiếm{' '}
                               <span className="font-semibold">
                                 "{item.type === 'hashtag' ? `#${item.keyword}` : item.keyword}"
                               </span>
                             </p>
-                            <div className="flex items-center gap-1 mt-1">
-                              <Lock className="w-3 h-3 text-gray-400" />
-                              <span className="text-xs text-gray-500">Chỉ mình tôi</span>
+                            <div className="flex items-center gap-1 mt-0.5 sm:mt-1">
+                              <Lock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-gray-400" />
+                              <span className="text-[10px] sm:text-xs text-gray-500">Chỉ mình tôi</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs text-gray-500">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                            <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap">
                               {formatTime(item.searchedAt)}
                             </span>
                             <div className="relative">
                               <button
                                 onClick={() => handleDelete(item._id)}
                                 disabled={deletingId === item._id}
-                                className="p-1 hover:bg-gray-200 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                                className="p-1 hover:bg-gray-200 rounded-full transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 touch-manipulation"
+                                style={{ touchAction: 'manipulation' }}
                               >
                                 {deletingId === item._id ? (
-                                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                  <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
                                 ) : (
-                                  <Trash2 className="w-4 h-4 text-gray-600" />
+                                  <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600" />
                                 )}
                               </button>
                             </div>

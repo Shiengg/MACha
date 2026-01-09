@@ -38,8 +38,14 @@ export const getPendingEvents = async (): Promise<AdminEvent[]> => {
 
 export const getAllEvents = async (filters?: GetAllEventsParams): Promise<AdminEvent[]> => {
   try {
+    // Set default limit to 10000 to get all events for admin dashboard if not specified
+    const params = {
+      ...filters,
+      limit: filters?.limit || 10000,
+      page: filters?.page || 0,
+    };
     const response = await apiClient.get<{ events: AdminEvent[] }>(GET_ALL_EVENTS_ROUTE, {
-      params: filters,
+      params,
       withCredentials: true,
     });
     return response.data.events || [];

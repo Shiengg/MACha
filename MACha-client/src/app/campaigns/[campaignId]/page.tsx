@@ -66,27 +66,44 @@ function CampaignDetails() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, [campaignId]);
 
-    // Intersection Observer to detect when scroll past donate card
+    // Scroll event to detect when scroll past donate card
     useEffect(() => {
         if (!donateCardRef.current) return;
 
-        const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach((entry) => {
-                    // Show sticky bar when donate card is not visible (scrolled past it)
-                    setShowStickyBar(!entry.isIntersecting);
-                });
-            },
-            {
-                threshold: 0,
-                rootMargin: '-80px 0px 0px 0px', // Offset for header height
-            }
-        );
+        let ticking = false;
+        let lastState = false;
 
-        observer.observe(donateCardRef.current);
+        const handleScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    if (!donateCardRef.current) return;
+                    
+                    const donateCardRect = donateCardRef.current.getBoundingClientRect();
+                    const headerHeight = 64; // Header height
+                    const threshold = headerHeight + 20; // Add 20px buffer
+                    
+                    // Show sticky bar when donate card top is above threshold
+                    const shouldShow = donateCardRect.top < threshold;
+                    
+                    // Only update if state actually changed to prevent flickering
+                    if (lastState !== shouldShow) {
+                        setShowStickyBar(shouldShow);
+                        lastState = shouldShow;
+                    }
+                    
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        
+        // Check initial state
+        handleScroll();
 
         return () => {
-            observer.disconnect();
+            window.removeEventListener('scroll', handleScroll);
         };
     }, [campaign]);
 
@@ -453,7 +470,7 @@ function CampaignDetails() {
 
     // Withdrawal Request Handlers
     const handleCreateRequest = () => {
-        if (!user || !campaign) return;
+        if (!user || !campaign || !campaign.creator) return;
         const isCreator = user._id === campaign.creator._id || user.id === campaign.creator._id;
         if (!isCreator) {
             Swal.fire({
@@ -913,7 +930,7 @@ function CampaignDetails() {
             <div className="min-h-screen bg-gray-50">
                 {/* Sticky Bar - Shows when scroll past donate card */}
                 {showStickyBar && (
-                    <div className="fixed top-[64px] left-0 right-0 bg-white border-b border-gray-200 shadow-md z-40">
+                    <div className="hidden md:block fixed top-[64px] left-0 right-0 bg-white border-b border-gray-200 shadow-md z-40">
                         <div className="max-w-6xl mx-auto px-4">
                             <div className="flex items-center justify-between py-3">
                                 {/* Tabs */}
@@ -961,21 +978,46 @@ function CampaignDetails() {
                                 </div>
 
                                 {/* Donate Button */}
-                                {campaign.end_date && daysLeft === 0 ? (
-                                    <div className="px-4 py-2 text-sm text-gray-500">
-                                        Chiến dịch đã kết thúc
-                                    </div>
-                                ) : (
-                                    <button
-                                        onClick={handleDonate}
-                                        className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-lg hover:bg-orange-600 transition flex items-center gap-2"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        Ủng hộ ngay
-                                    </button>
-                                )}
+                                {(() => {
+                                    // Check if campaign has ended
+                                    if (campaign.end_date && daysLeft === 0) {
+                                        return (
+                                            <div className="px-4 py-2 text-sm text-gray-500">
+                                                Chiến dịch đã kết thúc
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    // Check campaign status
+                                    const allowedStatuses = ['active', 'voting', 'approved'];
+                                    if (allowedStatuses.includes(campaign.status)) {
+                                        return (
+                                            <button
+                                                onClick={handleDonate}
+                                                className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-lg hover:bg-orange-600 transition flex items-center gap-2"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                Ủng hộ ngay
+                                            </button>
+                                        );
+                                    }
+                                    
+                                    // Show status-specific messages
+                                    const statusMessages: Record<string, string> = {
+                                        'pending': 'Chiến dịch đang duyệt',
+                                        'completed': 'Chiến dịch này đã hoàn tất',
+                                        'rejected': 'Chiến dịch này đã bị từ chối',
+                                        'cancelled': 'Chiến dịch bị huỷ'
+                                    };
+                                    
+                                    return (
+                                        <div className="px-4 py-2 text-sm text-gray-500">
+                                            {statusMessages[campaign.status] || 'Không thể ủng hộ chiến dịch này'}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>
@@ -1543,7 +1585,7 @@ function CampaignDetails() {
                                         </div>
                                     )}
 
-                                    {activeTab === 'updates' && <UpdatesTab campaignId={campaignId} updates={updates} setUpdates={setUpdates} updatesLoading={updatesLoading} isCreator={!!(user && campaign && user._id === campaign.creator._id)} />}
+                                    {activeTab === 'updates' && <UpdatesTab campaignId={campaignId} updates={updates} setUpdates={setUpdates} updatesLoading={updatesLoading} isCreator={!!(user && campaign && campaign.creator && (user._id === campaign.creator._id || user.id === campaign.creator._id))} />}
 
                                     {activeTab === 'withdrawals' && (
                                         <div className="space-y-6" data-tab="withdrawals">
@@ -1557,7 +1599,7 @@ function CampaignDetails() {
                                                         Quản lý các yêu cầu rút tiền và vote cho withdrawal requests
                                                     </p>
                                                 </div>
-                                                {user && campaign && (user._id === campaign.creator._id || user.id === campaign.creator._id) && (
+                                                {user && campaign && campaign.creator && (user._id === campaign.creator._id || user.id === campaign.creator._id) && (
                                                     <button
                                                         onClick={handleCreateRequest}
                                                         className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all flex items-center gap-2 shadow-md hover:shadow-lg"
@@ -1638,7 +1680,7 @@ function CampaignDetails() {
                                                             </div>
                                                         ) : (
                                                             activeRequests.map((escrow) => {
-                                                                const isCreator = user && campaign && (user._id === campaign.creator._id || user.id === campaign.creator._id);
+                                                                const isCreator = user && campaign && campaign.creator && (user._id === campaign.creator._id || user.id === campaign.creator._id);
                                                                 const userVoteForRequest =
                                                                     escrow._id === activeWithdrawalRequest?._id ? userVote : null;
 
@@ -1861,36 +1903,66 @@ function CampaignDetails() {
 
                                 {/* Action Buttons */}
                                 <div className="space-y-3">
-                                    {campaign.end_date && daysLeft === 0 ? (
-                                        <div className="w-full py-4 px-4 bg-gray-100 border-2 border-gray-300 rounded-xl flex flex-col items-center justify-center gap-2">
-                                            <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            <p className="text-gray-700 font-semibold text-center">Chiến dịch đã kết thúc</p>
-                                            <p className="text-gray-500 text-sm text-center">Cảm ơn bạn đã quan tâm đến chiến dịch này</p>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <button 
-                                                onClick={handleDonate} 
-                                                className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2"
-                                            >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    {(() => {
+                                        // Check if campaign has ended
+                                        if (campaign.end_date && daysLeft === 0) {
+                                            return (
+                                                <div className="w-full py-4 px-4 bg-gray-100 border-2 border-gray-300 rounded-xl flex flex-col items-center justify-center gap-2">
+                                                    <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <p className="text-gray-700 font-semibold text-center">Chiến dịch đã kết thúc</p>
+                                                    <p className="text-gray-500 text-sm text-center">Cảm ơn bạn đã quan tâm đến chiến dịch này</p>
+                                                </div>
+                                            );
+                                        }
+                                        
+                                        // Check campaign status
+                                        const allowedStatuses = ['active', 'voting', 'approved'];
+                                        if (allowedStatuses.includes(campaign.status)) {
+                                            return (
+                                                <>
+                                                    <button 
+                                                        onClick={handleDonate} 
+                                                        className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        Ủng hộ ngay
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setIsCreatePostOpen(true)}
+                                                        className="w-full py-4 bg-white border-2 border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-400 transition flex items-center justify-center gap-2"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                        Tạo bài viết
+                                                    </button>
+                                                </>
+                                            );
+                                        }
+                                        
+                                        // Show status-specific messages
+                                        const statusMessages: Record<string, string> = {
+                                            'pending': 'Chiến dịch đang duyệt',
+                                            'completed': 'Chiến dịch này đã hoàn tất',
+                                            'rejected': 'Chiến dịch này đã bị từ chối',
+                                            'cancelled': 'Chiến dịch bị huỷ'
+                                        };
+                                        
+                                        return (
+                                            <div className="w-full py-4 px-4 bg-gray-100 border-2 border-gray-300 rounded-xl flex flex-col items-center justify-center gap-2">
+                                                <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                                Ủng hộ ngay
-                                            </button>
-                                            <button 
-                                                onClick={() => setIsCreatePostOpen(true)}
-                                                className="w-full py-4 bg-white border-2 border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-400 transition flex items-center justify-center gap-2"
-                                            >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                </svg>
-                                                Tạo bài viết
-                                            </button>
-                                        </>
-                                    )}
+                                                <p className="text-gray-700 font-semibold text-center">
+                                                    {statusMessages[campaign.status] || 'Không thể ủng hộ chiến dịch này'}
+                                                </p>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
 

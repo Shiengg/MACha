@@ -175,8 +175,8 @@ export default function ConversationList({
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="p-4 border-b border-gray-200">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4">Tin nhắn</h2>
+            <div className="p-3 sm:p-4 border-b border-gray-200">
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-3 sm:mb-4">Tin nhắn</h2>
                 
                 {/* Search Bar */}
                 <div className="relative">
@@ -186,7 +186,7 @@ export default function ConversationList({
                         placeholder="Tìm kiếm cuộc trò chuyện..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-400 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all"
+                        className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 bg-gray-50 border border-gray-400 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all"
                     />
                 </div>
             </div>
@@ -217,7 +217,7 @@ export default function ConversationList({
                         </p>
                     </div>
                 ) : (
-                    <div className="px-2 py-2 space-y-1">
+                    <div className="px-1 sm:px-2 py-1 sm:py-2 space-y-0.5 sm:space-y-1">
                         {filteredConversations.map((conversation) => {
                             const otherParticipant = getOtherParticipant(
                                 conversation.members,
@@ -237,16 +237,17 @@ export default function ConversationList({
                                 <button
                                     key={conversation._id}
                                     onClick={() => onSelectConversation(conversation)}
-                                    className={`w-full p-3 rounded-lg transition-colors text-left ${
+                                    className={`w-full p-2 sm:p-3 rounded-lg transition-colors text-left touch-manipulation ${
                                         isSelected 
                                             ? 'bg-emerald-100' 
-                                            : 'hover:bg-gray-200'
+                                            : 'hover:bg-gray-200 active:bg-gray-200'
                                     }`}
+                                    style={{ touchAction: 'manipulation' }}
                                 >
-                                    <div className="flex items-start gap-3">
+                                    <div className="flex items-start gap-2 sm:gap-3">
                                         {/* Avatar */}
                                         <div className="relative flex-shrink-0">
-                                            <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-semibold overflow-hidden">
+                                            <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-semibold overflow-hidden text-sm sm:text-base">
                                                 {otherParticipant.avatar ? (
                                                     <Image
                                                         src={otherParticipant.avatar}
@@ -261,24 +262,24 @@ export default function ConversationList({
                                             </div>
                                             {/* Online Status Indicator */}
                                             {isOnline && (
-                                                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                                                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 border-2 border-white rounded-full"></div>
                                             )}
                                         </div>
 
                                         {/* Content */}
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <h3 className="font-semibold text-gray-800 truncate">
+                                            <div className="flex items-center justify-between mb-0.5 sm:mb-1 gap-1">
+                                                <h3 className="font-semibold text-gray-800 truncate text-sm sm:text-base">
                                                     {otherParticipant?.fullname || otherParticipant?.username}
                                                 </h3>
                                                 {conversation.lastMessage && (
-                                                    <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                                                    <span className="text-[10px] sm:text-xs text-gray-500 flex-shrink-0 whitespace-nowrap">
                                                         {formatTime(conversation.lastMessage.createdAt)}
                                                     </span>
                                                 )}
                                             </div>
                                             {conversation.lastMessage && (
-                                                <p className="text-sm text-gray-600 truncate">
+                                                <p className="text-xs sm:text-sm text-gray-600 truncate">
                                                     {isLastFromCurrentUser ? 'Bạn: ' : ''}
                                                     {formatLastMessageContent(conversation.lastMessage.content)}
                                                 </p>

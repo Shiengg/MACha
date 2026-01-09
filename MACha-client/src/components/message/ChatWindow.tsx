@@ -13,9 +13,10 @@ import { cloudinaryService } from '@/services/cloudinary.service';
 interface ChatWindowProps {
     conversation: Conversation | null;
     onToggleInfoPanel?: () => void;
+    onBackToList?: () => void;
 }
 
-export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWindowProps) {
+export default function ChatWindow({ conversation, onToggleInfoPanel, onBackToList }: ChatWindowProps) {
     const { user } = useAuth();
     const { socket } = useSocket();
     const { isUserOnline } = useOnlineStatus();
@@ -385,9 +386,21 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
     return (
         <div className="flex-1 flex flex-col h-full">
             {/* Chat Header */}
-            <div className="p-4 border-b border-gray-200 bg-white">
-                <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
+            <div className="p-3 sm:p-4 border-b border-gray-200 bg-white">
+                <div className="flex items-center justify-between gap-2 sm:gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                        {/* Back Button - Mobile Only */}
+                        {onBackToList && (
+                            <button
+                                onClick={onBackToList}
+                                className="md:hidden flex-shrink-0 p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+                                aria-label="Back to conversation list"
+                            >
+                                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                        )}
                         {(() => {
                             const otherParticipant = getOtherParticipant(conversation.members, currentUserId);
                             const isOnline = otherParticipant._id && isUserOnline(otherParticipant._id);
@@ -395,7 +408,7 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                                 <>
                                     {/* Avatar */}
                                     <div className="relative flex-shrink-0">
-                                        <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-semibold overflow-hidden">
+                                        <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-semibold overflow-hidden">
                                             {otherParticipant.avatar ? (
                                                 <Image
                                                     src={otherParticipant.avatar}
@@ -410,14 +423,14 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                                         </div>
                                         {/* Online Status Indicator */}
                                         {isOnline && (
-                                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                                            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 border-2 border-white rounded-full"></div>
                                         )}
                                     </div>
-                                    <div>
-                                        <h3 className="font-semibold text-gray-800">
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="font-semibold text-gray-800 text-sm sm:text-base truncate">
                                             {otherParticipant.fullname || otherParticipant.username || 'Người dùng'}
                                         </h3>
-                                        <p className="text-xs text-gray-500">
+                                        <p className="text-xs text-gray-500 truncate">
                                             {isOnline ? 'Đang hoạt động' : 'Offline'}
                                         </p>
                                     </div>
@@ -429,17 +442,18 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                     {onToggleInfoPanel && (
                         <button
                             onClick={onToggleInfoPanel}
-                            className="flex-shrink-0 w-6 h-6 rounded-full bg-orange-500 hover:bg-orange-600 flex items-center justify-center text-white transition-colors"
+                            className="flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-orange-500 hover:bg-orange-600 flex items-center justify-center text-white transition-colors touch-manipulation"
+                            style={{ touchAction: 'manipulation' }}
                             aria-label="Toggle info panel"
                         >
-                            <span className="text-sm font-semibold">i</span>
+                            <span className="text-xs sm:text-sm font-semibold">i</span>
                         </button>
                     )}
                 </div>
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-2 relative">
+            <div className="flex-1 overflow-y-auto p-2 sm:p-4 bg-gray-50 space-y-2 relative">
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
                         <div className="flex flex-col items-center gap-2">
@@ -510,24 +524,24 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                                     onMouseEnter={() => setHoveredMessageId(msg._id)}
                                     onMouseLeave={() => setHoveredMessageId(null)}
                                 >
-                                    <div className="max-w-[70%] flex flex-row-reverse gap-2 relative">
+                                    <div className="max-w-[85%] sm:max-w-[70%] flex flex-row-reverse gap-1.5 sm:gap-2 relative">
                                         <div className="flex flex-col relative">
                                             <div
-                                                className={`${msg.type === 'image' ? 'p-1' : 'px-4 py-2'} ${bubbleBaseClasses} ${bubbleShapeClasses}`}
+                                                className={`${msg.type === 'image' ? 'p-1' : 'px-3 py-1.5 sm:px-4 sm:py-2'} ${bubbleBaseClasses} ${bubbleShapeClasses}`}
                                             >
                                                 {msg.type === 'image' ? (
-                                                    <div className="relative rounded-lg overflow-hidden max-w-sm">
+                                                    <div className="relative rounded-lg overflow-hidden max-w-xs sm:max-w-sm">
                                                         <Image
                                                             src={msg.content}
                                                             alt="Message image"
                                                             width={400}
                                                             height={400}
-                                                            className="object-contain max-h-96 w-auto"
+                                                            className="object-contain max-h-64 sm:max-h-96 w-auto"
                                                             unoptimized
                                                         />
                                                     </div>
                                                 ) : (
-                                                    <p className="text-base whitespace-pre-wrap break-words">
+                                                    <p className="text-sm sm:text-base whitespace-pre-wrap break-words">
                                                         {renderMessageContent(msg.content)}
                                                     </p>
                                                 )}
@@ -569,25 +583,25 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                                     }
                                 }}
                             >
-                                <div className="relative max-w-[70%]">
+                                <div className="relative max-w-[85%] sm:max-w-[70%]">
                                     {/* Cột bubble, luôn thẳng hàng, chừa chỗ avatar bên trái */}
-                                    <div className="ml-10 flex flex-col relative group">
+                                    <div className="ml-8 sm:ml-10 flex flex-col relative group">
                                         <div
-                                            className={`${msg.type === 'image' ? 'p-1' : 'px-4 py-2'} ${bubbleBaseClasses} ${bubbleShapeClasses}`}
+                                            className={`${msg.type === 'image' ? 'p-1' : 'px-3 py-1.5 sm:px-4 sm:py-2'} ${bubbleBaseClasses} ${bubbleShapeClasses}`}
                                         >
                                             {msg.type === 'image' ? (
-                                                <div className="relative rounded-lg overflow-hidden max-w-sm">
+                                                <div className="relative rounded-lg overflow-hidden max-w-xs sm:max-w-sm">
                                                     <Image
                                                         src={msg.content}
                                                         alt="Message image"
                                                         width={400}
                                                         height={400}
-                                                        className="object-contain max-h-96 w-auto"
+                                                        className="object-contain max-h-64 sm:max-h-96 w-auto"
                                                         unoptimized
                                                     />
                                                 </div>
                                             ) : (
-                                                <p className="text-base whitespace-pre-wrap break-words">
+                                                <p className="text-sm sm:text-base whitespace-pre-wrap break-words">
                                                     {renderMessageContent(msg.content)}
                                                 </p>
                                             )}
@@ -601,7 +615,7 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
 
                                     {/* Avatar chỉ hiện cho tin cuối nhóm, đặt absolute để không làm lệch bubble */}
                                     {isLastOfGroup && (
-                                        <div className="absolute left-0 bottom-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white text-xs overflow-hidden">
+                                        <div className="absolute left-0 bottom-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white text-xs overflow-hidden">
                                             {sender.avatar ? (
                                                 <Image
                                                     src={sender.avatar}
@@ -625,9 +639,9 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
 
             {/* Image Preview */}
             {imagePreview && (
-                <div className="px-4 pt-2 bg-gray-50">
+                <div className="px-3 sm:px-4 pt-2 bg-gray-50">
                     <div className="relative inline-block">
-                        <div className="relative w-32 h-32 rounded-lg overflow-hidden border-2 border-orange-500">
+                        <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-lg overflow-hidden border-2 border-orange-500">
                             <Image
                                 src={imagePreview}
                                 alt="Preview"
@@ -638,17 +652,18 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                         <button
                             type="button"
                             onClick={handleRemoveImage}
-                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                            className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-5 h-5 sm:w-6 sm:h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors touch-manipulation"
+                            style={{ touchAction: 'manipulation' }}
                         >
-                            <X className="w-4 h-4" />
+                            <X className="w-3 h-3 sm:w-4 sm:h-4" />
                         </button>
                     </div>
                 </div>
             )}
 
             {/* Message Input */}
-            <div className="px-4 pb-4 pt-2 bg-gray-50">
-                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+            <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-2 bg-gray-50 border-t border-gray-200">
+                <form onSubmit={handleSendMessage} className="flex items-end gap-1.5 sm:gap-2">
                     {/* Image Upload Button */}
                     <input
                         ref={fileInputRef}
@@ -661,13 +676,14 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploadingImage || sending}
-                        className="flex-shrink-0 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-shrink-0 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                        style={{ touchAction: 'manipulation' }}
                         aria-label="Attach image"
                     >
                         {uploadingImage ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                         ) : (
-                            <ImageIcon className="w-5 h-5" />
+                            <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                         )}
                     </button>
 
@@ -685,7 +701,7 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                             }}
                             placeholder={sending || uploadingImage ? "Đang gửi..." : "Nhập tin nhắn..."}
                             rows={1}
-                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 focus:bg-white transition-all text-sm self-end"
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-50 border border-gray-200 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 focus:bg-white transition-all text-sm sm:text-base self-end"
                             style={{
                                 maxHeight: '120px',
                                 minHeight: '44px',
@@ -697,13 +713,14 @@ export default function ChatWindow({ conversation, onToggleInfoPanel }: ChatWind
                     <button
                         type="submit"
                         disabled={(!message.trim() && !selectedImage) || sending || uploadingImage}
-                        className="flex-shrink-0 p-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="flex-shrink-0 p-2 sm:p-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation"
+                        style={{ touchAction: 'manipulation' }}
                         aria-label="Send message"
                     >
                         {sending || uploadingImage ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                         ) : (
-                            <Send className="w-5 h-5" />
+                            <Send className="w-4 h-4 sm:w-5 sm:h-5" />
                         )}
                     </button>
                 </form>

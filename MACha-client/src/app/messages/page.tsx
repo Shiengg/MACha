@@ -59,11 +59,17 @@ function MessagesPageContent() {
         router.push(`/messages?conversation=${conversation._id}`);
     };
 
+    const handleBackToList = () => {
+        setSelectedConversation(null);
+        router.push('/messages');
+        setShowInfoPanel(false);
+    };
+
     return (
-        <div className="bg-gray-300">
-            <div className="flex h-[calc(100vh-73px)]">
+        <div className="bg-gray-50 md:bg-gray-300">
+            <div className="flex h-[calc(100vh-73px)] md:h-[calc(100vh-73px)] relative">
                 {/* Left Sidebar - Conversation List */}
-                <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
+                <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-gray-200 bg-white flex flex-col`}>
                     <ConversationList 
                         selectedConversationId={selectedConversation?._id ?? null}
                         onSelectConversation={handleSelectConversation}
@@ -73,20 +79,37 @@ function MessagesPageContent() {
                 </div>
 
                 {/* Center - Chat Window */}
-                <div className="flex-1 flex flex-col bg-white my-4 ml-4 mr-2 rounded-lg overflow-hidden shadow-sm">
-                    <ChatWindow 
-                        conversation={selectedConversation} 
-                        onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
-                    />
-                </div>
-
-                {showInfoPanel && (
-                    <div className="w-80 border-l border-gray-200 bg-white flex flex-col my-4 mr-4 ml-2 rounded-lg shadow-sm">
-                        <ConversationInfo 
-                            conversation={selectedConversation}
-                            conversationId={selectedConversation?._id ?? null}
+                {selectedConversation && (
+                    <div className="flex-1 flex flex-col bg-white md:my-4 md:ml-4 md:mr-2 md:rounded-lg overflow-hidden md:shadow-sm absolute md:relative inset-0 md:inset-auto z-10">
+                        <ChatWindow 
+                            conversation={selectedConversation} 
+                            onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
+                            onBackToList={handleBackToList}
                         />
                     </div>
+                )}
+
+                {/* Info Panel - Desktop: Sidebar, Mobile: Modal */}
+                {showInfoPanel && selectedConversation && (
+                    <>
+                        {/* Desktop: Sidebar */}
+                        <div className="hidden lg:flex w-80 border-l border-gray-200 bg-white flex flex-col my-4 mr-4 ml-2 rounded-lg shadow-sm">
+                            <ConversationInfo 
+                                conversation={selectedConversation}
+                                conversationId={selectedConversation?._id ?? null}
+                                onClose={() => setShowInfoPanel(false)}
+                            />
+                        </div>
+                        
+                        {/* Mobile: Full Screen Panel */}
+                        <div className="lg:hidden fixed inset-0 bg-white z-[60] overflow-y-auto">
+                            <ConversationInfo 
+                                conversation={selectedConversation}
+                                conversationId={selectedConversation?._id ?? null}
+                                onClose={() => setShowInfoPanel(false)}
+                            />
+                        </div>
+                    </>
                 )}
             </div>
         </div>

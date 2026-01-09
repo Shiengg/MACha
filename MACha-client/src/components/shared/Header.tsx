@@ -131,7 +131,7 @@ export default function Header() {
                         </button>
 
                         {/* Search Bar - Desktop/Tablet */}
-                        <div className="hidden md:flex flex-1 max-w-lg relative">
+                        <div className="hidden md:flex flex-1 max-w-lg relative z-10">
                             <form onSubmit={handleSearchSubmit} className="w-full">
                                 <div className="relative">
                                     <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 md:w-5 md:h-5" />
@@ -312,9 +312,9 @@ export default function Header() {
                     </div>
                 </div>
 
-                {/* Mobile Search Bar - Expanded */}
+                        {/* Mobile Search Bar - Expanded */}
                 {isSearchExpanded && (
-                    <div className="md:hidden mt-3 pb-2">
+                    <div className="md:hidden mt-3 pb-2 relative">
                         <form onSubmit={handleSearchSubmit}>
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
