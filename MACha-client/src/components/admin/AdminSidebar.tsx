@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAdminSidebar } from '@/contexts/AdminSidebarContext';
 import { 
   BarChart3, 
   Users, 
@@ -13,7 +14,8 @@ import {
   MoreVertical,
   LogOut,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  X
 } from 'lucide-react';
 
 interface MenuItem {
@@ -33,6 +35,7 @@ export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
+  const { isSidebarOpen, closeSidebar } = useAdminSidebar();
 
   const handleLogout = async () => {
     await logout();
@@ -61,15 +64,35 @@ export default function AdminSidebar() {
   ];
 
   return (
-    <div className="w-64 bg-gray-50 h-screen fixed left-0 top-0 flex flex-col border-r border-gray-200">
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
-            A
+    <>
+      {/* Overlay for mobile */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={closeSidebar}
+        />
+      )}
+      
+      <div className={`w-64 bg-gray-50 h-screen fixed left-0 top-0 flex flex-col border-r border-gray-200 shadow-lg transition-transform duration-300 z-50 ${
+        isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="p-6 border-b border-gray-200 bg-white">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
+                A
+              </div>
+              <span className="text-gray-900 font-bold text-lg">Admin Panel</span>
+            </div>
+            <button
+              onClick={closeSidebar}
+              className="lg:hidden p-1 hover:bg-gray-100 rounded transition-colors"
+              aria-label="Close sidebar"
+            >
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
           </div>
-          <span className="text-gray-900 font-bold text-lg">Admin Panel</span>
         </div>
-      </div>
 
       <nav className="flex-1 p-4 overflow-y-auto">
         {menuSections.map((section, sectionIndex) => (
@@ -129,6 +152,7 @@ export default function AdminSidebar() {
         </button>
       </div>
     </div>
+    </>
   );
 }
 

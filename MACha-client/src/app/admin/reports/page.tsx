@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
+import AdminContentWrapper from '@/components/admin/AdminContentWrapper';
 import { 
   getGroupedReports, 
   getReportsByItem, 
@@ -373,43 +374,43 @@ export default function AdminReports() {
       <AdminSidebar />
       <AdminHeader />
       
-      <div className="ml-64 pt-16">
-        <div className="p-8">
-          <div className="mb-8">
-            <h1 className="text-2xl font-semibold text-gray-900 mb-2">Quản lý báo cáo</h1>
-            <p className="text-gray-600">Xem và xử lý các báo cáo từ người dùng (nhóm theo item).</p>
+      <AdminContentWrapper>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="mb-4 sm:mb-6 lg:mb-8">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-1 sm:mb-2">Quản lý báo cáo</h1>
+            <p className="text-sm sm:text-base text-gray-600">Xem và xử lý các báo cáo từ người dùng (nhóm theo item).</p>
           </div>
 
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">
                 Items bị báo cáo <span className="text-gray-500 font-normal">({totalCount})</span>
               </h2>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="relative">
+            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:flex-none">
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
                 />
               </div>
               
               <div className="relative" ref={filterRef}>
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors text-sm sm:text-base"
                 >
                   <SlidersHorizontal className="w-4 h-4 text-gray-600" />
-                  <span className="text-sm font-bold">Filters</span>
+                  <span className="text-xs sm:text-sm font-bold">Filters</span>
                 </button>
                 
                 {showFilters && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
-                    <div className="space-y-4">
+                  <div className="absolute right-0 mt-2 w-64 sm:w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 sm:p-4">
+                    <div className="space-y-3 sm:space-y-4">
                       <div className="relative">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Trạng thái
@@ -455,42 +456,46 @@ export default function AdminReports() {
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               {loading ? (
-                <div className="flex items-center justify-center py-12">
+                <div className="flex items-center justify-center py-8 sm:py-12">
                   <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-600">Đang tải dữ liệu...</p>
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3 sm:mb-4"></div>
+                    <p className="text-sm sm:text-base text-gray-600">Đang tải dữ liệu...</p>
                   </div>
                 </div>
               ) : filteredItems.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-600">Không tìm thấy items bị báo cáo</p>
+                <div className="text-center py-8 sm:py-12">
+                  <p className="text-sm sm:text-base text-gray-600">Không tìm thấy items bị báo cáo</p>
                 </div>
               ) : (
-                <table className="w-full">
+                <table className="w-full min-w-[900px]">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-100">
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Item</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Loại</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Số lượng báo cáo</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Lý do phổ biến</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Ngày báo cáo mới nhất</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Hành động</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900">Item</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900">Loại</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900">Số lượng báo cáo</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900 hidden lg:table-cell">Lý do phổ biến</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900 hidden md:table-cell">Ngày báo cáo mới nhất</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900">Hành động</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredItems.map((item) => (
                       <tr key={`${item.reported_type}:${item.reported_id}`} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-gray-900">
-                            {item.reported_type}:{item.reported_id.slice(-8)}
+                        <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+                          <div className="min-w-0">
+                            <div className="font-medium text-gray-900 text-xs sm:text-sm truncate">
+                              {item.reported_type}:{item.reported_id.slice(-8)}
+                            </div>
+                            <div className="text-xs text-gray-500 lg:hidden mt-1">{getTopReason(item.reasons)}</div>
+                            <div className="text-xs text-gray-500 md:hidden mt-1">{formatDate(item.latest_report_at)}</div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{getTypeLabel(item.reported_type)}</div>
+                        <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+                          <div className="text-xs sm:text-sm text-gray-900">{getTypeLabel(item.reported_type)}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-gray-900">{item.count}</span>
+                        <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900">{item.count}</span>
                             {item.pending_count > 0 && (
                               <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">
                                 {item.pending_count} chờ xử lý
@@ -498,67 +503,67 @@ export default function AdminReports() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{getTopReason(item.reasons)}</div>
+                        <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 hidden lg:table-cell">
+                          <div className="text-xs sm:text-sm text-gray-900">{getTopReason(item.reasons)}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{formatDate(item.latest_report_at)}</div>
+                        <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 hidden md:table-cell">
+                          <div className="text-xs sm:text-sm text-gray-900">{formatDate(item.latest_report_at)}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
+                        <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+                          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                             <button
                               onClick={() => handleViewItemDetails(item)}
                               disabled={processingItemKey === `${item.reported_type}:${item.reported_id}`}
-                              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <Eye className="w-4 h-4" />
-                              Xem chi tiết
+                              <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden sm:inline">Xem chi tiết</span>
                             </button>
                             {item.pending_count > 0 && (
                               <>
                                 <button
                                   onClick={() => handleBatchUpdate(item, 'resolved')}
                                   disabled={processingItemKey === `${item.reported_type}:${item.reported_id}`}
-                                  className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {processingItemKey === `${item.reported_type}:${item.reported_id}` ? (
                                     <>
-                                      <div className="w-4 h-4 text-green-700">
+                                      <div className="w-3 h-3 sm:w-4 sm:h-4 text-green-700">
                                         <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                           <path d="M10.72,19.9a8,8,0,0,1-6.5-9.79A7.77,7.77,0,0,1,10.4,4.16a8,8,0,0,1,9.49,6.52A1.54,1.54,0,0,0,21.38,12h.13a1.37,1.37,0,0,0,1.38-1.54,11,11,0,1,0-12.7,12.39A1.54,1.54,0,0,0,12,21.34h0A1.47,1.47,0,0,0,10.72,19.9Z">
                                             <animateTransform attributeName="transform" type="rotate" dur="0.75s" values="0 12 12;360 12 12" repeatCount="indefinite"></animateTransform>
                                           </path>
                                         </svg>
                                       </div>
-                                      Đang xử lý...
+                                      <span className="hidden sm:inline">Đang xử lý...</span>
                                     </>
                                   ) : (
                                     <>
-                                      <CheckCircle className="w-4 h-4" />
-                                      Phê duyệt
+                                      <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                                      <span className="hidden sm:inline">Phê duyệt</span>
                                     </>
                                   )}
                                 </button>
                                 <button
                                   onClick={() => handleBatchUpdate(item, 'rejected')}
                                   disabled={processingItemKey === `${item.reported_type}:${item.reported_id}`}
-                                  className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {processingItemKey === `${item.reported_type}:${item.reported_id}` ? (
                                     <>
-                                      <div className="w-4 h-4 text-red-700">
+                                      <div className="w-3 h-3 sm:w-4 sm:h-4 text-red-700">
                                         <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                           <path d="M10.72,19.9a8,8,0,0,1-6.5-9.79A7.77,7.77,0,0,1,10.4,4.16a8,8,0,0,1,9.49,6.52A1.54,1.54,0,0,0,21.38,12h.13a1.37,1.37,0,0,0,1.38-1.54,11,11,0,1,0-12.7,12.39A1.54,1.54,0,0,0,12,21.34h0A1.47,1.47,0,0,0,10.72,19.9Z">
                                             <animateTransform attributeName="transform" type="rotate" dur="0.75s" values="0 12 12;360 12 12" repeatCount="indefinite"></animateTransform>
                                           </path>
                                         </svg>
                                       </div>
-                                      Đang xử lý...
+                                      <span className="hidden sm:inline">Đang xử lý...</span>
                                     </>
                                   ) : (
                                     <>
-                                      <XCircle className="w-4 h-4" />
-                                      Từ chối
+                                      <XCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                                      <span className="hidden sm:inline">Từ chối</span>
                                     </>
                                   )}
                                 </button>
@@ -573,15 +578,15 @@ export default function AdminReports() {
               )}
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-              <div className="text-sm text-gray-600">
+            <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-t border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 bg-gray-50">
+              <div className="text-xs sm:text-sm text-gray-600">
                 Hiển thị {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalCount)} / {totalCount} items
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className={`px-4 py-2 rounded-lg transition-all text-sm ${
+                  className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-xs sm:text-sm ${
                     currentPage === 1
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
@@ -592,14 +597,14 @@ export default function AdminReports() {
                 
                 {getPageNumbers().map((page, index) => (
                   page === '...' ? (
-                    <span key={`ellipsis-${index}`} className="px-4 py-2 text-gray-400">
+                    <span key={`ellipsis-${index}`} className="px-2 sm:px-4 py-2 text-gray-400 text-xs sm:text-sm">
                       ...
                     </span>
                   ) : (
                     <button
                       key={page}
                       onClick={() => handlePageChange(page as number)}
-                      className={`px-4 py-2 rounded-lg transition-all text-sm ${
+                      className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-xs sm:text-sm ${
                         currentPage === page
                           ? 'bg-blue-600 text-white'
                           : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
@@ -613,7 +618,7 @@ export default function AdminReports() {
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages || totalPages === 0}
-                  className={`px-4 py-2 rounded-lg transition-all text-sm ${
+                  className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-xs sm:text-sm ${
                     currentPage === totalPages || totalPages === 0
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
@@ -625,7 +630,7 @@ export default function AdminReports() {
             </div>
           </div>
         </div>
-      </div>
+      </AdminContentWrapper>
 
       {showItemDetailsModal && selectedItem && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowItemDetailsModal(false)}>

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
+import AdminContentWrapper from '@/components/admin/AdminContentWrapper';
 import EventDetailModal from '@/components/admin/EventDetailModal';
 import { getPendingEvents, getAllEvents, approveEvent, rejectEvent, AdminEvent } from '@/services/admin/event.service';
 import Swal from 'sweetalert2';
@@ -351,34 +352,34 @@ export default function AdminEventApproval() {
       <AdminSidebar />
       <AdminHeader />
       
-      <div className="ml-64 pt-16">
-        <div className="p-8">
+      <AdminContentWrapper>
+        <div className="p-4 sm:p-6 lg:p-8">
           {/* Main Title */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-semibold text-gray-900 mb-2">Quản lý sự kiện</h1>
-            <p className="text-gray-600">Quản lý, tìm kiếm và lọc các sự kiện trong hệ thống.</p>
+          <div className="mb-4 sm:mb-6 lg:mb-8">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-1 sm:mb-2">Quản lý sự kiện</h1>
+            <p className="text-sm sm:text-base text-gray-600">Quản lý, tìm kiếm và lọc các sự kiện trong hệ thống.</p>
           </div>
 
           {/* Header with title, count, search and filters */}
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">
                 {statusFilter === 'pending' ? 'Sự kiện chờ duyệt' : 
                  statusFilter === 'all' ? 'Tất cả sự kiện' :
                  `Sự kiện ${getStatusBadge(statusFilter).label.toLowerCase()}`}
                 <span className="text-gray-500 font-normal"> ({filteredEvents.length})</span>
               </h2>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
               {/* Search Bar */}
-              <div className="relative">
+              <div className="relative flex-1 sm:flex-none">
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
                 />
               </div>
               
@@ -386,16 +387,16 @@ export default function AdminEventApproval() {
               <div className="relative" ref={filterRef}>
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors text-sm sm:text-base"
                 >
                   <SlidersHorizontal className="w-4 h-4 text-gray-600" />
-                  <span className="text-sm font-bold">Filters</span>
+                  <span className="text-xs sm:text-sm font-bold">Filters</span>
                 </button>
                 
                 {/* Filters Dropdown */}
                 {showFilters && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
-                    <div className="space-y-4">
+                  <div className="absolute right-0 mt-2 w-64 sm:w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 sm:p-4">
+                    <div className="space-y-3 sm:space-y-4">
                       {/* Status Filter */}
                       <div className="relative">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -426,15 +427,15 @@ export default function AdminEventApproval() {
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               {loading ? (
-                <div className="flex items-center justify-center py-12">
+                <div className="flex items-center justify-center py-8 sm:py-12">
                   <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-600">Đang tải dữ liệu...</p>
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3 sm:mb-4"></div>
+                    <p className="text-sm sm:text-base text-gray-600">Đang tải dữ liệu...</p>
                   </div>
                 </div>
               ) : filteredEvents.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-600 mb-2">
+                <div className="text-center py-8 sm:py-12">
+                  <p className="text-sm sm:text-base text-gray-600 mb-2">
                     {statusFilter === 'pending' 
                       ? 'Không có sự kiện nào đang chờ duyệt'
                       : searchQuery
@@ -442,16 +443,16 @@ export default function AdminEventApproval() {
                       : `Không có sự kiện nào với trạng thái "${getStatusBadge(statusFilter).label}"`}
                   </p>
                   {statusFilter === 'pending' && (
-                    <p className="text-sm text-gray-500 mt-2">
+                    <p className="text-xs sm:text-sm text-gray-500 mt-2">
                       Các sự kiện mới tạo sẽ có trạng thái "Chờ duyệt" và xuất hiện ở đây
                     </p>
                   )}
                 </div>
               ) : (
-                <table className="w-full">
+                <table className="w-full min-w-[800px]">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-100">
-                      <th className="px-6 py-3 text-left">
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left">
                         <input 
                           type="checkbox" 
                           className="w-4 h-4 rounded-full border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -459,12 +460,12 @@ export default function AdminEventApproval() {
                           onChange={(e) => handleSelectAll(e.target.checked)}
                         />
                       </th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Tên sự kiện</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Người tạo</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Loại</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Ngày bắt đầu</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Trạng thái</th>
-                      <th className="px-6 py-3 text-left"></th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900">Tên sự kiện</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900 hidden md:table-cell">Người tạo</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900 hidden lg:table-cell">Loại</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900 hidden sm:table-cell">Ngày bắt đầu</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900">Trạng thái</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -473,7 +474,7 @@ export default function AdminEventApproval() {
                       const isLastTwo = index >= paginatedEvents.length - 2;
                       return (
                         <tr key={event._id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
                             <input 
                               type="checkbox" 
                               className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -481,26 +482,29 @@ export default function AdminEventApproval() {
                               onChange={(e) => handleSelectEvent(event._id, e.target.checked)}
                             />
                           </td>
-                          <td className="px-6 py-4">
-                            <div className="font-medium text-gray-900">{event.title}</div>
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+                            <div className="font-medium text-gray-900 text-xs sm:text-sm">{event.title}</div>
+                            <div className="text-xs text-gray-500 md:hidden mt-1">{event.creator?.fullname || event.creator?.username || 'Unknown'}</div>
+                            <div className="text-xs text-gray-500 lg:hidden mt-1">{getCategoryLabel(event.category)}</div>
+                            <div className="text-xs text-gray-500 sm:hidden mt-1">{formatDate(event.start_date)}</div>
                           </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">{event.creator?.fullname || event.creator?.username || 'Unknown'}</div>
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 hidden md:table-cell">
+                            <div className="text-xs sm:text-sm text-gray-900">{event.creator?.fullname || event.creator?.username || 'Unknown'}</div>
                           </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">{getCategoryLabel(event.category)}</div>
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 hidden lg:table-cell">
+                            <div className="text-xs sm:text-sm text-gray-900">{getCategoryLabel(event.category)}</div>
                           </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">{formatDate(event.start_date)}</div>
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 hidden sm:table-cell">
+                            <div className="text-xs sm:text-sm text-gray-900">{formatDate(event.start_date)}</div>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
                             <span
-                              className={`px-2.5 py-1 text-xs font-medium rounded-full ${statusBadge.bgColor} ${statusBadge.textColor}`}
+                              className={`px-2 sm:px-2.5 py-1 text-xs font-medium rounded-full ${statusBadge.bgColor} ${statusBadge.textColor}`}
                             >
                               {statusBadge.label}
                             </span>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
                             <button
                               ref={(el) => {
                                 buttonRefs.current[event._id] = el;
@@ -508,7 +512,7 @@ export default function AdminEventApproval() {
                               onClick={() => handleToggleMenu(event._id, isLastTwo)}
                               className="text-gray-400 hover:text-gray-600 transition-colors p-1"
                             >
-                              <MoreVertical className="w-5 h-5" />
+                              <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5" />
                             </button>
                           </td>
                         </tr>
@@ -520,16 +524,16 @@ export default function AdminEventApproval() {
             </div>
 
             {/* Pagination */}
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-              <div className="text-sm text-gray-600">
+            <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-t border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 bg-gray-50">
+              <div className="text-xs sm:text-sm text-gray-600">
                 Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredEvents.length)} / {filteredEvents.length} sự kiện
-                {searchQuery && ` (lọc từ ${events.length} tổng)`}
+                {searchQuery && <span className="hidden sm:inline"> (lọc từ {events.length} tổng)</span>}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className={`px-4 py-2 rounded-lg transition-all text-sm ${
+                  className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-xs sm:text-sm ${
                     currentPage === 1
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
@@ -540,14 +544,14 @@ export default function AdminEventApproval() {
                 
                 {getPageNumbers().map((page, index) => (
                   page === '...' ? (
-                    <span key={`ellipsis-${index}`} className="px-4 py-2 text-gray-400">
+                    <span key={`ellipsis-${index}`} className="px-2 sm:px-4 py-2 text-gray-400 text-xs sm:text-sm">
                       ...
                     </span>
                   ) : (
                     <button
                       key={page}
                       onClick={() => handlePageChange(page as number)}
-                      className={`px-4 py-2 rounded-lg transition-all text-sm ${
+                      className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-xs sm:text-sm ${
                         currentPage === page
                           ? 'bg-blue-600 text-white'
                           : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
@@ -561,7 +565,7 @@ export default function AdminEventApproval() {
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages || totalPages === 0}
-                  className={`px-4 py-2 rounded-lg transition-all text-sm ${
+                  className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-xs sm:text-sm ${
                     currentPage === totalPages || totalPages === 0
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
@@ -573,7 +577,7 @@ export default function AdminEventApproval() {
             </div>
           </div>
         </div>
-      </div>
+      </AdminContentWrapper>
 
       {/* Event Detail Modal */}
       {selectedEventId && (
