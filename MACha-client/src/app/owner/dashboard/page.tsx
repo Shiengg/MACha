@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
+import OwnerContentWrapper from '@/components/owner/OwnerContentWrapper';
 import { ownerService, DashboardData } from '@/services/owner.service';
 import { Users, Shield, DollarSign, TrendingUp, TrendingDown, CheckCircle, XCircle, ArrowUpRight, Activity, History } from 'lucide-react';
 import Link from 'next/link';
@@ -35,12 +36,14 @@ export default function OwnerDashboard() {
       <div className="min-h-screen bg-gray-50">
         <OwnerSidebar />
         <OwnerHeader />
-        <div className="ml-64 pt-16 flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading dashboard...</p>
+        <OwnerContentWrapper>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading dashboard...</p>
+            </div>
           </div>
-        </div>
+        </OwnerContentWrapper>
       </div>
     );
   }
@@ -50,11 +53,13 @@ export default function OwnerDashboard() {
       <div className="min-h-screen bg-gray-50">
         <OwnerSidebar />
         <OwnerHeader />
-        <div className="ml-64 pt-16 flex items-center justify-center h-screen">
-          <div className="text-center">
-            <p className="text-red-500">{error || 'Failed to load dashboard'}</p>
+        <OwnerContentWrapper>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <p className="text-red-500">{error || 'Failed to load dashboard'}</p>
+            </div>
           </div>
-        </div>
+        </OwnerContentWrapper>
       </div>
     );
   }
@@ -95,19 +100,19 @@ export default function OwnerDashboard() {
       <OwnerSidebar />
       <OwnerHeader />
       
-      <div className="ml-64 pt-16">
-        <div className="p-8">
-          <div className="mb-6 flex items-center justify-between">
+      <OwnerContentWrapper>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-              <p className="text-gray-600">Tổng quan hệ thống MACha</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Dashboard</h1>
+              <p className="text-sm sm:text-base text-gray-600">Tổng quan hệ thống MACha</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full sm:w-auto">
               {(['today', 'week', 'month'] as const).map((filter) => (
                 <button
                   key={filter}
                   onClick={() => setTimeFilter(filter)}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-sm sm:text-base flex-1 sm:flex-none ${
                     timeFilter === filter
                       ? 'bg-purple-600 text-white shadow-md'
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
@@ -120,7 +125,7 @@ export default function OwnerDashboard() {
           </div>
 
           {/* Quick Links */}
-          <div className="mb-6 grid grid-cols-5 gap-4">
+          <div className="mb-4 sm:mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
             <Link href="/owner/admins" className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all hover:border-purple-300 group">
               <div className="flex items-center gap-3">
                 <Shield className="w-6 h-6 text-purple-600 group-hover:scale-110 transition-transform" />
@@ -168,13 +173,13 @@ export default function OwnerDashboard() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-4 gap-6 mb-6">
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <Shield className="w-8 h-8 text-purple-600" />
+                <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
                 <div className="text-right">
-                  <div className="text-gray-500 text-sm mb-1">Total Admins</div>
-                  <div className="text-2xl font-bold text-gray-900">{dashboardData.overview.admins}</div>
+                  <div className="text-gray-500 text-xs sm:text-sm mb-1">Total Admins</div>
+                  <div className="text-xl sm:text-2xl font-bold text-gray-900">{dashboardData.overview.admins}</div>
                 </div>
               </div>
             </div>
@@ -182,13 +187,14 @@ export default function OwnerDashboard() {
             {financialStats.map((stat, index) => {
               const IconComponent = stat.icon;
               return (
-                <div key={index} className={`${stat.bgColor} p-6 rounded-lg border border-gray-200 shadow-sm`}>
+                <div key={index} className={`${stat.bgColor} p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm`}>
                   <div className="flex items-center justify-between mb-4">
-                    <IconComponent className={`w-8 h-8 ${stat.color}`} />
+                    <IconComponent className={`w-6 h-6 sm:w-8 sm:h-8 ${stat.color}`} />
                     <div className="text-right">
-                      <div className="text-gray-600 text-sm mb-1">{stat.label}</div>
-                      <div className={`text-2xl font-bold ${stat.color}`}>
-                        {stat.value.toLocaleString('vi-VN')} VND
+                      <div className="text-gray-600 text-xs sm:text-sm mb-1">{stat.label}</div>
+                      <div className={`text-lg sm:text-xl lg:text-2xl font-bold ${stat.color}`}>
+                        <span className="block sm:inline">{Math.floor(stat.value / 1000000)}M</span>
+                        <span className="hidden sm:inline"> VND</span>
                       </div>
                     </div>
                   </div>
@@ -197,9 +203,9 @@ export default function OwnerDashboard() {
             })}
           </div>
 
-          <div className="grid grid-cols-2 gap-6 mb-6">
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Approvals/Rejections ({timeFilter})</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Approvals/Rejections ({timeFilter})</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
                   <div className="flex items-center gap-3">
@@ -224,9 +230,9 @@ export default function OwnerDashboard() {
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Flow (Last 12 Months)</h3>
-              <div className="h-64 relative">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Financial Flow (Last 12 Months)</h3>
+              <div className="h-48 sm:h-64 relative overflow-x-auto">
                 <svg viewBox="0 0 400 200" className="w-full h-full">
                   <defs>
                     <linearGradient id="donatedGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -299,12 +305,12 @@ export default function OwnerDashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Top 5 Campaigns</h3>
-                <Link href="/owner/financial/campaigns" className="text-purple-600 hover:text-purple-700 text-sm flex items-center gap-1">
-                  View All <ArrowUpRight className="w-4 h-4" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Top 5 Campaigns</h3>
+                <Link href="/owner/financial/campaigns" className="text-purple-600 hover:text-purple-700 text-xs sm:text-sm flex items-center gap-1">
+                  View All <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4" />
                 </Link>
               </div>
               <div className="space-y-3">
@@ -361,7 +367,7 @@ export default function OwnerDashboard() {
             </div>
           </div>
         </div>
-      </div>
+      </OwnerContentWrapper>
     </div>
   );
 }

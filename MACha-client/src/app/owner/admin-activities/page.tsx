@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
+import OwnerContentWrapper from '@/components/owner/OwnerContentWrapper';
 import { ownerService, AdminActivities } from '@/services/owner.service';
 import { Activity, CheckCircle, XCircle, FileText, DollarSign, Users } from 'lucide-react';
 
@@ -90,12 +91,14 @@ function OwnerAdminActivitiesContent() {
       <div className="min-h-screen bg-gray-50">
         <OwnerSidebar />
         <OwnerHeader />
-        <div className="ml-64 pt-16 flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading...</p>
+        <OwnerContentWrapper>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading...</p>
+            </div>
           </div>
-        </div>
+        </OwnerContentWrapper>
       </div>
     );
   }
@@ -116,17 +119,16 @@ function OwnerAdminActivitiesContent() {
     <div className="min-h-screen bg-gray-50">
       <OwnerSidebar />
       <OwnerHeader />
-      
-      <div className="ml-64 pt-16">
-        <div className="p-8">
-          <div className="mb-6 flex items-center justify-between">
+      <OwnerContentWrapper>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="mb-4 sm:mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Hoạt động Admin</h1>
-              <p className="text-gray-600">Thống kê hoạt động của admin</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Hoạt động Admin</h1>
+              <p className="text-sm sm:text-base text-gray-600">Thống kê hoạt động của admin</p>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm mb-6">
+          <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm mb-4 sm:mb-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-purple-100 rounded-lg">
                 <Users className="w-5 h-5 text-purple-600" />
@@ -154,74 +156,74 @@ function OwnerAdminActivitiesContent() {
           </div>
 
           {data.admin && (
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-5 rounded-lg border border-purple-200 shadow-sm mb-6">
-              <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 sm:p-5 rounded-lg border border-purple-200 shadow-sm mb-4 sm:mb-6">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-2 bg-purple-600 rounded-full">
-                  <Users className="w-5 h-5 text-white" />
+                  <Users className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Đang xem hoạt động của</p>
-                  <p className="text-lg font-semibold text-gray-900">{data.admin.username}</p>
+                  <p className="text-xs sm:text-sm text-gray-600">Đang xem hoạt động của</p>
+                  <p className="text-base sm:text-lg font-semibold text-gray-900">{data.admin.username}</p>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 rounded-lg shadow-lg mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
-                <Activity className="w-8 h-8 text-white" />
+          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 sm:p-6 rounded-lg shadow-lg mb-4 sm:mb-6">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-white/20 rounded-lg backdrop-blur-sm">
+                <Activity className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               </div>
               <div>
-                <p className="text-sm text-purple-100">Tổng số hành động</p>
-                <h2 className="text-3xl font-bold text-white">{data.statistics.total_actions || 0}</h2>
+                <p className="text-xs sm:text-sm text-purple-100">Tổng số hành động</p>
+                <h2 className="text-2xl sm:text-3xl font-bold text-white">{data.statistics.total_actions || 0}</h2>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
             {stats.map((stat, index) => {
               const IconComponent = stat.icon;
               return (
-                <div key={index} className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                <div key={index} className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between mb-3">
-                    <div className={`${stat.color} p-3 rounded-lg shadow-sm`}>
-                      <IconComponent className="w-6 h-6 text-white" />
+                    <div className={`${stat.color} p-2 sm:p-3 rounded-lg shadow-sm`}>
+                      <IconComponent className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                     </div>
                     <div className="text-right">
-                      <div className="text-3xl font-bold text-gray-900">{stat.value}</div>
+                      <div className="text-2xl sm:text-3xl font-bold text-gray-900">{stat.value}</div>
                     </div>
                   </div>
-                  <div className="text-sm font-medium text-gray-700">{stat.label}</div>
+                  <div className="text-xs sm:text-sm font-medium text-gray-700">{stat.label}</div>
                 </div>
               );
             })}
           </div>
 
-          <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-purple-600" />
+          <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
+              <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
               Tổng kết hoạt động
             </h3>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              <div className="p-4 sm:p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm font-medium text-gray-600">Tổng số duyệt</div>
-                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <div className="text-xs sm:text-sm font-medium text-gray-600">Tổng số duyệt</div>
+                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
                 </div>
-                <div className="text-4xl font-bold text-green-600">
+                <div className="text-3xl sm:text-4xl font-bold text-green-600">
                   {(data.statistics.campaign_approvals || 0) + 
                    (data.statistics.event_approvals || 0) + 
                    (data.statistics.kyc_approvals || 0) + 
                    (data.statistics.withdrawal_approvals || 0)}
                 </div>
               </div>
-              <div className="p-6 bg-gradient-to-br from-red-50 to-rose-50 rounded-lg border border-red-200">
+              <div className="p-4 sm:p-6 bg-gradient-to-br from-red-50 to-rose-50 rounded-lg border border-red-200">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm font-medium text-gray-600">Tổng số từ chối</div>
-                  <XCircle className="w-5 h-5 text-red-600" />
+                  <div className="text-xs sm:text-sm font-medium text-gray-600">Tổng số từ chối</div>
+                  <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
                 </div>
-                <div className="text-4xl font-bold text-red-600">
+                <div className="text-3xl sm:text-4xl font-bold text-red-600">
                   {(data.statistics.campaign_rejections || 0) + 
                    (data.statistics.event_rejections || 0) + 
                    (data.statistics.kyc_rejections || 0) + 
@@ -231,7 +233,7 @@ function OwnerAdminActivitiesContent() {
             </div>
           </div>
         </div>
-      </div>
+      </OwnerContentWrapper>
     </div>
   );
 }
@@ -242,12 +244,14 @@ export default function OwnerAdminActivities() {
       <div className="min-h-screen bg-gray-50">
         <OwnerSidebar />
         <OwnerHeader />
-        <div className="ml-64 pt-16 flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading...</p>
+        <OwnerContentWrapper>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading...</p>
+            </div>
           </div>
-        </div>
+        </OwnerContentWrapper>
       </div>
     }>
       <OwnerAdminActivitiesContent />

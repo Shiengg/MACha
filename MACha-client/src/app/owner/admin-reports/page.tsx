@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
+import OwnerContentWrapper from '@/components/owner/OwnerContentWrapper';
 import { getAdminReports, getReportsByAdmin, updateReportStatus, type Report, type ReportStatus, type ReportResolution } from '@/services/report.service';
 import { ownerService } from '@/services/owner.service';
 import Swal from 'sweetalert2';
@@ -152,15 +153,15 @@ export default function OwnerAdminReports() {
       <OwnerSidebar />
       <OwnerHeader />
       
-      <div className="ml-64 pt-16">
-        <div className="p-8">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Báo cáo về Admin</h1>
-            <p className="text-gray-600">Xem và xử lý các báo cáo về admin</p>
+      <OwnerContentWrapper>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Báo cáo về Admin</h1>
+            <p className="text-sm sm:text-base text-gray-600">Xem và xử lý các báo cáo về admin</p>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Trạng thái</label>
                 <select
@@ -209,136 +210,138 @@ export default function OwnerAdminReports() {
               <p className="text-gray-500">Không có báo cáo nào</p>
             </div>
           ) : (
-            <>
+            <div>
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Người báo cáo</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Admin được báo cáo</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lý do</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày báo cáo</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Hành động</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {reports.map((report) => {
-                      const reportedAdmin = getReportedAdmin(report);
-                      return (
-                        <tr key={report._id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              {report.reporter.avatar ? (
-                                <img className="h-8 w-8 rounded-full" src={report.reporter.avatar} alt={report.reporter.username} />
-                              ) : (
-                                <div className="h-8 w-8 rounded-full bg-purple-600 flex items-center justify-center text-white text-sm font-bold">
-                                  {report.reporter.username?.[0]?.toUpperCase() || 'U'}
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[800px]">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Người báo cáo</th>
+                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Admin được báo cáo</th>
+                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Lý do</th>
+                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
+                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Ngày báo cáo</th>
+                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {reports.map((report) => {
+                        const reportedAdmin = getReportedAdmin(report);
+                        return (
+                          <tr key={report._id} className="hover:bg-gray-50">
+                            <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                {report.reporter.avatar ? (
+                                  <img className="h-8 w-8 rounded-full" src={report.reporter.avatar} alt={report.reporter.username} />
+                                ) : (
+                                  <div className="h-8 w-8 rounded-full bg-purple-600 flex items-center justify-center text-white text-sm font-bold">
+                                    {report.reporter.username?.[0]?.toUpperCase() || 'U'}
+                                  </div>
+                                )}
+                                <div className="ml-2 sm:ml-3">
+                                  <div className="text-xs sm:text-sm font-medium text-gray-900">{report.reporter.fullname || report.reporter.username}</div>
+                                  <div className="text-xs sm:text-sm text-gray-500">@{report.reporter.username}</div>
                                 </div>
-                              )}
-                              <div className="ml-3">
-                                <div className="text-sm font-medium text-gray-900">{report.reporter.fullname || report.reporter.username}</div>
-                                <div className="text-sm text-gray-500">@{report.reporter.username}</div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {reportedAdmin ? (
-                              <div className="text-sm text-gray-900">{reportedAdmin.username || 'N/A'}</div>
-                            ) : (
-                              <div className="text-sm text-gray-400">N/A</div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">{getReasonLabel(report.reported_reason)}</div>
-                            {report.description && (
-                              <div className="text-xs text-gray-500 mt-1 truncate max-w-xs">{report.description}</div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(report.status)}`}>
-                              {report.status === 'pending' ? 'Đang chờ' : report.status === 'resolved' ? 'Đã xử lý' : report.status === 'rejected' ? 'Đã từ chối' : report.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(report.submitted_at).toLocaleDateString('vi-VN')}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => handleViewDetail(report)}
-                                className="text-blue-600 hover:text-blue-900"
-                              >
-                                <Eye className="w-5 h-5" />
-                              </button>
-                              {report.status === 'pending' && (
-                                <>
-                                  <button
-                                    onClick={() => handleAction(report, 'warn')}
-                                    className="text-yellow-600 hover:text-yellow-900"
-                                    title="Cảnh báo"
-                                  >
-                                    <AlertTriangle className="w-5 h-5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleAction(report, 'remove')}
-                                    className="text-orange-600 hover:text-orange-900"
-                                    title="Gỡ admin"
-                                  >
-                                    <UserMinus className="w-5 h-5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleAction(report, 'ban')}
-                                    className="text-red-600 hover:text-red-900"
-                                    title="Cấm admin"
-                                  >
-                                    <Ban className="w-5 h-5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleAction(report, 'no_action')}
-                                    className="text-gray-600 hover:text-gray-900"
-                                    title="Không xử lý"
-                                  >
-                                    <X className="w-5 h-5" />
-                                  </button>
-                                </>
+                            </td>
+                            <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap hidden md:table-cell">
+                              {reportedAdmin ? (
+                                <div className="text-xs sm:text-sm text-gray-900">{reportedAdmin.username || 'N/A'}</div>
+                              ) : (
+                                <div className="text-xs sm:text-sm text-gray-400">N/A</div>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                            <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 hidden lg:table-cell">
+                              <div className="text-xs sm:text-sm text-gray-900">{getReasonLabel(report.reported_reason)}</div>
+                              {report.description && (
+                                <div className="text-xs text-gray-500 mt-1 truncate max-w-xs">{report.description}</div>
+                              )}
+                            </td>
+                            <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(report.status)}`}>
+                                {report.status === 'pending' ? 'Đang chờ' : report.status === 'resolved' ? 'Đã xử lý' : report.status === 'rejected' ? 'Đã từ chối' : report.status}
+                              </span>
+                            </td>
+                            <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 hidden sm:table-cell">
+                              {new Date(report.submitted_at).toLocaleDateString('vi-VN')}
+                            </td>
+                            <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex items-center justify-end gap-1 sm:gap-2">
+                                <button
+                                  onClick={() => handleViewDetail(report)}
+                                  className="text-blue-600 hover:text-blue-900"
+                                >
+                                  <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+                                </button>
+                                {report.status === 'pending' && (
+                                  <>
+                                    <button
+                                      onClick={() => handleAction(report, 'warn')}
+                                      className="text-yellow-600 hover:text-yellow-900"
+                                      title="Cảnh báo"
+                                    >
+                                      <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleAction(report, 'remove')}
+                                      className="text-orange-600 hover:text-orange-900"
+                                      title="Gỡ admin"
+                                    >
+                                      <UserMinus className="w-4 h-4 sm:w-5 sm:h-5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleAction(report, 'ban')}
+                                      className="text-red-600 hover:text-red-900"
+                                      title="Cấm admin"
+                                    >
+                                      <Ban className="w-4 h-4 sm:w-5 sm:h-5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleAction(report, 'no_action')}
+                                      className="text-gray-600 hover:text-gray-900"
+                                      title="Không xử lý"
+                                    >
+                                      <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between mt-4">
+              <div className="flex items-center justify-between mt-4 p-3 sm:p-4 flex-wrap gap-2">
                 <button
                   onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
                   disabled={currentPage === 0}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+                  className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm"
                 >
                   Previous
                 </button>
-                <span className="text-gray-600">
-                  Page {currentPage + 1} of {totalPages}
+                <span className="text-sm text-gray-600">
+                  Trang {currentPage + 1} / {totalPages}
                 </span>
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
                   disabled={currentPage >= totalPages - 1}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+                  className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm"
                 >
                   Next
                 </button>
               </div>
-            </>
+            </div>
           )}
         </div>
-      </div>
+      </OwnerContentWrapper>
 
       {showDetailModal && selectedReport && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Chi tiết Báo cáo</h2>
             <div className="space-y-4">
               <div>
@@ -404,8 +407,8 @@ export default function OwnerAdminReports() {
       )}
 
       {showActionModal && selectedReport && selectedAction && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-md">
             <h2 className="text-xl font-bold text-gray-900 mb-4">
               {selectedAction === 'warn' ? 'Cảnh báo Admin' : selectedAction === 'remove' ? 'Gỡ Admin' : selectedAction === 'ban' ? 'Cấm Admin' : 'Không xử lý'}
             </h2>

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
+import OwnerContentWrapper from '@/components/owner/OwnerContentWrapper';
 import { ownerService, User } from '@/services/owner.service';
 import Swal from 'sweetalert2';
 import { Search, Ban, Unlock, RotateCcw, Eye, MoreVertical, Download, Filter } from 'lucide-react';
@@ -224,12 +225,14 @@ export default function OwnerUsers() {
       <div className="min-h-screen bg-gray-50">
         <OwnerSidebar />
         <OwnerHeader />
-        <div className="ml-64 pt-16 flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading...</p>
+        <OwnerContentWrapper>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading...</p>
+            </div>
           </div>
-        </div>
+        </OwnerContentWrapper>
       </div>
     );
   }
@@ -239,29 +242,30 @@ export default function OwnerUsers() {
       <OwnerSidebar />
       <OwnerHeader />
       
-      <div className="ml-64 pt-16">
-        <div className="p-8">
-          <div className="mb-6 flex items-center justify-between">
+      <OwnerContentWrapper>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Quản lý Users</h1>
-              <p className="text-gray-600">Quản lý tất cả người dùng trong hệ thống</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Quản lý Users</h1>
+              <p className="text-sm sm:text-base text-gray-600">Quản lý tất cả người dùng trong hệ thống</p>
             </div>
             <button
               onClick={exportToCSV}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
+              className="px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 text-sm sm:text-base w-full sm:w-auto justify-center"
             >
-              <Download className="w-5 h-5" />
-              Export CSV
+              <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Export CSV</span>
+              <span className="sm:hidden">Export</span>
             </button>
           </div>
 
           {/* Filters */}
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Filter className="w-5 h-5 text-gray-600" />
-              <h3 className="font-semibold text-gray-900">Filters</h3>
+          <div className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200 shadow-sm mb-4 sm:mb-6">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <Filter className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+              <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Filters</h3>
             </div>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
                 <div className="relative">
@@ -330,47 +334,48 @@ export default function OwnerUsers() {
           {/* Users Table */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 min-w-[800px]">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KYC Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Email</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">KYC Status</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Created</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {users.map((user) => (
                     <tr key={user._id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           {user.avatar ? (
-                            <img className="h-10 w-10 rounded-full" src={user.avatar} alt={user.username} />
+                            <img className="h-8 w-8 sm:h-10 sm:w-10 rounded-full" src={user.avatar} alt={user.username} />
                           ) : (
-                            <div className="h-10 w-10 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold">
+                            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm">
                               {user.username?.[0]?.toUpperCase() || 'U'}
                             </div>
                           )}
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">{user.fullname || user.username}</div>
-                            <div className="text-sm text-gray-500">@{user.username}</div>
+                          <div className="ml-2 sm:ml-4">
+                            <div className="text-xs sm:text-sm font-medium text-gray-900">{user.fullname || user.username}</div>
+                            <div className="text-xs sm:text-sm text-gray-500">@{user.username}</div>
+                            <div className="text-xs text-gray-400 md:hidden mt-1">{user.email}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{user.email}</div>
+                      <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap hidden md:table-cell">
+                        <div className="text-xs sm:text-sm text-gray-900">{user.email}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                           user.role === 'admin' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
                         }`}>
                           {user.role}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap hidden lg:table-cell">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                           user.kyc_status === 'verified' ? 'bg-green-100 text-green-800' :
                           user.kyc_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
@@ -380,7 +385,7 @@ export default function OwnerUsers() {
                           {user.kyc_status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
                         <div className="flex flex-col gap-1">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             user.is_verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
@@ -394,10 +399,10 @@ export default function OwnerUsers() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 hidden sm:table-cell">
                         {new Date(user.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="relative inline-block">
                           <button
                             ref={(el) => {
@@ -406,7 +411,7 @@ export default function OwnerUsers() {
                             onClick={() => handleToggleMenu(user._id)}
                             className="text-gray-600 hover:text-gray-900"
                           >
-                            <MoreVertical className="w-5 h-5" />
+                            <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
                         </div>
                       </td>
@@ -417,28 +422,28 @@ export default function OwnerUsers() {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between p-4 border-t border-gray-200">
+            <div className="flex items-center justify-between p-3 sm:p-4 border-t border-gray-200 flex-wrap gap-2">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
                 Previous
               </button>
-              <span className="text-sm text-gray-700">
-                Page {currentPage} of {totalPages}
+              <span className="text-xs sm:text-sm text-gray-700">
+                Trang {currentPage} / {totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
                 Next
               </button>
             </div>
           </div>
         </div>
-      </div>
+      </OwnerContentWrapper>
 
       {/* Portal-rendered dropdown menu */}
       {openMenuId && menuPosition && typeof window !== 'undefined' && createPortal(

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
+import OwnerContentWrapper from '@/components/owner/OwnerContentWrapper';
 import { ownerService, FinancialOverview } from '@/services/owner.service';
 import { DollarSign, TrendingUp, TrendingDown, Calendar, Filter } from 'lucide-react';
 
@@ -50,12 +51,14 @@ export default function OwnerFinancial() {
       <div className="min-h-screen bg-gray-50">
         <OwnerSidebar />
         <OwnerHeader />
-        <div className="ml-64 pt-16 flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading...</p>
+        <OwnerContentWrapper>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading...</p>
+            </div>
           </div>
-        </div>
+        </OwnerContentWrapper>
       </div>
     );
   }
@@ -66,16 +69,15 @@ export default function OwnerFinancial() {
     <div className="min-h-screen bg-gray-50">
       <OwnerSidebar />
       <OwnerHeader />
-      
-      <div className="ml-64 pt-16">
-        <div className="p-8">
-          <div className="mb-6 flex items-center justify-between">
+      <OwnerContentWrapper>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Tài chính tổng quan</h1>
-              <p className="text-gray-600">Tổng quan tài chính hệ thống</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Tài chính tổng quan</h1>
+              <p className="text-sm sm:text-base text-gray-600">Tổng quan tài chính hệ thống</p>
             </div>
-            <div className="flex gap-3">
-              <div className="flex gap-2">
+            <div className="flex gap-2 sm:gap-3 w-full sm:w-auto flex-wrap">
+              <div className="flex gap-2 flex-wrap">
                 {(['day', 'week', 'month', 'year'] as const).map((filter) => (
                   <button
                     key={filter}
@@ -90,79 +92,79 @@ export default function OwnerFinancial() {
                   </button>
                 ))}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                  className="px-2 sm:px-3 py-2 text-sm sm:text-base border border-gray-300 rounded-lg flex-1 sm:flex-none"
                 />
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                  className="px-2 sm:px-3 py-2 text-sm sm:text-base border border-gray-300 rounded-lg flex-1 sm:flex-none"
                 />
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-6 mb-6">
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <DollarSign className="w-8 h-8 text-green-500" />
-                <TrendingUp className="w-5 h-5 text-green-500" />
+                <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
               </div>
-              <div className="text-gray-500 text-sm mb-1">Total Donated</div>
-              <div className="text-2xl font-bold text-gray-900">
-                {data.donations.total.toLocaleString('vi-VN')} VND
+              <div className="text-gray-500 text-xs sm:text-sm mb-1">Total Donated</div>
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+                {Math.floor(data.donations.total / 1000000)}M VND
               </div>
-              <div className="text-sm text-gray-500 mt-1">{data.donations.count} donations</div>
+              <div className="text-xs sm:text-sm text-gray-500 mt-1">{data.donations.count} donations</div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <DollarSign className="w-8 h-8 text-red-500" />
-                <TrendingDown className="w-5 h-5 text-red-500" />
+                <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-red-500" />
+                <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
               </div>
-              <div className="text-gray-500 text-sm mb-1">Total Released</div>
-              <div className="text-2xl font-bold text-gray-900">
-                {data.escrow.total_released.toLocaleString('vi-VN')} VND
+              <div className="text-gray-500 text-xs sm:text-sm mb-1">Total Released</div>
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+                {Math.floor(data.escrow.total_released / 1000000)}M VND
               </div>
-              <div className="text-sm text-gray-500 mt-1">{data.escrow.released_count} releases</div>
+              <div className="text-xs sm:text-sm text-gray-500 mt-1">{data.escrow.released_count} releases</div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <DollarSign className="w-8 h-8 text-yellow-500" />
+                <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-500" />
               </div>
-              <div className="text-gray-500 text-sm mb-1">Total Pending</div>
-              <div className="text-2xl font-bold text-gray-900">
-                {data.escrow.pending_amount.toLocaleString('vi-VN')} VND
+              <div className="text-gray-500 text-xs sm:text-sm mb-1">Total Pending</div>
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+                {Math.floor(data.escrow.pending_amount / 1000000)}M VND
               </div>
-              <div className="text-sm text-gray-500 mt-1">{data.escrow.pending_count} pending</div>
+              <div className="text-xs sm:text-sm text-gray-500 mt-1">{data.escrow.pending_count} pending</div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <DollarSign className="w-8 h-8 text-blue-500" />
+                <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
                 {data.net_flow >= 0 ? (
-                  <TrendingUp className="w-5 h-5 text-blue-500" />
+                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
                 ) : (
-                  <TrendingDown className="w-5 h-5 text-red-500" />
+                  <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
                 )}
               </div>
-              <div className="text-gray-500 text-sm mb-1">Net Balance</div>
-              <div className={`text-2xl font-bold ${data.net_flow >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                {data.net_flow.toLocaleString('vi-VN')} VND
+              <div className="text-gray-500 text-xs sm:text-sm mb-1">Net Balance</div>
+              <div className={`text-lg sm:text-xl lg:text-2xl font-bold ${data.net_flow >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                {Math.floor(data.net_flow / 1000000)}M VND
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6 mb-6">
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tiền vào theo tháng (Line Chart)</h3>
-              <div className="h-64 relative">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Tiền vào theo tháng (Line Chart)</h3>
+              <div className="h-48 sm:h-64 relative overflow-x-auto">
                 <svg viewBox="0 0 400 200" className="w-full h-full">
                   {(data.donations.by_month || []).map((month, index, array) => {
                     const x = 50 + (index * (350 / Math.max(array.length - 1, 1)));
@@ -194,9 +196,9 @@ export default function OwnerFinancial() {
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tiền ra theo tháng (Line Chart)</h3>
-              <div className="h-64 relative">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Tiền ra theo tháng (Line Chart)</h3>
+              <div className="h-48 sm:h-64 relative overflow-x-auto">
                 <svg viewBox="0 0 400 200" className="w-full h-full">
                   {(data.escrow.by_month || []).map((month, index, array) => {
                     const x = 50 + (index * (350 / Math.max(array.length - 1, 1)));
@@ -229,9 +231,9 @@ export default function OwnerFinancial() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">So sánh vào/ra (Bar Chart)</h3>
-            <div className="h-64 relative">
+          <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm mb-4 sm:mb-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">So sánh vào/ra (Bar Chart)</h3>
+            <div className="h-48 sm:h-64 relative overflow-x-auto">
               <svg viewBox="0 0 400 200" className="w-full h-full">
                 {(data.donations.by_month || []).slice(0, 6).map((month, index) => {
                   const x = 50 + (index * 60);
@@ -314,7 +316,7 @@ export default function OwnerFinancial() {
             </div>
           </div>
         </div>
-      </div>
+      </OwnerContentWrapper>
     </div>
   );
 }
