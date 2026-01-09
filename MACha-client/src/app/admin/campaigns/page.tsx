@@ -2,21 +2,31 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import AdminContentWrapper from '@/components/admin/AdminContentWrapper';
-import { getAllCampaigns, approveCampaign, rejectCampaign, Campaign } from '@/services/admin/campaign.service';
+import { getAllCampaigns, getPendingCampaigns, approveCampaign, rejectCampaign, Campaign } from '@/services/admin/campaign.service';
 import Swal from 'sweetalert2';
 import { MoreVertical, ChevronDown, Search, SlidersHorizontal } from 'lucide-react';
 
 export default function AdminCampaignApproval() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialStatusFromUrl = searchParams.get('status');
+
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>(
+    initialStatusFromUrl === 'pending' ? 'pending' :
+    initialStatusFromUrl === 'active' ? 'active' :
+    initialStatusFromUrl === 'rejected' ? 'rejected' :
+    initialStatusFromUrl === 'completed' ? 'completed' :
+    initialStatusFromUrl === 'cancelled' ? 'cancelled' :
+    'all'
+  );
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; isLastTwo: boolean } | null>(null);
@@ -29,7 +39,7 @@ export default function AdminCampaignApproval() {
 
   useEffect(() => {
     fetchCampaigns();
-  }, []);
+  }, [statusFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -64,7 +74,13 @@ export default function AdminCampaignApproval() {
   const fetchCampaigns = async () => {
     try {
       setLoading(true);
-      const data = await getAllCampaigns();
+      let data: Campaign[] = [];
+      // Khi lọc theo "pending" thì gọi API riêng cho admin để lấy danh sách chờ duyệt
+      if (statusFilter === 'pending') {
+        data = await getPendingCampaigns();
+      } else {
+        data = await getAllCampaigns();
+      }
       setCampaigns(data);
     } catch (error: any) {
       Swal.fire({

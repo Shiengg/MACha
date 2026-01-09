@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import AdminContentWrapper from '@/components/admin/AdminContentWrapper';
@@ -13,11 +13,21 @@ import { MoreVertical, ChevronDown, Search, SlidersHorizontal } from 'lucide-rea
 
 export default function AdminEventApproval() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialStatusFromUrl = searchParams.get('status');
+
   const [events, setEvents] = useState<AdminEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<string>('pending');
+  const [statusFilter, setStatusFilter] = useState<string>(
+    initialStatusFromUrl === 'published' ? 'published' :
+    initialStatusFromUrl === 'rejected' ? 'rejected' :
+    initialStatusFromUrl === 'cancelled' ? 'cancelled' :
+    initialStatusFromUrl === 'completed' ? 'completed' :
+    initialStatusFromUrl === 'all' ? 'all' :
+    'pending'
+  );
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; isLastTwo: boolean } | null>(null);
