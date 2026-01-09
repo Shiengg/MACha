@@ -230,8 +230,10 @@ export const getCampaignsByCreator = async (creatorId) => {
         return JSON.parse(cached);
     }
 
+    // Exclude campaigns with status: pending, rejected, and cancelled
     const campaigns = await Campaign.find({
-        creator: creatorId
+        creator: creatorId,
+        status: { $nin: ['pending', 'rejected', 'cancelled'] }
     })
         .populate("creator", "username avatar fullname")
         .populate("hashtag", "name")
@@ -567,8 +569,11 @@ export const searchCampaignsByHashtag = async (hashtagName) => {
         return [];
     }
 
-    // Find campaigns with this hashtag
-    const campaigns = await Campaign.find({ hashtag: hashtag._id })
+    // Find campaigns with this hashtag, excluding pending, rejected, and cancelled campaigns
+    const campaigns = await Campaign.find({ 
+        hashtag: hashtag._id,
+        status: { $nin: ['pending', 'rejected', 'cancelled'] }
+    })
         .populate("creator", "username fullname avatar")
         .populate("hashtag", "name")
         .sort({ createdAt: -1 });
@@ -625,9 +630,10 @@ export const searchCampaignsByTitle = async (searchTerm, limit = 50) => {
     const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const searchRegex = new RegExp(escapedSearch, 'i');
 
-    // Find all campaigns that match the search term
+    // Find all campaigns that match the search term, excluding pending, rejected, and cancelled campaigns
     const allCampaigns = await Campaign.find({
-        title: searchRegex
+        title: searchRegex,
+        status: { $nin: ['pending', 'rejected', 'cancelled'] }
     })
         .populate("creator", "username fullname avatar")
         .populate("hashtag", "name")
@@ -659,7 +665,10 @@ export const searchCampaignsByTitle = async (searchTerm, limit = 50) => {
 
     // Convert back to Mongoose documents
     const campaignIds = results.map(c => c._id);
-    const populatedCampaigns = await Campaign.find({ _id: { $in: campaignIds } })
+    const populatedCampaigns = await Campaign.find({ 
+        _id: { $in: campaignIds },
+        status: { $nin: ['pending', 'rejected', 'cancelled'] }
+    })
         .populate("creator", "username fullname avatar")
         .populate("hashtag", "name");
 

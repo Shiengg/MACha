@@ -169,16 +169,27 @@ export const submitKYCWithVNPT = async (userId, kycData) => {
         }
     };
 
+    // Lấy độ tin cậy từ VNPT eKYC (0-1, cần nhân 100 để có %)
+    const confidencePercent = (vnptResult.confidence || 0) * 100;
+    
     let kycStatus = 'pending';
     let rejectionReason = null;
+    let userKycStatus = 'pending';
 
-    if (vnptResult.recommendation === 'REJECT') {
-        kycStatus = 'rejected';
-        rejectionReason = vnptResult.mismatch_reasons?.join(', ') || 'Thông tin xác thực không khớp với dữ liệu từ VNPT eKYC';
-    } else if (vnptResult.recommendation === 'APPROVE') {
+    if (confidencePercent >= 85) {
         kycStatus = 'verified';
-    } else {
+        userKycStatus = 'verified';
+        console.log(`✅ [KYC Service] Độ tin cậy ${confidencePercent.toFixed(1)}% >= 85% → Tự động verified`);
+    } else if (confidencePercent >= 50) {
         kycStatus = 'pending';
+        userKycStatus = 'pending';
+        console.log(`⏳ [KYC Service] Độ tin cậy ${confidencePercent.toFixed(1)}% (50-85%) → Pending admin duyệt`);
+    } else {
+        kycStatus = 'rejected';
+        userKycStatus = 'unverified';
+        rejectionReason = vnptResult.mismatch_reasons?.join(', ') || 
+                         `Độ tin cậy quá thấp (${confidencePercent.toFixed(1)}% < 50%). ${vnptResult.warnings?.join('; ') || 'Thông tin xác thực không đạt yêu cầu'}`;
+        console.log(`❌ [KYC Service] Độ tin cậy ${confidencePercent.toFixed(1)}% < 50% → Rejected`);
     }
 
     const processingTimeMs = Date.now() - startTime;
@@ -201,11 +212,11 @@ export const submitKYCWithVNPT = async (userId, kycData) => {
         mismatch_reasons: vnptResult.mismatch_reasons || [],
         warnings: vnptResult.warnings || [],
         extracted_fields: vnptResult.extracted_data._raw_data,
-        ai_notes: vnptResult.recommendation === 'APPROVE' 
-            ? 'VNPT eKYC xác thực thành công tự động' 
-            : vnptResult.recommendation === 'MANUAL_REVIEW'
-            ? `VNPT eKYC yêu cầu xem xét thủ công. ${vnptResult.warnings?.length > 0 ? 'Cảnh báo: ' + vnptResult.warnings.join('; ') : ''}`
-            : `VNPT eKYC từ chối: ${vnptResult.mismatch_reasons?.join(', ')}`,
+        ai_notes: confidencePercent >= 85
+            ? `VNPT eKYC xác thực thành công tự động (độ tin cậy: ${confidencePercent.toFixed(1)}%)` 
+            : confidencePercent >= 50
+            ? `VNPT eKYC yêu cầu xem xét thủ công (độ tin cậy: ${confidencePercent.toFixed(1)}%). ${vnptResult.warnings?.length > 0 ? 'Cảnh báo: ' + vnptResult.warnings.join('; ') : ''}`
+            : `VNPT eKYC từ chối do độ tin cậy thấp (${confidencePercent.toFixed(1)}% < 50%). ${vnptResult.mismatch_reasons?.join(', ')}`,
         recommendation: vnptResult.recommendation,
         processing_time_ms: processingTimeMs
     };
@@ -230,7 +241,7 @@ export const submitKYCWithVNPT = async (userId, kycData) => {
     });
 
     user.current_kyc_id = kyc._id;
-    user.kyc_status = kycStatus === 'rejected' ? 'unverified' : kycStatus;
+    user.kyc_status = userKycStatus;
     await user.save();
     
     await invalidateKYCCaches(userId);
@@ -241,10 +252,10 @@ export const submitKYCWithVNPT = async (userId, kycData) => {
         user,
         vnpt_result: vnptResult,
         message: kycStatus === 'verified'
-            ? 'KYC đã được xác thực thành công bởi VNPT eKYC'
+            ? `KYC đã được xác thực thành công tự động bởi VNPT eKYC (độ tin cậy: ${confidencePercent.toFixed(1)}%)`
             : kycStatus === 'pending' 
-            ? 'KYC đã được gửi thành công. Vui lòng chờ admin duyệt.'
-            : 'KYC đã bị từ chối do thông tin không khớp.'
+            ? `KYC đã được gửi thành công (độ tin cậy: ${confidencePercent.toFixed(1)}%). Vui lòng chờ admin duyệt.`
+            : `KYC đã bị từ chối do độ tin cậy thấp (${confidencePercent.toFixed(1)}% < 50%).`
     };
 };
 

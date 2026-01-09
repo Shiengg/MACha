@@ -104,7 +104,7 @@ export const sepayCallback = async (req, res) => {
 export const sepaySuccess = async (req, res) => {
     try {
         const { order_invoice_number } = req.query;
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
 
         if (order_invoice_number) {
             // Success redirect có quyền override cancelled/failed vì SePay chỉ redirect về đây khi thanh toán thành công
@@ -125,7 +125,7 @@ export const sepaySuccess = async (req, res) => {
 export const sepayError = async (req, res) => {
     try {
         const { order_invoice_number } = req.query;
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
 
         if (order_invoice_number) {
             const result = await donationService.updateSepayDonationStatus(order_invoice_number, 'failed', {});
@@ -145,7 +145,7 @@ export const sepayError = async (req, res) => {
 export const sepayCancel = async (req, res) => {
     try {
         const { order_invoice_number } = req.query;
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
 
         if (order_invoice_number) {
             const donation = await donationService.getDonationByOrderInvoice(order_invoice_number);

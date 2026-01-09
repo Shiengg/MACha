@@ -715,7 +715,7 @@ function KYCSubmissionContent() {
   ];
 
   return (
-    <div className="min-h-screen bg-white py-12 px-4 relative overflow-hidden">
+    <div className="min-h-screen bg-white py-6 sm:py-8 md:py-12 px-3 sm:px-4 relative overflow-hidden">
       {/* Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-50 rounded-full blur-3xl"></div>
@@ -724,21 +724,21 @@ function KYCSubmissionContent() {
 
       <div className="max-w-4xl mx-auto relative z-10">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-50 rounded-2xl mb-6 border border-blue-100">
-            <Shield className="w-8 h-8 text-blue-600" />
+        <div className="text-center mb-6 sm:mb-8 md:mb-12">
+          <div className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-blue-50 rounded-xl sm:rounded-2xl mb-4 sm:mb-6 border border-blue-100">
+            <Shield className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-blue-600" />
           </div>
-          <h1 className="text-5xl font-bold text-gray-900 mb-4 tracking-tight">Xác thực danh tính</h1>
-          <p className="text-gray-600 text-lg font-medium">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-2 sm:mb-3 md:mb-4 tracking-tight">Xác thực danh tính</h1>
+          <p className="text-gray-600 text-sm sm:text-base md:text-lg font-medium px-2">
             Hoàn thành xác thực để có thể tạo chiến dịch gây quỹ
           </p>
         </div>
 
         {/* Progress Indicator */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between relative">
+        <div className="mb-6 sm:mb-8 md:mb-12">
+          <div className="flex items-center justify-between relative px-2 sm:px-4">
             {/* Progress line */}
-            <div className="absolute top-6 left-0 right-0 h-0.5 bg-gray-200 -z-10">
+            <div className="absolute top-4 sm:top-5 md:top-6 left-0 right-0 h-0.5 bg-gray-200 -z-10">
               <div 
                 className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500 ease-out"
                 style={{ width: `${((currentStep - 1) / 2) * 100}%` }}
@@ -753,7 +753,7 @@ function KYCSubmissionContent() {
               return (
                 <div key={step.number} className="flex flex-col items-center flex-1">
                   <div
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center font-semibold text-sm transition-all duration-300 ${
+                    className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg sm:rounded-xl flex items-center justify-center font-semibold text-xs sm:text-sm transition-all duration-300 ${
                       isCompleted
                         ? 'bg-gradient-to-br from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/30'
                         : isActive
@@ -762,19 +762,20 @@ function KYCSubmissionContent() {
                     }`}
                   >
                     {isCompleted ? (
-                      <CheckCircle2 className="w-6 h-6" />
+                      <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
                     ) : (
-                      <StepIcon className="w-6 h-6" />
+                      <StepIcon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
                     )}
                   </div>
                   <span
-                    className={`mt-3 text-sm font-medium transition-colors ${
+                    className={`mt-2 sm:mt-3 text-xs sm:text-sm font-medium transition-colors text-center px-1 ${
                       isActive || isCompleted
                         ? 'text-gray-900'
                         : 'text-gray-400'
                     }`}
                   >
-                    {step.label}
+                    <span className="hidden sm:inline">{step.label}</span>
+                    <span className="sm:hidden">{step.number}</span>
                   </span>
                 </div>
               );
@@ -784,34 +785,34 @@ function KYCSubmissionContent() {
 
         {/* Form */}
         <form onSubmit={handleSubmit}>
-          <div className="bg-white rounded-2xl p-8 md:p-10 shadow-2xl border border-white/10 backdrop-blur-sm">
+          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 lg:p-10 shadow-2xl border border-white/10 backdrop-blur-sm">
             {/* Step 1: Personal Info */}
             {currentStep === 1 && (
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 mb-8 pb-6 border-b border-gray-200">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <User className="w-5 h-5 text-blue-600" />
+              <div className="space-y-4 sm:space-y-6">
+                <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6 md:mb-8 pb-4 sm:pb-5 md:pb-6 border-b border-gray-200">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                    <User className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Thông tin cá nhân</h2>
-                    <p className="text-gray-500 text-sm mt-0.5">Vui lòng điền đầy đủ thông tin theo CCCD</p>
+                    <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Thông tin cá nhân</h2>
+                    <p className="text-gray-500 text-xs sm:text-sm mt-0.5">Vui lòng điền đầy đủ thông tin theo CCCD</p>
                   </div>
                 </div>
                 
                 <div>
-                  <label className="block text-gray-700 font-semibold mb-2 text-sm">
+                  <label className="block text-gray-700 font-semibold mb-1.5 sm:mb-2 text-xs sm:text-sm">
                     Họ và tên (theo CCCD) <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                      <User className="w-5 h-5" />
+                    <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                      <User className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                     <input
                       type="text"
                       name="identity_verified_name"
                       value={formData.identity_verified_name}
                       onChange={handleInputChange}
-                      className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      className="w-full bg-gray-50 text-gray-900 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 md:py-3.5 text-sm sm:text-base rounded-lg sm:rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       placeholder="Nguyễn Văn A"
                       required
                     />
@@ -860,35 +861,35 @@ function KYCSubmissionContent() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
-                    <label className="block text-gray-700 font-semibold mb-2 text-sm">Tỉnh/Thành phố</label>
+                    <label className="block text-gray-700 font-semibold mb-1.5 sm:mb-2 text-xs sm:text-sm">Tỉnh/Thành phố</label>
                     <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                        <MapPin className="w-5 h-5" />
+                      <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                        <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
                       <input
                         type="text"
                         name="address.city"
                         value={formData.address.city}
                         onChange={handleInputChange}
-                        className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        className="w-full bg-gray-50 text-gray-900 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 md:py-3.5 text-sm sm:text-base rounded-lg sm:rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                         placeholder="Hà Nội"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-gray-700 font-semibold mb-2 text-sm">Quận/Huyện</label>
+                    <label className="block text-gray-700 font-semibold mb-1.5 sm:mb-2 text-xs sm:text-sm">Quận/Huyện</label>
                     <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                        <MapPin className="w-5 h-5" />
+                      <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                        <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
                       <input
                         type="text"
                         name="address.district"
                         value={formData.address.district}
                         onChange={handleInputChange}
-                        className="w-full bg-gray-50 text-gray-900 pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        className="w-full bg-gray-50 text-gray-900 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 md:py-3.5 text-sm sm:text-base rounded-lg sm:rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                         placeholder="Hoàn Kiếm"
                       />
                     </div>
@@ -899,14 +900,14 @@ function KYCSubmissionContent() {
 
             {/* Step 2: Bank Info */}
             {currentStep === 2 && (
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 mb-8 pb-6 border-b border-gray-200">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <Building2 className="w-5 h-5 text-blue-600" />
+              <div className="space-y-4 sm:space-y-6">
+                <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6 md:mb-8 pb-4 sm:pb-5 md:pb-6 border-b border-gray-200">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                    <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Thông tin ngân hàng</h2>
-                    <p className="text-gray-500 text-sm mt-0.5">Thông tin để nhận tiền từ chiến dịch</p>
+                    <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Thông tin ngân hàng</h2>
+                    <p className="text-gray-500 text-xs sm:text-sm mt-0.5">Thông tin để nhận tiền từ chiến dịch</p>
                   </div>
                 </div>
                 
@@ -977,28 +978,28 @@ function KYCSubmissionContent() {
 
             {/* Step 3: Documents */}
             {currentStep === 3 && (
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 mb-8 pb-6 border-b border-gray-200">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-blue-600" />
+              <div className="space-y-4 sm:space-y-6">
+                <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6 md:mb-8 pb-4 sm:pb-5 md:pb-6 border-b border-gray-200">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Tài liệu xác thực</h2>
-                    <p className="text-gray-500 text-sm mt-0.5">Upload các tài liệu cần thiết</p>
+                    <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Tài liệu xác thực</h2>
+                    <p className="text-gray-500 text-xs sm:text-sm mt-0.5">Upload các tài liệu cần thiết</p>
                   </div>
                 </div>
                 
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {/* CCCD Mặt trước */}
                   <div>
-                    <label className="block text-gray-700 font-semibold mb-3 text-sm">
+                    <label className="block text-gray-700 font-semibold mb-2 sm:mb-3 text-xs sm:text-sm">
                       Ảnh CCCD mặt trước <span className="text-red-500">*</span>
                     </label>
                     {!identityFrontPreview ? (
-                      <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors group">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <Upload className="w-10 h-10 text-gray-400 group-hover:text-blue-600 transition-colors mb-3" />
-                          <p className="mb-2 text-sm text-gray-500 font-medium">
+                      <label className="flex flex-col items-center justify-center w-full h-40 sm:h-48 border-2 border-dashed border-gray-300 rounded-lg sm:rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors group">
+                        <div className="flex flex-col items-center justify-center pt-4 sm:pt-5 pb-4 sm:pb-6 px-4">
+                          <Upload className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400 group-hover:text-blue-600 transition-colors mb-2 sm:mb-3" />
+                          <p className="mb-1 sm:mb-2 text-xs sm:text-sm text-gray-500 font-medium text-center">
                             <span className="text-blue-600">Click để upload</span> hoặc kéo thả file
                           </p>
                           <p className="text-xs text-gray-400">PNG, JPG, JPEG (MAX. 10MB)</p>
@@ -1012,30 +1013,30 @@ function KYCSubmissionContent() {
                       </label>
                     ) : (
                       <div className="relative group">
-                        <div className="border-2 border-gray-200 rounded-xl p-4 bg-gray-50">
+                        <div className="border-2 border-gray-200 rounded-lg sm:rounded-xl p-2 sm:p-4 bg-gray-50">
                           <img
                             src={identityFrontPreview}
                             alt="CCCD mặt trước"
-                            className="w-full h-64 object-contain rounded-lg"
+                            className="w-full h-48 sm:h-64 object-contain rounded-lg"
                             style={{ transform: `rotate(${identityFrontRotation}deg)` }}
                           />
                         </div>
-                        <div className="absolute top-6 right-6 flex gap-2">
+                        <div className="absolute top-3 right-3 sm:top-6 sm:right-6 flex gap-2">
                           <button
                             type="button"
                             onClick={handleRotateIdentityFront}
-                            className="bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-blue-600 transition-all shadow-lg"
+                            className="bg-blue-500 text-white rounded-full w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center hover:bg-blue-600 transition-all shadow-lg"
                             title="Xoay ảnh 90°"
                           >
-                            <RotateCw className="w-5 h-5" />
+                            <RotateCw className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
                           <button
                             type="button"
                             onClick={removeIdentityFront}
-                            className="bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-red-600 transition-all shadow-lg"
+                            className="bg-red-500 text-white rounded-full w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center hover:bg-red-600 transition-all shadow-lg"
                             title="Xóa ảnh"
                           >
-                            <X className="w-5 h-5" />
+                            <X className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
                         </div>
                       </div>
@@ -1183,40 +1184,44 @@ function KYCSubmissionContent() {
             )}
 
             {/* Navigation Buttons */}
-            <div className="flex items-center justify-between mt-10 pt-8 border-t border-gray-200">
+            <div className="flex items-center justify-between mt-6 sm:mt-8 md:mt-10 pt-4 sm:pt-6 md:pt-8 border-t border-gray-200 gap-2 sm:gap-4">
               <button
                 type="button"
                 onClick={currentStep === 1 ? handleCancel : prevStep}
-                className="px-6 py-3.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold flex items-center gap-2"
+                className="px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3.5 text-xs sm:text-sm md:text-base bg-gray-100 text-gray-700 rounded-lg sm:rounded-xl hover:bg-gray-200 transition-all font-semibold flex items-center gap-1.5 sm:gap-2"
               >
-                <ArrowLeft className="w-5 h-5" />
-                {currentStep === 1 ? 'Hủy' : 'Quay lại'}
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">{currentStep === 1 ? 'Hủy' : 'Quay lại'}</span>
+                <span className="sm:hidden">{currentStep === 1 ? 'Hủy' : '←'}</span>
               </button>
 
               {currentStep < 3 ? (
                 <button
                   type="button"
                   onClick={handleNextStep}
-                  className="px-8 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-semibold shadow-lg shadow-blue-500/30 flex items-center gap-2"
+                  className="px-4 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3.5 text-xs sm:text-sm md:text-base bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg sm:rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-semibold shadow-lg shadow-blue-500/30 flex items-center gap-1.5 sm:gap-2"
                 >
-                  Tiếp tục
-                  <ArrowRight className="w-5 h-5" />
+                  <span className="hidden sm:inline">Tiếp tục</span>
+                  <span className="sm:hidden">Tiếp</span>
+                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               ) : (
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-8 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg shadow-green-500/30 flex items-center gap-2"
+                  className="px-4 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3.5 text-xs sm:text-sm md:text-base bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg sm:rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg shadow-green-500/30 flex items-center gap-1.5 sm:gap-2"
                 >
                   {loading ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Đang gửi...
+                      <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span className="hidden sm:inline">Đang gửi...</span>
+                      <span className="sm:hidden">Gửi...</span>
                     </>
                   ) : (
                     <>
-                      <CheckCircle2 className="w-5 h-5" />
-                      Gửi yêu cầu
+                      <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span className="hidden sm:inline">Gửi yêu cầu</span>
+                      <span className="sm:hidden">Gửi</span>
                     </>
                   )}
                 </button>
@@ -1226,29 +1231,29 @@ function KYCSubmissionContent() {
         </form>
 
         {/* Info Box */}
-        <div className="mt-8 bg-gray-50 rounded-2xl p-6 md:p-8 shadow-lg border border-gray-200">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-              <Shield className="w-6 h-6 text-blue-600" />
+        <div className="mt-4 sm:mt-6 md:mt-8 bg-gray-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 shadow-lg border border-gray-200">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+              <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
             </div>
             <div className="flex-1">
-              <h3 className="text-gray-900 font-bold text-lg mb-4">Tại sao cần xác thực?</h3>
-              <ul className="space-y-3 text-gray-600">
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">Đảm bảo tính minh bạch và uy tín của người tạo chiến dịch</span>
+              <h3 className="text-gray-900 font-bold text-base sm:text-lg mb-3 sm:mb-4">Tại sao cần xác thực?</h3>
+              <ul className="space-y-2 sm:space-y-3 text-gray-600">
+                <li className="flex items-start gap-2 sm:gap-3">
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm">Đảm bảo tính minh bạch và uy tín của người tạo chiến dịch</span>
                 </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">Bảo vệ người quyên góp khỏi các chiến dịch lừa đảo</span>
+                <li className="flex items-start gap-2 sm:gap-3">
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm">Bảo vệ người quyên góp khỏi các chiến dịch lừa đảo</span>
                 </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">Tuân thủ quy định pháp luật về gây quỹ từ thiện</span>
+                <li className="flex items-start gap-2 sm:gap-3">
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm">Tuân thủ quy định pháp luật về gây quỹ từ thiện</span>
                 </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">Tạo niềm tin cho cộng đồng</span>
+                <li className="flex items-start gap-2 sm:gap-3">
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm">Tạo niềm tin cho cộng đồng</span>
                 </li>
               </ul>
             </div>

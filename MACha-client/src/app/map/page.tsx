@@ -436,62 +436,62 @@ export default function MapPage() {
     <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900" style={{ marginTop: '73px' }}>
       <aside 
         className={`fixed left-0 top-[73px] h-[calc(100vh-73px)] bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto z-10 transition-all duration-300 ${
-          isSidebarOpen ? 'w-80' : 'w-0'
+          isSidebarOpen ? 'w-full sm:w-80' : 'w-0'
         }`}
       >
-        <div className={`p-4 space-y-6 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <div className={`p-3 sm:p-4 space-y-4 sm:space-y-6 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">
               Tìm kiếm theo tên chiến dịch, sự kiện, địa điểm
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Nhập tên chiến dịch, sự kiện hoặc địa điểm..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">
               Chiến dịch thiện nguyện
             </h3>
-            <div className="space-y-3">
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{statistics.active}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Đang thực hiện</div>
+            <div className="grid grid-cols-3 sm:grid-cols-1 gap-2 sm:gap-3">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-2 sm:p-3 rounded-lg">
+                <div className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{statistics.active}</div>
+                <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Đang thực hiện</div>
               </div>
-              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{statistics.completed}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Đạt mục tiêu</div>
+              <div className="bg-green-50 dark:bg-green-900/20 p-2 sm:p-3 rounded-lg">
+                <div className="text-lg sm:text-2xl font-bold text-green-600 dark:text-green-400">{statistics.completed}</div>
+                <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Đạt mục tiêu</div>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{statistics.finished}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Đã kết thúc</div>
+              <div className="bg-gray-50 dark:bg-gray-700 p-2 sm:p-3 rounded-lg">
+                <div className="text-lg sm:text-2xl font-bold text-gray-600 dark:text-gray-400">{statistics.finished}</div>
+                <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Đã kết thúc</div>
               </div>
             </div>
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">
               Sự kiện thiện nguyện
             </h3>
-            <div className="space-y-3">
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{eventStatistics.upcoming}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Sắp diễn ra</div>
+            <div className="grid grid-cols-3 sm:grid-cols-1 gap-2 sm:gap-3">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-2 sm:p-3 rounded-lg">
+                <div className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{eventStatistics.upcoming}</div>
+                <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Sắp diễn ra</div>
               </div>
-              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{eventStatistics.ongoing}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Đang diễn ra</div>
+              <div className="bg-green-50 dark:bg-green-900/20 p-2 sm:p-3 rounded-lg">
+                <div className="text-lg sm:text-2xl font-bold text-green-600 dark:text-green-400">{eventStatistics.ongoing}</div>
+                <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Đang diễn ra</div>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{eventStatistics.completed}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Đã kết thúc</div>
+              <div className="bg-gray-50 dark:bg-gray-700 p-2 sm:p-3 rounded-lg">
+                <div className="text-lg sm:text-2xl font-bold text-gray-600 dark:text-gray-400">{eventStatistics.completed}</div>
+                <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Đã kết thúc</div>
               </div>
             </div>
           </div>
@@ -600,20 +600,20 @@ export default function MapPage() {
 
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className={`fixed top-[calc(73px+50%)] z-20 bg-white dark:bg-gray-800 rounded-r-full shadow-lg border-r border-y border-gray-200 dark:border-gray-700 p-3 transition-all duration-300 hover:bg-gray-50 dark:hover:bg-gray-700 ${
-          isSidebarOpen ? 'left-80' : 'left-0'
+        className={`fixed top-[calc(73px+50%)] z-20 bg-white dark:bg-gray-800 rounded-r-full shadow-lg border-r border-y border-gray-200 dark:border-gray-700 p-2 sm:p-3 transition-all duration-300 hover:bg-gray-50 dark:hover:bg-gray-700 ${
+          isSidebarOpen ? 'left-full sm:left-80' : 'left-0'
         }`}
         style={{ transform: 'translateY(-50%)' }}
         aria-label={isSidebarOpen ? 'Thu gọn sidebar' : 'Mở rộng sidebar'}
       >
         {isSidebarOpen ? (
-          <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+          <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 dark:text-gray-300" />
         ) : (
-          <ChevronRight className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+          <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 dark:text-gray-300" />
         )}
       </button>
 
-      <div className={`h-full relative transition-all duration-300 ${isSidebarOpen ? 'ml-80' : 'ml-0'}`}>
+      <div className={`h-full relative transition-all duration-300 ${isSidebarOpen ? 'ml-0 sm:ml-80' : 'ml-0'}`}>
         <div
           ref={mapContainer}
           className="w-full h-full"

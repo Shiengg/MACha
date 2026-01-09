@@ -581,6 +581,16 @@ export const verifyFullKYC = async (frontImageUrl, backImageUrl, selfieUrl, opti
 
         const overallConfidence = calculateOverallConfidence(ocrResult, faceCompareResult, cardLivenessResult, faceLivenessResult);
 
+        // Determine recommendation
+        let recommendation = 'MANUAL_REVIEW';
+        if (match && overallConfidence >= 0.85 && warnings.length === 0) {
+            recommendation = 'APPROVE';
+        } else if (match && overallConfidence >= 0.65 && warnings.length <= 1) {
+            recommendation = 'MANUAL_REVIEW';
+        } else if (!match) {
+            recommendation = 'REJECT';
+        }
+
         console.log('✅ [VNPT eKYC] Hoàn thành xác thực KYC');
         console.log('═══════════════════════════════════════════');
         console.log('📋 OCR (Trích xuất thông tin):', ocrResult.success ? '✅ Thành công' : '❌ Thất bại');
@@ -594,15 +604,6 @@ export const verifyFullKYC = async (frontImageUrl, backImageUrl, selfieUrl, opti
         console.log('📊 Độ tin cậy tổng:', (overallConfidence * 100).toFixed(1) + '%');
         console.log('🎯 Khuyến nghị:', recommendation);
         console.log('═══════════════════════════════════════════');
-
-        let recommendation = 'MANUAL_REVIEW';
-        if (match && overallConfidence >= 0.85 && warnings.length === 0) {
-            recommendation = 'APPROVE';
-        } else if (match && overallConfidence >= 0.7 && warnings.length <= 1) {
-            recommendation = 'MANUAL_REVIEW';
-        } else if (!match) {
-            recommendation = 'REJECT';
-        }
 
         return {
             success: true,

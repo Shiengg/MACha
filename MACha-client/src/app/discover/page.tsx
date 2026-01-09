@@ -274,7 +274,7 @@ function DiscoverContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <div className="relative h-[400px] bg-gradient-to-br from-orange-500 via-orange-400 to-teal-400 overflow-hidden">
+      <div className="relative h-[250px] sm:h-[300px] md:h-[400px] bg-gradient-to-br from-orange-500 via-orange-400 to-teal-400 overflow-hidden">
         <div className="absolute inset-0 bg-black/20"></div>
         <div 
           className="absolute inset-0 bg-cover bg-center"
@@ -284,12 +284,12 @@ function DiscoverContent() {
             opacity: 0.3
           }}
         ></div>
-        <div className="relative h-full flex items-center justify-center text-center px-4">
+        <div className="relative h-full flex items-center justify-center text-center px-4 sm:px-6">
           <div>
-            <h1 className="text-5xl md:text-6xl font-bold text-white mb-4 drop-shadow-lg">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-2 sm:mb-3 md:mb-4 drop-shadow-lg">
               Chung tay vì cộng đồng
             </h1>
-            <p className="text-xl text-white/90 max-w-2xl mx-auto drop-shadow">
+            <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/90 max-w-2xl mx-auto drop-shadow px-2">
               Mỗi đóng góp của bạn đều tạo nên sự khác biệt lớn lao cho những người cần giúp đỡ
             </p>
           </div>
@@ -297,9 +297,9 @@ function DiscoverContent() {
       </div>
 
       {/* Category Filter Section */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 mb-3 sm:mb-4 text-center">
             Chiến dịch gây quỹ nổi bật
           </h2>
           {loading ? (
@@ -307,63 +307,65 @@ function DiscoverContent() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
             </div>
           ) : (
-            <div className="flex items-center justify-center gap-3 flex-wrap">
-              {categories.map((category) => {
-                const Icon = category.icon;
-                return (
-                  <button
-                    key={category.id}
-                    onClick={() => setSelectedCategory(category.id)}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-medium transition-all ${
-                      selectedCategory === category.id
-                        ? 'bg-orange-500 text-white shadow-lg scale-105'
-                        : 'bg-white text-gray-700 border border-gray-300 hover:border-orange-500 hover:text-orange-500'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span>{category.label}</span>
-                  </button>
-                );
-              })}
+            <div className="overflow-x-auto pb-2 -mx-3 sm:mx-0">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:justify-center min-w-max sm:min-w-0 px-3 sm:px-0">
+                {categories.map((category) => {
+                  const Icon = category.icon;
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => setSelectedCategory(category.id)}
+                      className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3 rounded-full text-sm sm:text-base font-medium transition-all whitespace-nowrap ${
+                        selectedCategory === category.id
+                          ? 'bg-orange-500 text-white shadow-lg scale-105'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:border-orange-500 hover:text-orange-500'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span>{category.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
       </div>
 
       {/* Campaigns Grid */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+          <div className="flex items-center justify-center py-12 sm:py-20">
+            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-orange-500"></div>
           </div>
         ) : filteredCampaigns.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-6xl mb-4">🔍</div>
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">
+          <div className="text-center py-12 sm:py-20">
+            <div className="text-4xl sm:text-6xl mb-3 sm:mb-4">🔍</div>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">
               Không tìm thấy chiến dịch
             </h3>
-            <p className="text-gray-600">
+            <p className="text-sm sm:text-base text-gray-600 px-4">
               Hiện tại chưa có chiến dịch nào trong danh mục này
             </p>
           </div>
         ) : (
           <>
-            <div className="mb-6 text-gray-600">
+            <div className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600">
               {selectedCategory === 'all' ? (
                 <>Tìm thấy <span className="font-bold text-gray-800">{total}</span> chiến dịch</>
               ) : (
                 <>Tìm thấy <span className="font-bold text-gray-800">{total}</span> chiến dịch trong danh mục này</>
               )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
               {filteredCampaigns.map((campaign) => (
                 <CampaignCard key={campaign._id} campaign={campaign} showCreator={true} />
               ))}
             </div>
             {totalPages > 1 && (
-              <div className="flex justify-center items-center gap-2 mt-8">
+              <div className="flex justify-center items-center gap-1.5 sm:gap-2 mt-6 sm:mt-8 flex-wrap">
                 {/* Current Page / Total Pages */}
-                <div className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium">
+                <div className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-gray-300 text-gray-700 text-sm sm:text-base font-medium">
                   {currentPage}/{totalPages}
                 </div>
                 
@@ -376,46 +378,56 @@ function DiscoverContent() {
                     }
                   }}
                   disabled={currentPage === 1 || loading}
-                  className={`px-4 py-2 rounded-lg border border-gray-300 font-medium transition-all flex items-center gap-1 ${
+                  className={`px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg border border-gray-300 text-xs sm:text-sm md:text-base font-medium transition-all flex items-center gap-1 ${
                     currentPage === 1 || loading
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       : 'bg-white text-gray-700 hover:bg-gray-50 hover:border-orange-500 hover:text-orange-500'
                   }`}
                 >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Trang trước</span>
+                  <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">Trang trước</span>
+                  <span className="sm:hidden">Trước</span>
                 </button>
                 
-                {/* Page Numbers */}
-                {getPageNumbers().map((pageNum, index) => (
-                  pageNum === '...' ? (
-                    <button
-                      key={`ellipsis-${index}`}
-                      disabled
-                      className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-400 cursor-default"
-                    >
-                      ...
-                    </button>
-                  ) : (
-                    <button
-                      key={pageNum}
-                      onClick={() => {
-                        if (typeof pageNum === 'number') {
-                          loadData(pageNum);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }
-                      }}
-                      disabled={loading}
-                      className={`px-4 py-2 rounded-lg border font-medium transition-all ${
-                        pageNum === currentPage
-                          ? 'bg-orange-500 text-white border-orange-500 shadow-lg'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-orange-500 hover:text-orange-500'
-                      } ${loading ? 'cursor-not-allowed opacity-50' : ''}`}
-                    >
-                      {pageNum}
-                    </button>
-                  )
-                ))}
+                {/* Page Numbers - Hide on very small screens */}
+                <div className="hidden sm:flex items-center gap-1.5 sm:gap-2">
+                  {getPageNumbers().map((pageNum, index) => (
+                    pageNum === '...' ? (
+                      <button
+                        key={`ellipsis-${index}`}
+                        disabled
+                        className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-gray-300 bg-white text-gray-400 cursor-default text-sm sm:text-base"
+                      >
+                        ...
+                      </button>
+                    ) : (
+                      <button
+                        key={pageNum}
+                        onClick={() => {
+                          if (typeof pageNum === 'number') {
+                            loadData(pageNum);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }
+                        }}
+                        disabled={loading}
+                        className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border text-sm sm:text-base font-medium transition-all ${
+                          pageNum === currentPage
+                            ? 'bg-orange-500 text-white border-orange-500 shadow-lg'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-orange-500 hover:text-orange-500'
+                        } ${loading ? 'cursor-not-allowed opacity-50' : ''}`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  ))}
+                </div>
+                
+                {/* Mobile: Show only current page */}
+                <div className="sm:hidden">
+                  <div className="px-3 py-1.5 rounded-lg border border-orange-500 bg-orange-500 text-white text-sm font-medium">
+                    {currentPage}
+                  </div>
+                </div>
                 
                 {/* Next Button */}
                 <button
@@ -426,14 +438,15 @@ function DiscoverContent() {
                     }
                   }}
                   disabled={currentPage === totalPages || loading}
-                  className={`px-4 py-2 rounded-lg border border-gray-300 font-medium transition-all flex items-center gap-1 ${
+                  className={`px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg border border-gray-300 text-xs sm:text-sm md:text-base font-medium transition-all flex items-center gap-1 ${
                     currentPage === totalPages || loading
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       : 'bg-white text-gray-700 hover:bg-gray-50 hover:border-orange-500 hover:text-orange-500'
                   }`}
                 >
-                  <span>Trang sau</span>
-                  <ChevronRight className="w-4 h-4" />
+                  <span className="hidden sm:inline">Trang sau</span>
+                  <span className="sm:hidden">Sau</span>
+                  <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
                 </button>
               </div>
             )}

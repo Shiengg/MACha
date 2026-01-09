@@ -749,24 +749,24 @@ function CreateCampaignContent() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-      <div className="max-w-[1200px] mx-auto pt-8 pb-12 px-4">
+      <div className="max-w-[1200px] mx-auto pt-4 sm:pt-6 md:pt-8 pb-6 sm:pb-8 md:pb-12 px-3 sm:px-4">
         
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+        <div className="text-center mb-4 sm:mb-6 md:mb-8">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-1 sm:mb-2">
             Tạo chiến dịch gây quỹ
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
             Hoàn thành các bước để tạo chiến dịch của bạn
           </p>
         </div>
 
-        <div className="mb-12">
-          <div className="flex items-center justify-between max-w-[800px] mx-auto">
+        <div className="mb-6 sm:mb-8 md:mb-12">
+          <div className="flex items-center justify-between max-w-[800px] mx-auto px-2 sm:px-4">
             {steps.map((step, index) => (
               <div key={step.number} className="flex items-center flex-1">
                 <div className="flex flex-col items-center flex-1">
                   <div
-                    className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all ${
+                    className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm md:text-lg transition-all ${
                       currentStep === step.number
                         ? 'bg-blue-600 text-white scale-110 shadow-lg'
                         : currentStep > step.number
@@ -777,24 +777,25 @@ function CreateCampaignContent() {
                     {currentStep > step.number ? '✓' : step.number}
                   </div>
                   <span
-                    className={`mt-2 text-xs text-center font-medium ${
+                    className={`mt-1 sm:mt-2 text-[10px] sm:text-xs text-center font-medium px-1 ${
                       currentStep === step.number
                         ? 'text-blue-600 dark:text-blue-400'
                         : 'text-gray-600 dark:text-gray-400'
                     }`}
                   >
-                    {step.title}
+                    <span className="hidden sm:inline">{step.title}</span>
+                    <span className="sm:hidden">{step.number}</span>
                   </span>
                 </div>
 
                 {index < steps.length - 1 && (
                   <div
-                    className={`h-1 flex-1 mx-2 transition-all ${
+                    className={`h-0.5 sm:h-1 flex-1 mx-1 sm:mx-2 transition-all ${
                       currentStep > step.number
                         ? 'bg-green-500'
                         : 'bg-gray-300 dark:bg-gray-700'
                     }`}
-                    style={{ marginTop: '-24px' }}
+                    style={{ marginTop: '-16px' }}
                   />
                 )}
               </div>
@@ -802,20 +803,20 @@ function CreateCampaignContent() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 md:p-8">
           
-          <div className="min-h-[500px]">
+          <div className="min-h-[400px] sm:min-h-[500px]">
             {currentStep === 1 && (
-              <div className="space-y-6">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
+              <div className="space-y-4 sm:space-y-6">
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4 md:mb-6">
                   Bước 1: Thông tin liên hệ
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-3 sm:mb-4">
                   Thông tin này sẽ được sử dụng để liên hệ với bạn về chiến dịch
                 </p>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">
                     Họ và tên <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -823,7 +824,7 @@ function CreateCampaignContent() {
                     value={formData.fullname}
                     onChange={(e) => handleInputChange('fullname', e.target.value)}
                     placeholder="VD: Nguyễn Văn A"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 text-sm sm:text-base rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
 
@@ -1745,26 +1746,28 @@ function CreateCampaignContent() {
             )}
           </div>
 
-          <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-between items-center mt-4 sm:mt-6 md:mt-8 pt-4 sm:pt-5 md:pt-6 border-t border-gray-200 dark:border-gray-700 gap-2 sm:gap-4">
             {currentStep === 1 ? (
               <button
                 onClick={handleCancel}
                 disabled={isSubmitting}
-                className="px-6 py-3 rounded-lg font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base rounded-lg font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                ✕ Hủy
+                <span className="hidden sm:inline">✕ Hủy</span>
+                <span className="sm:hidden">Hủy</span>
               </button>
             ) : (
               <button
                 onClick={handlePrevious}
                 disabled={isSubmitting}
-                className="px-6 py-3 rounded-lg font-semibold bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-400 dark:hover:bg-gray-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base rounded-lg font-semibold bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-400 dark:hover:bg-gray-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                ← Quay lại
+                <span className="hidden sm:inline">← Quay lại</span>
+                <span className="sm:hidden">←</span>
               </button>
             )}
 
-            <div className="text-sm text-gray-600 dark:text-gray-400">
+            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
               Bước {currentStep} / {totalSteps}
             </div>
 
@@ -1772,23 +1775,28 @@ function CreateCampaignContent() {
               <button
                 onClick={handleNext}
                 disabled={isSubmitting}
-                className="px-6 py-3 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Tiếp theo →
+                <span className="hidden sm:inline">Tiếp theo →</span>
+                <span className="sm:hidden">Tiếp →</span>
               </button>
             ) : (
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="px-6 py-3 rounded-lg font-semibold bg-green-600 text-white hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base rounded-lg font-semibold bg-green-600 text-white hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 sm:gap-2"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Đang gửi...
+                    <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
+                    <span className="hidden sm:inline">Đang gửi...</span>
+                    <span className="sm:hidden">Gửi...</span>
                   </>
                 ) : (
-                  '✓ Gửi yêu cầu'
+                  <>
+                    <span className="hidden sm:inline">✓ Gửi yêu cầu</span>
+                    <span className="sm:hidden">Gửi</span>
+                  </>
                 )}
               </button>
             )}

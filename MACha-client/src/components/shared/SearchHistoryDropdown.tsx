@@ -31,19 +31,30 @@ export default function SearchHistoryDropdown({
   }, [isOpen, isAuthenticated]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        onClose();
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      
+      // Only close if the click/touch is definitely outside
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
+        // For touch events, only close on touchend to allow buttons to work
+        if (event.type === 'touchend') {
+          onClose();
+        } else if (event.type === 'mousedown') {
+          onClose();
+        }
       }
     };
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-    }
+      // Use touchend instead of touchstart to allow buttons to be clicked first
+      document.addEventListener('touchend', handleClickOutside, { passive: true });
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('touchend', handleClickOutside);
+      };
+    }
   }, [isOpen, onClose]);
 
   const loadHistory = async () => {
@@ -88,13 +99,18 @@ export default function SearchHistoryDropdown({
     onClose();
   };
 
-  const handleItemClickWrapper = (e: React.MouseEvent, item: SearchHistoryItem) => {
+  const handleItemClickWrapper = (e: React.MouseEvent | React.TouchEvent, item: SearchHistoryItem) => {
     e.stopPropagation();
+    // Only prevent default for touch events to avoid double-firing
+    if (e.type === 'touchend') {
+      e.preventDefault();
+    }
     handleItemClick(item);
   };
 
-  const handleDelete = async (e: React.MouseEvent, historyId: string) => {
+  const handleDelete = async (e: React.MouseEvent | React.TouchEvent, historyId: string) => {
     e.stopPropagation();
+    e.preventDefault();
     try {
       await deleteSearchHistory([historyId]);
       setHistory(prev => prev.filter(item => item._id !== historyId));
@@ -103,9 +119,12 @@ export default function SearchHistoryDropdown({
     }
   };
 
-  const handleEditClick = (e: React.MouseEvent) => {
+  const handleEditClick = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
-    e.preventDefault();
+    // Prevent default for touch to avoid double navigation
+    if (e.type === 'touchend' || e.type === 'touchstart') {
+      e.preventDefault();
+    }
     router.push('/search/history');
     onClose();
   };
@@ -117,7 +136,9 @@ export default function SearchHistoryDropdown({
   return (
     <div
       ref={dropdownRef}
-      className="absolute top-full left-0 mt-2 w-full max-w-lg bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[500px] overflow-hidden flex flex-col"
+      className="absolute top-full left-0 mt-2 w-full max-w-lg bg-white rounded-lg shadow-xl border border-gray-200 z-[100] max-h-[500px] overflow-hidden flex flex-col"
+      style={{ touchAction: 'manipulation', pointerEvents: 'auto' }}
+      onTouchStart={(e) => e.stopPropagation()}
     >
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
@@ -125,8 +146,13 @@ export default function SearchHistoryDropdown({
           {history.length > 0 && (
             <button
               onClick={handleEditClick}
+              onTouchEnd={(e) => {
+                e.stopPropagation();
+                handleEditClick(e);
+              }}
               type="button"
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium py-2 px-2 -mx-2 min-w-[44px] min-h-[44px] active:bg-blue-50 rounded transition-colors"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
             >
               Chỉnh sửa
             </button>
@@ -151,7 +177,12 @@ export default function SearchHistoryDropdown({
               <div
                 key={item._id}
                 onClick={(e) => handleItemClickWrapper(e, item)}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors group"
+                onTouchEnd={(e) => {
+                  e.stopPropagation();
+                  handleItemClickWrapper(e, item);
+                }}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors group touch-manipulation"
+                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
               >
                 <div className="flex-shrink-0">
                   {item.type === 'hashtag' ? (
@@ -167,7 +198,13 @@ export default function SearchHistoryDropdown({
                 </div>
                 <button
                   onClick={(e) => handleDelete(e, item._id)}
-                  className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onTouchEnd={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleDelete(e, item._id);
+                  }}
+                  className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 active:bg-gray-300 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity touch-manipulation"
+                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                 >
                   <X className="w-4 h-4 text-gray-500" />
                 </button>
