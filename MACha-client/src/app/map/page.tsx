@@ -35,7 +35,22 @@ export default function MapPage() {
     completed: 0,
     total: 0,
   });
+  const [sidebarWidth, setSidebarWidth] = useState(280);
   const router = useRouter();
+
+  // Update sidebar width based on screen size
+  useEffect(() => {
+    const updateSidebarWidth = () => {
+      setSidebarWidth(window.innerWidth >= 640 ? 320 : 280);
+    };
+    
+    updateSidebarWidth();
+    window.addEventListener('resize', updateSidebarWidth);
+    
+    return () => {
+      window.removeEventListener('resize', updateSidebarWidth);
+    };
+  }, []);
 
   useEffect(() => {
     if (!MAPBOX_TOKEN) {
@@ -436,7 +451,7 @@ export default function MapPage() {
     <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900" style={{ marginTop: '73px' }}>
       <aside 
         className={`fixed left-0 top-[73px] h-[calc(100vh-73px)] bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto z-10 transition-all duration-300 ${
-          isSidebarOpen ? 'w-full sm:w-80' : 'w-0'
+          isSidebarOpen ? 'w-[280px] sm:w-80' : 'w-0'
         }`}
       >
         <div className={`p-3 sm:p-4 space-y-4 sm:space-y-6 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
@@ -600,10 +615,11 @@ export default function MapPage() {
 
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className={`fixed top-[calc(73px+50%)] z-20 bg-white dark:bg-gray-800 rounded-r-full shadow-lg border-r border-y border-gray-200 dark:border-gray-700 p-2 sm:p-3 transition-all duration-300 hover:bg-gray-50 dark:hover:bg-gray-700 ${
-          isSidebarOpen ? 'left-full sm:left-80' : 'left-0'
-        }`}
-        style={{ transform: 'translateY(-50%)' }}
+        className="fixed top-[calc(73px+50%)] z-20 bg-white dark:bg-gray-800 rounded-r-full shadow-lg border-r border-y border-gray-200 dark:border-gray-700 p-2 sm:p-3 transition-all duration-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        style={{ 
+          transform: 'translateY(-50%)',
+          left: isSidebarOpen ? `${sidebarWidth}px` : '0'
+        }}
         aria-label={isSidebarOpen ? 'Thu gọn sidebar' : 'Mở rộng sidebar'}
       >
         {isSidebarOpen ? (
@@ -613,7 +629,20 @@ export default function MapPage() {
         )}
       </button>
 
-      <div className={`h-full relative transition-all duration-300 ${isSidebarOpen ? 'ml-0 sm:ml-80' : 'ml-0'}`}>
+      <div 
+        className="h-full relative transition-all duration-300"
+        style={{
+          left: isSidebarOpen ? `${sidebarWidth}px` : '0',
+          right: '0',
+          width: isSidebarOpen ? `calc(100% - ${sidebarWidth}px)` : '100%'
+        }}
+        onTransitionEnd={() => {
+          // Trigger map resize after transition completes
+          if (map.current) {
+            map.current.resize();
+          }
+        }}
+      >
         <div
           ref={mapContainer}
           className="w-full h-full"
