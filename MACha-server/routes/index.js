@@ -17,6 +17,7 @@ import eventRoutes from "./EventRoute.js";
 import ownerRoutes from "./OwnerRoute.js";
 import recoveryRoutes from "./RecoveryRoute.js";
 import recommendationRoutes from "./RecommendationRoute.js";
+import adminRoutes from "./AdminRoute.js";
 
 export {
     authRoutes,
@@ -38,5 +39,6 @@ export {
     eventRoutes,
     ownerRoutes,
     recoveryRoutes,
-    recommendationRoutes
+    recommendationRoutes,
+    adminRoutes
 }

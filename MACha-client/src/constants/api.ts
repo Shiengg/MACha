@@ -188,3 +188,6 @@ export const INIT_SEPAY_RECOVERY_PAYMENT_ROUTE = (recoveryCaseId: string) => `${
 export const RECOMMENDATION_ROUTE = "api/recommendations";
 export const GET_RECOMMENDED_CAMPAIGNS_ROUTE = `${RECOMMENDATION_ROUTE}`;
 export const GET_ANONYMOUS_RECOMMENDATIONS_ROUTE = `${RECOMMENDATION_ROUTE}/anonymous`;
+
+export const ADMIN_ROUTE = "api/admin";
+export const ADMIN_DASHBOARD_ROUTE = `${ADMIN_ROUTE}/dashboard`;

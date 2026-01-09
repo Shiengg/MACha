@@ -44,7 +44,6 @@ export default function AdminSidebar() {
       title: 'GENERAL',
       items: [
         { icon: BarChart3, label: 'Dashboard', href: '/admin/dashboard' },
-        { icon: Settings, label: 'Cài đặt', href: '/admin/settings' },
       ],
     },
     {
