@@ -6,10 +6,13 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js",
+    "start": "concurrently \"node server.js\" \"node worker/worker.js\" --names \"SERVER,WORKER\" --prefix-colors \"blue,green\"",
+    "start:server-only": "node server.js",
+    "start:with-worker": "concurrently \"npm:start\" \"npm:worker:prod\" --names \"SERVER,WORKER\" --prefix-colors \"blue,green\"",
     "dev": "nodemon server.js",
     "worker": "nodemon worker/worker.js",
     "worker:dev": "nodemon worker/worker.js",
+    "worker:prod": "node worker/worker.js",
     "subscriber": "node subscribers/initSubscriber.js",
     "migrate:kyc": "node scripts/migrate-kyc-data.js",
     "migrate:kyc:dry-run": "node scripts/migrate-kyc-data.js --dry-run",
@@ -37,6 +40,7 @@
     "sepay-pg-node": "^1.0.0",
     "socket.io": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "concurrently": "^9.1.2"
   }
 }
