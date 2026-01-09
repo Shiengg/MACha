@@ -18,6 +18,10 @@ export interface Notification {
     _id: string;
     title: string;
   };
+  event?: {
+    _id: string;
+    title: string;
+  };
   is_read: boolean;
   createdAt: string;
 }

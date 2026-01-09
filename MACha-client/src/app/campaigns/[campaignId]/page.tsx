@@ -19,7 +19,7 @@ import CreatePostModal from '@/components/shared/CreatePostModal';
 import ReportModal from '@/components/shared/ReportModal';
 import { getReportsByItem } from '@/services/report.service';
 import { FaFlag } from 'react-icons/fa';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Share2 } from 'lucide-react';
 import Link from 'next/link';
 
 function CampaignDetails() {
@@ -57,9 +57,29 @@ function CampaignDetails() {
     const [showReportModal, setShowReportModal] = useState(false);
     const [hasReported, setHasReported] = useState(false);
     const [isCheckingReport, setIsCheckingReport] = useState(false);
+    const [isSharing, setIsSharing] = useState(false);
 
     const handleDonate = () => {
         router.push(`/campaigns/${campaignId}/donate`);
+    };
+
+    const handleShare = async () => {
+        if (!campaign || !navigator.share || isSharing) return;
+        
+        try {
+            setIsSharing(true);
+            await navigator.share({
+                title: campaign.title,
+                url: `/campaigns/${campaign._id}`,
+            });
+        } catch (error: any) {
+            // User cancelled or share failed - ignore silently
+            if (error.name !== 'AbortError') {
+                console.error('Share failed:', error);
+            }
+        } finally {
+            setIsSharing(false);
+        }
     };
 
     useEffect(() => {
@@ -1247,8 +1267,8 @@ function CampaignDetails() {
                                         <div className="text-gray-500 dark:text-gray-400 text-sm">Ngày còn lại</div>
                                     </div>
                                     <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
-                                        <div className="text-2xl font-bold text-blue-500">283</div>
-                                        <div className="text-gray-500 dark:text-gray-400 text-sm">Lượt chia sẻ</div>
+                                        <div className="text-2xl font-bold text-blue-500">{updates.length}</div>
+                                        <div className="text-gray-500 dark:text-gray-400 text-sm">Số cập nhật</div>
                                     </div>
                                 </div>
                             </div>
@@ -2032,31 +2052,17 @@ function CampaignDetails() {
                             {/* Share */}
                             <div className="bg-white rounded-2xl shadow-lg p-6">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
-                                        <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
-                                    </svg>
+                                    <Share2 className="w-5 h-5 text-blue-500" />
                                     <h3 className="font-bold text-gray-900">Chia sẻ chiến dịch</h3>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button className="flex-1 py-2 px-4 border border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50 transition flex items-center justify-center gap-2 text-sm font-medium">
-                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                                        </svg>
-                                        Facebook
-                                    </button>
-                                    <button className="flex-1 py-2 px-4 border border-sky-400 text-sky-400 rounded-lg hover:bg-sky-50 transition flex items-center justify-center gap-2 text-sm font-medium">
-                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
-                                        </svg>
-                                        Twitter
-                                    </button>
-                                    <button className="flex-1 py-2 px-4 border border-red-400 text-red-400 rounded-lg hover:bg-red-50 transition flex items-center justify-center gap-2 text-sm font-medium">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                        </svg>
-                                        Email
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={handleShare}
+                                    disabled={isSharing}
+                                    className="w-full py-3 px-4 border border-gray-300 hover:border-gray-400 rounded-lg transition flex items-center justify-center gap-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Share2 className="w-5 h-5" />
+                                    {isSharing ? 'Đang chia sẻ...' : 'Chia sẻ'}
+                                </button>
                             </div>
 
                             {/* Report */}

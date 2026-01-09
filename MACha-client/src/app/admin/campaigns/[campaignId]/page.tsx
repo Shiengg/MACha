@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
+import AdminContentWrapper from '@/components/admin/AdminContentWrapper';
 import { getCampaignById, Campaign } from '@/services/admin/campaign.service';
 import { campaignService, CampaignUpdate } from '@/services/campaign.service';
 import { donationService, Donation } from '@/services/donation.service';
@@ -152,12 +153,14 @@ export default function AdminCampaignDetail() {
       <div className="min-h-screen bg-[#0f1419]">
         <AdminSidebar />
         <AdminHeader />
-        <div className="ml-64 pt-16 flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-400">Đang tải...</p>
+        <AdminContentWrapper>
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-400">Đang tải...</p>
+            </div>
           </div>
-        </div>
+        </AdminContentWrapper>
       </div>
     );
   }
@@ -171,7 +174,7 @@ export default function AdminCampaignDetail() {
       <AdminSidebar />
       <AdminHeader />
 
-      <div className="ml-64 pt-16">
+      <AdminContentWrapper>
         <div className="p-8">
           {/* Header */}
           <div className="mb-6">
@@ -638,7 +641,7 @@ export default function AdminCampaignDetail() {
             </div>
           </div>
         </div>
-      </div>
+      </AdminContentWrapper>
     </div>
   );
 }

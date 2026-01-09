@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
+import OwnerContentWrapper from '@/components/owner/OwnerContentWrapper';
 import { ownerService, Admin } from '@/services/owner.service';
 import Swal from 'sweetalert2';
 import { Plus, Search, Edit, Trash2, UserPlus, Ban, Unlock, Eye, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
@@ -356,34 +357,36 @@ export default function OwnerAdmins() {
       <OwnerSidebar />
       <OwnerHeader />
       
-      <div className="ml-64 pt-16">
-        <div className="p-8">
-          <div className="mb-6 flex items-center justify-between">
+      <OwnerContentWrapper>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Quản lý Admin</h1>
-              <p className="text-gray-600">Quản lý danh sách admin trong hệ thống</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Quản lý Admin</h1>
+              <p className="text-sm sm:text-base text-gray-600">Quản lý danh sách admin trong hệ thống</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full sm:w-auto">
               <button
                 onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all text-sm sm:text-base flex-1 sm:flex-none justify-center"
               >
-                <Download className="w-5 h-5" />
-                Export CSV
+                <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Export CSV</span>
+                <span className="sm:hidden">Export</span>
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all text-sm sm:text-base flex-1 sm:flex-none justify-center"
               >
-                <UserPlus className="w-5 h-5" />
-                Thêm Admin
+                <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Thêm Admin</span>
+                <span className="sm:hidden">Thêm</span>
               </button>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-6">
-            <div className="p-4 border-b border-gray-200">
-              <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-4 sm:mb-6">
+            <div className="p-3 sm:p-4 border-b border-gray-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
@@ -417,11 +420,11 @@ export default function OwnerAdmins() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-[800px]">
                     <thead className="bg-gray-50">
                       <tr>
                         <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                          className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                           onClick={() => handleSort('username')}
                         >
                           <div className="flex items-center gap-2">
@@ -430,7 +433,7 @@ export default function OwnerAdmins() {
                           </div>
                         </th>
                         <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                          className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 hidden md:table-cell"
                           onClick={() => handleSort('email')}
                         >
                           <div className="flex items-center gap-2">
@@ -438,9 +441,9 @@ export default function OwnerAdmins() {
                             {getSortIcon('email')}
                           </div>
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stats</th>
+                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Stats</th>
                         <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                          className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                           onClick={() => handleSort('is_verified')}
                         >
                           <div className="flex items-center gap-2">
@@ -449,7 +452,7 @@ export default function OwnerAdmins() {
                           </div>
                         </th>
                         <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                          className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 hidden sm:table-cell"
                           onClick={() => handleSort('createdAt')}
                         >
                           <div className="flex items-center gap-2">
@@ -457,13 +460,13 @@ export default function OwnerAdmins() {
                             {getSortIcon('createdAt')}
                           </div>
                         </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {sortedAndFilteredAdmins.map((admin) => (
                         <tr key={admin._id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               {admin.avatar ? (
                                 <img className="h-10 w-10 rounded-full" src={admin.avatar} alt={admin.username} />
@@ -472,17 +475,18 @@ export default function OwnerAdmins() {
                                   {admin.username?.[0]?.toUpperCase() || 'A'}
                                 </div>
                               )}
-                              <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900">{admin.fullname || admin.username}</div>
-                                <div className="text-sm text-gray-500">@{admin.username}</div>
+                              <div className="ml-2 sm:ml-4">
+                                <div className="text-xs sm:text-sm font-medium text-gray-900">{admin.fullname || admin.username}</div>
+                                <div className="text-xs sm:text-sm text-gray-500">@{admin.username}</div>
+                                <div className="text-xs text-gray-400 md:hidden mt-1">{admin.email}</div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{admin.email}</div>
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap hidden md:table-cell">
+                            <div className="text-xs sm:text-sm text-gray-900">{admin.email}</div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap hidden lg:table-cell">
+                            <div className="text-xs sm:text-sm text-gray-900">
                               {admin.stats ? (
                                 <>
                                   <div>Approvals: {admin.stats.approvals}</div>
@@ -493,7 +497,7 @@ export default function OwnerAdmins() {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
                             <div className="flex flex-col gap-1">
                               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                 admin.is_verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
@@ -507,10 +511,10 @@ export default function OwnerAdmins() {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 hidden sm:table-cell">
                             {new Date(admin.createdAt).toLocaleDateString('vi-VN')}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 ref={(el) => {
@@ -519,7 +523,7 @@ export default function OwnerAdmins() {
                                 onClick={() => handleToggleMenu(admin._id)}
                                 className="text-gray-600 hover:text-gray-900"
                               >
-                                <MoreVertical className="w-5 h-5" />
+                                <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5" />
                               </button>
                             </div>
                           </td>
@@ -529,21 +533,21 @@ export default function OwnerAdmins() {
                   </table>
                 </div>
 
-                <div className="flex items-center justify-between p-4 border-t border-gray-200">
+                <div className="flex items-center justify-between p-3 sm:p-4 border-t border-gray-200 flex-wrap gap-2">
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+                    className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm"
                   >
                     Previous
                   </button>
-                  <span className="text-gray-600">
-                    Page {currentPage} of {totalPages}
+                  <span className="text-gray-600 text-sm">
+                    Trang {currentPage} / {totalPages}
                   </span>
                   <button
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+                    className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm"
                   >
                     Next
                   </button>
@@ -552,11 +556,11 @@ export default function OwnerAdmins() {
             )}
           </div>
         </div>
-      </div>
+      </OwnerContentWrapper>
 
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Tạo Admin Mới</h2>
             <div className="space-y-4">
               <div>

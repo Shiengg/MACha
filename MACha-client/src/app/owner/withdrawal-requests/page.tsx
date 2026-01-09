@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
+import OwnerContentWrapper from '@/components/owner/OwnerContentWrapper';
 import { ownerService } from '@/services/owner.service';
 import { Escrow, Campaign, User } from '@/services/escrow.service';
 import { formatCurrencyVND, formatDateTime, formatWithdrawalStatus } from '@/utils/escrow.utils';
@@ -207,15 +208,14 @@ export default function OwnerWithdrawalRequests() {
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50">
         <OwnerSidebar />
         <OwnerHeader />
-
-        <div className="ml-64 pt-16">
-          <div className="p-8 flex items-center justify-center">
+        <OwnerContentWrapper>
+          <div className="p-4 sm:p-8 flex items-center justify-center min-h-[calc(100vh-4rem)]">
             <div className="text-center">
               <RefreshCw className="w-12 h-12 text-purple-500 animate-spin mx-auto mb-4" />
               <p className="text-gray-600">Đang tải...</p>
             </div>
           </div>
-        </div>
+        </OwnerContentWrapper>
       </div>
     );
   }
@@ -224,25 +224,24 @@ export default function OwnerWithdrawalRequests() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50">
       <OwnerSidebar />
       <OwnerHeader />
-
-      <div className="ml-64 pt-16">
-        <div className="p-8 overflow-y-auto">
+      <OwnerContentWrapper>
+        <div className="p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Yêu cầu rút tiền đã duyệt</h1>
-              <p className="text-gray-600">Xem và xử lý các yêu cầu rút tiền đã được admin duyệt</p>
+            <div className="mb-4 sm:mb-6 lg:mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Yêu cầu rút tiền đã duyệt</h1>
+              <p className="text-sm sm:text-base text-gray-600">Xem và xử lý các yêu cầu rút tiền đã được admin duyệt</p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-              <div className="flex items-center gap-4 mb-4">
+            <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+              <div className="flex items-center gap-3 sm:gap-4 mb-4">
                 <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
                   <input
                     type="text"
                     placeholder="Tìm kiếm theo campaign, người yêu cầu..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full pl-9 sm:pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
               </div>
@@ -253,68 +252,68 @@ export default function OwnerWithdrawalRequests() {
                   <p className="text-gray-500 text-lg">Không có yêu cầu rút tiền nào</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {filteredRequests.map((request) => (
                     <div
                       key={request._id}
-                      className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow"
+                      className="border border-gray-200 rounded-xl p-4 sm:p-6 hover:shadow-md transition-shadow"
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                              <DollarSign className="w-6 h-6 text-purple-600" />
+                      <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-0">
+                        <div className="flex-1 w-full">
+                          <div className="flex items-center gap-2 sm:gap-3 mb-3">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
                             </div>
-                            <div>
-                              <h3 className="font-semibold text-gray-900 text-lg">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-semibold text-gray-900 text-base sm:text-lg truncate">
                                 {getCampaignTitle(request.campaign)}
                               </h3>
-                              <p className="text-sm text-gray-500">
+                              <p className="text-xs sm:text-sm text-gray-500">
                                 Yêu cầu bởi: {getUserName(request.requested_by)}
                               </p>
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-3 sm:mb-4">
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Số tiền</p>
-                              <p className="text-lg font-bold text-green-600">
+                              <p className="text-base sm:text-lg font-bold text-green-600">
                                 {formatCurrencyVND(request.withdrawal_request_amount)}
                               </p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Trạng thái</p>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                 {formatWithdrawalStatus(request.request_status)}
                               </span>
                             </div>
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Ngày tạo</p>
-                              <p className="text-sm font-medium text-gray-900">
+                              <p className="text-xs sm:text-sm font-medium text-gray-900">
                                 {formatDateTime(request.createdAt)}
                               </p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Admin duyệt</p>
-                              <p className="text-sm font-medium text-gray-900">
+                              <p className="text-xs sm:text-sm font-medium text-gray-900">
                                 {getUserName(request.admin_reviewed_by)}
                               </p>
                             </div>
                           </div>
 
                           {request.request_reason && (
-                            <div className="mb-4">
+                            <div className="mb-3 sm:mb-4">
                               <p className="text-xs text-gray-500 mb-1">Lý do yêu cầu</p>
-                              <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
+                              <p className="text-xs sm:text-sm text-gray-700 bg-gray-50 p-2 sm:p-3 rounded-lg">
                                 {request.request_reason}
                               </p>
                             </div>
                           )}
 
                           {request.votingResults && (
-                            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                            <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-blue-50 rounded-lg">
                               <p className="text-xs text-gray-500 mb-2">Kết quả voting</p>
-                              <div className="flex items-center gap-4 text-sm">
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm">
                                 <span className="text-green-600">
                                   ✓ Approve: {request.votingResults.approveCount} ({request.votingResults.approvePercentage}
                                   %)
@@ -328,20 +327,21 @@ export default function OwnerWithdrawalRequests() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2 ml-4">
+                        <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-4">
                           <button
                             onClick={() => handleViewDetails(request)}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                            className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition flex-1 sm:flex-none"
                           >
                             Chi tiết
                           </button>
                           <button
                             onClick={() => handleProcessPayment(request)}
                             disabled={isProcessing || request.request_status !== 'admin_approved'}
-                            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-1 sm:flex-none justify-center"
                           >
-                            <Wallet className="w-4 h-4" />
-                            Chuyển khoản
+                            <Wallet className="w-3 h-3 sm:w-4 sm:h-4" />
+                            <span className="hidden sm:inline">Chuyển khoản</span>
+                            <span className="sm:hidden">Chuyển</span>
                           </button>
                         </div>
                       </div>
@@ -352,14 +352,14 @@ export default function OwnerWithdrawalRequests() {
             </div>
           </div>
         </div>
-      </div>
+      </OwnerContentWrapper>
 
       {showDetailsModal && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">Chi tiết yêu cầu rút tiền</h2>
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-900">Chi tiết yêu cầu rút tiền</h2>
                 <button
                   onClick={() => {
                     setShowDetailsModal(false);
@@ -367,35 +367,35 @@ export default function OwnerWithdrawalRequests() {
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  <XCircle className="w-6 h-6" />
+                  <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
               </div>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Campaign</h3>
-                <p className="text-lg font-semibold text-gray-900">{getCampaignTitle(selectedRequest.campaign)}</p>
+                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Campaign</h3>
+                <p className="text-base sm:text-lg font-semibold text-gray-900">{getCampaignTitle(selectedRequest.campaign)}</p>
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Người yêu cầu</h3>
-                <p className="text-lg font-semibold text-gray-900">
+                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Người yêu cầu</h3>
+                <p className="text-base sm:text-lg font-semibold text-gray-900">
                   {getUserName(selectedRequest.requested_by)}
                 </p>
-                <p className="text-sm text-gray-500">{getUserEmail(selectedRequest.requested_by)}</p>
+                <p className="text-xs sm:text-sm text-gray-500">{getUserEmail(selectedRequest.requested_by)}</p>
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Số tiền yêu cầu</h3>
-                <p className="text-2xl font-bold text-green-600">
+                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Số tiền yêu cầu</h3>
+                <p className="text-xl sm:text-2xl font-bold text-green-600">
                   {formatCurrencyVND(selectedRequest.withdrawal_request_amount)}
                 </p>
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Lý do yêu cầu</h3>
-                <p className="text-gray-900 bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Lý do yêu cầu</h3>
+                <p className="text-sm sm:text-base text-gray-900 bg-gray-50 p-3 sm:p-4 rounded-lg">
                   {selectedRequest.request_reason || 'Không có'}
                 </p>
               </div>

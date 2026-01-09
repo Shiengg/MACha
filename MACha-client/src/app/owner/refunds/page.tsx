@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
+import OwnerContentWrapper from '@/components/owner/OwnerContentWrapper';
 import { ownerService, Refund } from '@/services/owner.service';
 import Swal from 'sweetalert2';
 import {
@@ -205,14 +206,14 @@ export default function OwnerRefunds() {
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50">
         <OwnerSidebar />
         <OwnerHeader />
-        <div className="ml-64 pt-16">
-          <div className="p-8 flex items-center justify-center">
+        <OwnerContentWrapper>
+          <div className="p-4 sm:p-8 flex items-center justify-center min-h-[calc(100vh-4rem)]">
             <div className="text-center">
               <RefreshCw className="w-12 h-12 text-purple-500 animate-spin mx-auto mb-4" />
               <p className="text-gray-600">Đang tải...</p>
             </div>
           </div>
-        </div>
+        </OwnerContentWrapper>
       </div>
     );
   }
@@ -221,25 +222,24 @@ export default function OwnerRefunds() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50">
       <OwnerSidebar />
       <OwnerHeader />
-
-      <div className="ml-64 pt-16">
-        <div className="p-8 overflow-y-auto">
+      <OwnerContentWrapper>
+        <div className="p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Quản lý hoàn tiền</h1>
-              <p className="text-gray-600">Xem và xử lý các yêu cầu hoàn tiền cho người quyên góp</p>
+            <div className="mb-4 sm:mb-6 lg:mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Quản lý hoàn tiền</h1>
+              <p className="text-sm sm:text-base text-gray-600">Xem và xử lý các yêu cầu hoàn tiền cho người quyên góp</p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-              <div className="flex items-center gap-4 mb-4">
+            <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+              <div className="flex items-center gap-3 sm:gap-4 mb-4">
                 <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
                   <input
                     type="text"
                     placeholder="Tìm kiếm theo campaign, người quyên góp, email..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full pl-9 sm:pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
               </div>
@@ -251,45 +251,45 @@ export default function OwnerRefunds() {
                   <p className="text-gray-400 text-sm mt-2">Tất cả refunds đã được xử lý hoặc chưa có refund nào</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {filteredRefunds.map((refund) => (
                     <div
                       key={refund._id}
-                      className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow"
+                      className="border border-gray-200 rounded-xl p-4 sm:p-6 hover:shadow-md transition-shadow"
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                              <ArrowLeftRight className="w-6 h-6 text-blue-600" />
+                      <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-0">
+                        <div className="flex-1 w-full">
+                          <div className="flex items-center gap-2 sm:gap-3 mb-3">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <ArrowLeftRight className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                             </div>
-                            <div>
-                              <h3 className="font-semibold text-gray-900 text-lg">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-semibold text-gray-900 text-base sm:text-lg truncate">
                                 {refund.campaign?.title || 'N/A'}
                               </h3>
-                              <p className="text-sm text-gray-500">
+                              <p className="text-xs sm:text-sm text-gray-500">
                                 Người quyên góp: {refund.donor?.fullname || refund.donor?.username || 'N/A'}
                               </p>
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-3 sm:mb-4">
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Số tiền hoàn</p>
-                              <p className="text-lg font-bold text-green-600">
+                              <p className="text-base sm:text-lg font-bold text-green-600">
                                 {formatCurrencyVND(refund.refunded_amount)}
                               </p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Số tiền gốc</p>
-                              <p className="text-sm font-medium text-gray-900">
+                              <p className="text-xs sm:text-sm font-medium text-gray-900">
                                 {formatCurrencyVND(refund.original_amount)}
                               </p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Trạng thái</p>
                               <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                                className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
                                   refund.refund_status
                                 )}`}
                               >
@@ -298,43 +298,43 @@ export default function OwnerRefunds() {
                             </div>
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Tỷ lệ hoàn</p>
-                              <p className="text-sm font-medium text-gray-900">
+                              <p className="text-xs sm:text-sm font-medium text-gray-900">
                                 {(refund.refund_ratio * 100).toFixed(2)}%
                               </p>
                             </div>
                           </div>
 
                           {refund.notes && (
-                            <div className="mb-4">
+                            <div className="mb-3 sm:mb-4">
                               <p className="text-xs text-gray-500 mb-1">Ghi chú</p>
-                              <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
+                              <p className="text-xs sm:text-sm text-gray-700 bg-gray-50 p-2 sm:p-3 rounded-lg">
                                 {refund.notes}
                               </p>
                             </div>
                           )}
 
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
                             <div className="flex items-center gap-1">
-                              <User className="w-4 h-4" />
-                              <span>{refund.donor?.email || 'N/A'}</span>
+                              <User className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="truncate">{refund.donor?.email || 'N/A'}</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
+                              <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
                               <span>{formatDateTime(refund.createdAt)}</span>
                             </div>
                             {refund.refund_method && (
                               <div className="flex items-center gap-1">
-                                <Info className="w-4 h-4" />
+                                <Info className="w-3 h-3 sm:w-4 sm:h-4" />
                                 <span>Phương thức: {refund.refund_method === 'escrow' ? 'Escrow' : 'Recovery'}</span>
                               </div>
                             )}
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 ml-4">
+                        <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-4">
                           <button
                             onClick={() => handleViewDetails(refund)}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                            className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition flex-1 sm:flex-none"
                           >
                             Chi tiết
                           </button>
@@ -342,10 +342,11 @@ export default function OwnerRefunds() {
                             <button
                               onClick={() => handleProcessRefund(refund)}
                               disabled={isProcessing}
-                              className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                              className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-1 sm:flex-none justify-center"
                             >
-                              <Wallet className="w-4 h-4" />
-                              Hoàn tiền
+                              <Wallet className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden sm:inline">Hoàn tiền</span>
+                              <span className="sm:hidden">Hoàn</span>
                             </button>
                           )}
                         </div>
@@ -357,14 +358,14 @@ export default function OwnerRefunds() {
             </div>
           </div>
         </div>
-      </div>
+      </OwnerContentWrapper>
 
       {showDetailsModal && selectedRefund && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">Chi tiết refund</h2>
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-900">Chi tiết refund</h2>
                 <button
                   onClick={() => {
                     setShowDetailsModal(false);
@@ -372,59 +373,59 @@ export default function OwnerRefunds() {
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  <XCircle className="w-6 h-6" />
+                  <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
               </div>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Campaign</h3>
-                <p className="text-lg font-semibold text-gray-900">{selectedRefund.campaign?.title || 'N/A'}</p>
+                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Campaign</h3>
+                <p className="text-base sm:text-lg font-semibold text-gray-900">{selectedRefund.campaign?.title || 'N/A'}</p>
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Người quyên góp</h3>
-                <p className="text-lg font-semibold text-gray-900">
+                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Người quyên góp</h3>
+                <p className="text-base sm:text-lg font-semibold text-gray-900">
                   {selectedRefund.donor?.fullname || selectedRefund.donor?.username || 'N/A'}
                 </p>
-                <p className="text-sm text-gray-500">{selectedRefund.donor?.email || ''}</p>
+                <p className="text-xs sm:text-sm text-gray-500">{selectedRefund.donor?.email || ''}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Số tiền gốc</h3>
-                  <p className="text-xl font-bold text-gray-900">
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Số tiền gốc</h3>
+                  <p className="text-lg sm:text-xl font-bold text-gray-900">
                     {formatCurrencyVND(selectedRefund.original_amount)}
                   </p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Số tiền hoàn</h3>
-                  <p className="text-xl font-bold text-green-600">
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Số tiền hoàn</h3>
+                  <p className="text-lg sm:text-xl font-bold text-green-600">
                     {formatCurrencyVND(selectedRefund.refunded_amount)}
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Tỷ lệ hoàn</h3>
-                  <p className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Tỷ lệ hoàn</h3>
+                  <p className="text-base sm:text-lg font-semibold text-gray-900">
                     {(selectedRefund.refund_ratio * 100).toFixed(2)}%
                   </p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Còn lại</h3>
-                  <p className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Còn lại</h3>
+                  <p className="text-base sm:text-lg font-semibold text-gray-900">
                     {formatCurrencyVND(selectedRefund.remaining_refund)}
                   </p>
                 </div>
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Trạng thái</h3>
+                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Trạng thái</h3>
                 <span
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                  className={`inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${getStatusColor(
                     selectedRefund.refund_status
                   )}`}
                 >
@@ -433,8 +434,8 @@ export default function OwnerRefunds() {
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Phương thức</h3>
-                <p className="text-gray-900 capitalize">
+                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Phương thức</h3>
+                <p className="text-sm sm:text-base text-gray-900 capitalize">
                   {selectedRefund.refund_method === 'escrow'
                     ? 'Escrow (Từ số tiền còn lại)'
                     : 'Recovery (Từ recovery case)'}
@@ -443,8 +444,8 @@ export default function OwnerRefunds() {
 
               {selectedRefund.notes && (
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Ghi chú</h3>
-                  <p className="text-gray-900 bg-gray-50 p-4 rounded-lg">
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Ghi chú</h3>
+                  <p className="text-sm sm:text-base text-gray-900 bg-gray-50 p-3 sm:p-4 rounded-lg">
                     {selectedRefund.notes}
                   </p>
                 </div>

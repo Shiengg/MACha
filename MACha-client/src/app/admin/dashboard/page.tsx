@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
+import AdminContentWrapper from '@/components/admin/AdminContentWrapper';
 import { adminService, AdminDashboardData } from '@/services/admin.service';
 import { 
   Users, 
@@ -48,12 +49,14 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-gray-50">
         <AdminSidebar />
         <AdminHeader />
-        <div className="ml-64 pt-16 flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-500">Đang tải dashboard...</p>
+        <AdminContentWrapper>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-500">Đang tải dashboard...</p>
+            </div>
           </div>
-        </div>
+        </AdminContentWrapper>
       </div>
     );
   }
@@ -63,11 +66,13 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-gray-50">
         <AdminSidebar />
         <AdminHeader />
-        <div className="ml-64 pt-16 flex items-center justify-center h-screen">
-          <div className="text-center">
-            <p className="text-red-500">{error || 'Không thể tải dashboard'}</p>
+        <AdminContentWrapper>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <p className="text-red-500">{error || 'Không thể tải dashboard'}</p>
+            </div>
           </div>
-        </div>
+        </AdminContentWrapper>
       </div>
     );
   }
@@ -100,20 +105,19 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gray-50">
       <AdminSidebar />
       <AdminHeader />
-      
-      <div className="ml-64 pt-16">
-        <div className="p-8">
-          <div className="mb-6 flex items-center justify-between">
+      <AdminContentWrapper>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Trang tổng quan</h1>
-              <p className="text-gray-600">Chào mừng trở lại! Dưới đây là tổng quan hoạt động hệ thống.</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Trang tổng quan</h1>
+              <p className="text-sm sm:text-base text-gray-600">Chào mừng trở lại! Dưới đây là tổng quan hoạt động hệ thống.</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full sm:w-auto">
               {(['today', 'week', 'month'] as const).map((filter) => (
                 <button
                   key={filter}
                   onClick={() => setTimeFilter(filter)}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-sm sm:text-base flex-1 sm:flex-none ${
                     timeFilter === filter
                       ? 'bg-blue-600 text-white shadow-md'
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
@@ -126,74 +130,74 @@ export default function AdminDashboard() {
           </div>
 
           {/* Quick Links */}
-          <div className="mb-6 grid grid-cols-5 gap-4">
-            <Link href="/admin/users" className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all hover:border-blue-300 group">
-              <div className="flex items-center gap-3">
-                <Users className="w-6 h-6 text-blue-600 group-hover:scale-110 transition-transform" />
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">Quản lý người dùng</div>
-                  <div className="text-xs text-gray-500">User management</div>
+          <div className="mb-4 sm:mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
+            <Link href="/admin/users" className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all hover:border-blue-300 group">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 group-hover:scale-110 transition-transform flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-semibold text-gray-900">Quản lý người dùng</div>
+                  <div className="text-xs text-gray-500 hidden sm:block">User management</div>
                 </div>
               </div>
             </Link>
-            <Link href="/admin/campaigns" className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all hover:border-blue-300 group">
-              <div className="flex items-center gap-3">
-                <Megaphone className="w-6 h-6 text-green-600 group-hover:scale-110 transition-transform" />
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">Quản lý campaign</div>
-                  <div className="text-xs text-gray-500">Campaign management</div>
+            <Link href="/admin/campaigns" className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all hover:border-blue-300 group">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Megaphone className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 group-hover:scale-110 transition-transform flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-semibold text-gray-900">Quản lý campaign</div>
+                  <div className="text-xs text-gray-500 hidden sm:block">Campaign management</div>
                 </div>
               </div>
             </Link>
-            <Link href="/admin/events" className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all hover:border-blue-300 group">
-              <div className="flex items-center gap-3">
-                <Calendar className="w-6 h-6 text-purple-600 group-hover:scale-110 transition-transform" />
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">Quản lý sự kiện</div>
-                  <div className="text-xs text-gray-500">Event management</div>
+            <Link href="/admin/events" className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all hover:border-blue-300 group">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 group-hover:scale-110 transition-transform flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-semibold text-gray-900">Quản lý sự kiện</div>
+                  <div className="text-xs text-gray-500 hidden sm:block">Event management</div>
                 </div>
               </div>
             </Link>
-            <Link href="/admin/kyc" className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all hover:border-blue-300 group">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="w-6 h-6 text-orange-600 group-hover:scale-110 transition-transform" />
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">Duyệt người dùng</div>
-                  <div className="text-xs text-gray-500">KYC approval</div>
+            <Link href="/admin/kyc" className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all hover:border-blue-300 group">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 group-hover:scale-110 transition-transform flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-semibold text-gray-900">Duyệt người dùng</div>
+                  <div className="text-xs text-gray-500 hidden sm:block">KYC approval</div>
                 </div>
               </div>
             </Link>
-            <Link href="/admin/reports" className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all hover:border-blue-300 group">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="w-6 h-6 text-red-600 group-hover:scale-110 transition-transform" />
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">Quản lý báo cáo</div>
-                  <div className="text-xs text-gray-500">Reports management</div>
+            <Link href="/admin/reports" className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all hover:border-blue-300 group">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600 group-hover:scale-110 transition-transform flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-semibold text-gray-900">Quản lý báo cáo</div>
+                  <div className="text-xs text-gray-500 hidden sm:block">Reports management</div>
                 </div>
               </div>
             </Link>
           </div>
 
           {/* Overview Stats */}
-          <div className="grid grid-cols-5 gap-6 mb-6">
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <Users className="w-8 h-8 text-blue-600" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
                 <div className="text-right">
-                  <div className="text-gray-500 text-sm mb-1">Tổng người dùng</div>
-                  <div className="text-2xl font-bold text-gray-900">
+                  <div className="text-gray-500 text-xs sm:text-sm mb-1">Tổng người dùng</div>
+                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
                     {dashboardData.overview.total_users.toLocaleString('vi-VN')}
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <Megaphone className="w-8 h-8 text-green-600" />
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <Megaphone className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
                 <div className="text-right">
-                  <div className="text-gray-500 text-sm mb-1">Tổng campaigns</div>
-                  <div className="text-2xl font-bold text-gray-900">
+                  <div className="text-gray-500 text-xs sm:text-sm mb-1">Tổng campaigns</div>
+                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
                     {dashboardData.overview.total_campaigns.toLocaleString('vi-VN')}
                   </div>
                   <div className="text-xs text-green-600 mt-1">
@@ -203,36 +207,36 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <Calendar className="w-8 h-8 text-purple-600" />
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
                 <div className="text-right">
-                  <div className="text-gray-500 text-sm mb-1">Tổng sự kiện</div>
-                  <div className="text-2xl font-bold text-gray-900">
+                  <div className="text-gray-500 text-xs sm:text-sm mb-1">Tổng sự kiện</div>
+                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
                     {dashboardData.overview.total_events.toLocaleString('vi-VN')}
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <DollarSign className="w-8 h-8 text-yellow-600" />
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600" />
                 <div className="text-right">
-                  <div className="text-gray-500 text-sm mb-1">Tổng đóng góp</div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {dashboardData.overview.total_donations.toLocaleString('vi-VN')}
+                  <div className="text-gray-500 text-xs sm:text-sm mb-1">Tổng đóng góp</div>
+                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                    {Math.floor(dashboardData.overview.total_donations / 1000000)}M VND
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <CheckCircle className="w-8 h-8 text-green-600" />
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
                 <div className="text-right">
-                  <div className="text-gray-500 text-sm mb-1">Tổng duyệt</div>
-                  <div className="text-2xl font-bold text-gray-900">
+                  <div className="text-gray-500 text-xs sm:text-sm mb-1">Tổng duyệt</div>
+                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
                     {dashboardData.admin_stats.total_approvals.toLocaleString('vi-VN')}
                   </div>
                   <div className="text-xs text-red-600 mt-1">
@@ -244,99 +248,99 @@ export default function AdminDashboard() {
           </div>
 
           {/* Pending Items */}
-          <div className="grid grid-cols-5 gap-6 mb-6">
-            <Link href="/admin/campaigns?status=pending" className="bg-yellow-50 p-6 rounded-lg border border-yellow-200 shadow-sm hover:shadow-md transition-all">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6">
+            <Link href="/admin/campaigns?status=pending" className="bg-yellow-50 p-4 sm:p-6 rounded-lg border border-yellow-200 shadow-sm hover:shadow-md transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm mb-1">Campaigns chờ duyệt</div>
-                  <div className="text-2xl font-bold text-yellow-700">
+                  <div className="text-gray-600 text-xs sm:text-sm mb-1">Campaigns chờ duyệt</div>
+                  <div className="text-xl sm:text-2xl font-bold text-yellow-700">
                     {dashboardData.pending.campaigns}
                   </div>
                 </div>
-                <Megaphone className="w-8 h-8 text-yellow-600" />
+                <Megaphone className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600 flex-shrink-0" />
               </div>
             </Link>
 
-            <Link href="/admin/events?status=pending" className="bg-yellow-50 p-6 rounded-lg border border-yellow-200 shadow-sm hover:shadow-md transition-all">
+            <Link href="/admin/events?status=pending" className="bg-yellow-50 p-4 sm:p-6 rounded-lg border border-yellow-200 shadow-sm hover:shadow-md transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm mb-1">Sự kiện chờ duyệt</div>
-                  <div className="text-2xl font-bold text-yellow-700">
+                  <div className="text-gray-600 text-xs sm:text-sm mb-1">Sự kiện chờ duyệt</div>
+                  <div className="text-xl sm:text-2xl font-bold text-yellow-700">
                     {dashboardData.pending.events}
                   </div>
                 </div>
-                <Calendar className="w-8 h-8 text-yellow-600" />
+                <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600 flex-shrink-0" />
               </div>
             </Link>
 
-            <Link href="/admin/kyc" className="bg-yellow-50 p-6 rounded-lg border border-yellow-200 shadow-sm hover:shadow-md transition-all">
+            <Link href="/admin/kyc" className="bg-yellow-50 p-4 sm:p-6 rounded-lg border border-yellow-200 shadow-sm hover:shadow-md transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm mb-1">KYC chờ duyệt</div>
-                  <div className="text-2xl font-bold text-yellow-700">
+                  <div className="text-gray-600 text-xs sm:text-sm mb-1">KYC chờ duyệt</div>
+                  <div className="text-xl sm:text-2xl font-bold text-yellow-700">
                     {dashboardData.pending.kyc}
                   </div>
                 </div>
-                <CheckCircle className="w-8 h-8 text-yellow-600" />
+                <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600 flex-shrink-0" />
               </div>
             </Link>
 
-            <Link href="/admin/reports" className="bg-yellow-50 p-6 rounded-lg border border-yellow-200 shadow-sm hover:shadow-md transition-all">
+            <Link href="/admin/reports" className="bg-yellow-50 p-4 sm:p-6 rounded-lg border border-yellow-200 shadow-sm hover:shadow-md transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm mb-1">Báo cáo chờ xử lý</div>
-                  <div className="text-2xl font-bold text-yellow-700">
+                  <div className="text-gray-600 text-xs sm:text-sm mb-1">Báo cáo chờ xử lý</div>
+                  <div className="text-xl sm:text-2xl font-bold text-yellow-700">
                     {dashboardData.pending.reports}
                   </div>
                 </div>
-                <AlertTriangle className="w-8 h-8 text-yellow-600" />
+                <AlertTriangle className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600 flex-shrink-0" />
               </div>
             </Link>
 
-            <Link href="/admin/withdrawal-requests" className="bg-yellow-50 p-6 rounded-lg border border-yellow-200 shadow-sm hover:shadow-md transition-all">
+            <Link href="/admin/withdrawal-requests" className="bg-yellow-50 p-4 sm:p-6 rounded-lg border border-yellow-200 shadow-sm hover:shadow-md transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm mb-1">Yêu cầu rút tiền</div>
-                  <div className="text-2xl font-bold text-yellow-700">
+                  <div className="text-gray-600 text-xs sm:text-sm mb-1">Yêu cầu rút tiền</div>
+                  <div className="text-xl sm:text-2xl font-bold text-yellow-700">
                     {dashboardData.pending.withdrawals}
                   </div>
                 </div>
-                <DollarSign className="w-8 h-8 text-yellow-600" />
+                <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600 flex-shrink-0" />
               </div>
             </Link>
           </div>
 
           {/* Approvals/Rejections and Charts */}
-          <div className="grid grid-cols-2 gap-6 mb-6">
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Duyệt/Từ chối ({timeFilter === 'today' ? 'Hôm nay' : timeFilter === 'week' ? 'Tuần này' : 'Tháng này'})</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
-                    <span className="text-gray-700 font-medium">Đã duyệt</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Duyệt/Từ chối ({timeFilter === 'today' ? 'Hôm nay' : timeFilter === 'week' ? 'Tuần này' : 'Tháng này'})</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex items-center justify-between p-3 sm:p-4 bg-green-50 rounded-lg">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+                    <span className="text-gray-700 font-medium text-sm sm:text-base">Đã duyệt</span>
                   </div>
-                  <span className="text-2xl font-bold text-green-600">{approvalStats.approvals}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-green-600">{approvalStats.approvals}</span>
                 </div>
-                <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <XCircle className="w-6 h-6 text-red-600" />
-                    <span className="text-gray-700 font-medium">Đã từ chối</span>
+                <div className="flex items-center justify-between p-3 sm:p-4 bg-red-50 rounded-lg">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
+                    <span className="text-gray-700 font-medium text-sm sm:text-base">Đã từ chối</span>
                   </div>
-                  <span className="text-2xl font-bold text-red-600">{approvalStats.rejections}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-red-600">{approvalStats.rejections}</span>
                 </div>
-                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                  <span className="text-gray-700 font-medium">Tổng hành động</span>
-                  <span className="text-2xl font-bold text-blue-600">
+                <div className="flex items-center justify-between p-3 sm:p-4 bg-blue-50 rounded-lg">
+                  <span className="text-gray-700 font-medium text-sm sm:text-base">Tổng hành động</span>
+                  <span className="text-xl sm:text-2xl font-bold text-blue-600">
                     {approvalStats.approvals + approvalStats.rejections}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tăng trưởng người dùng (12 tháng gần đây)</h3>
-              <div className="h-64 relative">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Tăng trưởng người dùng (12 tháng gần đây)</h3>
+              <div className="h-48 sm:h-64 relative overflow-x-auto">
                 <svg viewBox="0 0 400 200" className="w-full h-full">
                   {(dashboardData.user_growth_by_month || []).map((item, index, array) => {
                     const x = 50 + (index * (350 / Math.max(array.length - 1, 1)));
@@ -376,10 +380,10 @@ export default function AdminDashboard() {
           </div>
 
           {/* Campaign Activity and Recent Actions */}
-          <div className="grid grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Hoạt động Campaign (12 tháng gần đây)</h3>
-              <div className="h-64 relative">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Hoạt động Campaign (12 tháng gần đây)</h3>
+              <div className="h-48 sm:h-64 relative overflow-x-auto">
                 <svg viewBox="0 0 400 200" className="w-full h-full">
                   {(dashboardData.campaign_activity_by_month || []).map((item, index, array) => {
                     const x = 50 + (index * (350 / Math.max(array.length - 1, 1)));
@@ -436,27 +440,27 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Hoạt động gần đây của bạn</h3>
+            <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Hoạt động gần đây của bạn</h3>
               </div>
-              <div className="space-y-3 max-h-64 overflow-y-auto">
+              <div className="space-y-2 sm:space-y-3 max-h-64 overflow-y-auto">
                 {(dashboardData.recent_actions || []).length > 0 ? (
                   dashboardData.recent_actions.map((action, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    <div key={index} className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                           action.status === 'approved' ? 'bg-green-100' : 'bg-red-100'
                         }`}>
                           {action.status === 'approved' ? (
-                            <CheckCircle className="w-5 h-5 text-green-600" />
+                            <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
                           ) : (
-                            <XCircle className="w-5 h-5 text-red-600" />
+                            <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium text-gray-900 truncate">{action.item}</div>
-                          <div className="text-sm text-gray-500">{action.type}</div>
+                          <div className="font-medium text-gray-900 truncate text-sm sm:text-base">{action.item}</div>
+                          <div className="text-xs sm:text-sm text-gray-500">{action.type}</div>
                         </div>
                       </div>
                       <div className="text-xs text-gray-500 whitespace-nowrap ml-2">
@@ -465,13 +469,13 @@ export default function AdminDashboard() {
                     </div>
                   ))
                 ) : (
-                  <div className="text-center text-gray-500 py-8">Chưa có hoạt động nào</div>
+                  <div className="text-center text-gray-500 py-6 sm:py-8 text-sm sm:text-base">Chưa có hoạt động nào</div>
                 )}
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </AdminContentWrapper>
     </div>
   );
 }

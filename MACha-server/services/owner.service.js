@@ -861,9 +861,10 @@ export const getApprovalHistory = async (filters = {}, page = 1, limit = 20) => 
         }
 
         const campaigns = await Campaign.find(campaignQuery)
-            .select("title status approved_by approved_at rejected_by rejected_at rejection_reason _id")
+            .select("title description status goal_amount current_amount start_date end_date category location contact_info approved_by approved_at rejected_by rejected_at rejection_reason createdAt updatedAt _id")
             .populate("approved_by", "username fullname")
             .populate("rejected_by", "username fullname")
+            .populate("creator", "username fullname email")
             .lean()
             .sort({ updatedAt: -1 });
 
@@ -925,9 +926,10 @@ export const getApprovalHistory = async (filters = {}, page = 1, limit = 20) => 
         }
 
         const events = await Event.find(eventQuery)
-            .select("title status approved_by approved_at rejected_by rejected_at rejected_reason _id")
+            .select("title description status category start_date end_date location capacity approved_by approved_at rejected_by rejected_at rejected_reason createdAt updatedAt _id")
             .populate("approved_by", "username fullname")
             .populate("rejected_by", "username fullname")
+            .populate("creator", "username fullname email")
             .lean()
             .sort({ updatedAt: -1 });
 
@@ -972,10 +974,10 @@ export const getApprovalHistory = async (filters = {}, page = 1, limit = 20) => 
         }
 
         const kycs = await KYC.find(kycQuery)
-            .select("user status verified_by verified_at rejected_by rejected_at rejection_reason _id")
+            .select("user status verified_by verified_at rejected_by rejected_at rejection_reason submitted_at processed_at ai_processing createdAt updatedAt _id")
             .populate("verified_by", "username fullname")
             .populate("rejected_by", "username fullname")
-            .populate("user", "username fullname")
+            .populate("user", "username fullname email")
             .lean()
             .sort({ updatedAt: -1 });
 
@@ -998,8 +1000,9 @@ export const getApprovalHistory = async (filters = {}, page = 1, limit = 20) => 
         }
 
         const reports = await Report.find(reportQuery)
-            .select("reported_type reported_id status reviewed_by reviewed_at resolution")
+            .select("reported_type reported_id reported_reason description status reviewed_by reviewed_at resolution resolution_details submitted_at resolved_at createdAt updatedAt _id")
             .populate("reviewed_by", "username fullname")
+            .populate("reporter", "username fullname email")
             .sort({ reviewed_at: -1 });
 
         activities.push(...reports.map(r => ({
@@ -1021,9 +1024,10 @@ export const getApprovalHistory = async (filters = {}, page = 1, limit = 20) => 
         }
 
         const escrows = await Escrow.find(escrowQuery)
-            .select("campaign request_status admin_reviewed_by admin_reviewed_at admin_rejection_reason _id")
+            .select("campaign total_amount remaining_amount withdrawal_request_amount request_reason request_status milestone_percentage admin_reviewed_by admin_reviewed_at admin_rejection_reason voting_start_date voting_end_date createdAt updatedAt _id")
             .populate("admin_reviewed_by", "username fullname")
-            .populate("campaign", "title")
+            .populate("campaign", "title goal_amount current_amount")
+            .populate("requested_by", "username fullname email")
             .lean()
             .sort({ admin_reviewed_at: -1 });
 
