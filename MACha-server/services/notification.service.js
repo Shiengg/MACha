@@ -17,6 +17,7 @@ export const getNotifications = async (userId) => {
         .populate("sender", "username avatar")
         .populate("post", "content_text")
         .populate("campaign", "title")
+        .populate("event", "title")
         .sort({ createdAt: -1 })
         .limit(50);
 

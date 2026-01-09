@@ -18,6 +18,7 @@ interface CampaignCardProps {
 export default function CampaignCard({ campaign, showCreator = false, onClick, disableNavigation = false }: CampaignCardProps) {
   const router = useRouter();
   const [donations, setDonations] = useState<Donation[]>([]);
+  const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
     const fetchDonations = async () => {
@@ -106,15 +107,23 @@ export default function CampaignCard({ campaign, showCreator = false, onClick, d
     return `${amount.toLocaleString('vi-VN')}`;
   };
 
-  const handleShare = (e: React.MouseEvent) => {
+  const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Share functionality
-    if (navigator.share) {
-      navigator.share({
+    if (!navigator.share || isSharing) return;
+    
+    try {
+      setIsSharing(true);
+      await navigator.share({
         title: campaign.title,
-        text: campaign.description,
         url: `/campaigns/${campaign._id}`,
       });
+    } catch (error: any) {
+      // User cancelled or share failed - ignore silently
+      if (error.name !== 'AbortError') {
+        console.error('Share failed:', error);
+      }
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -217,8 +226,9 @@ export default function CampaignCard({ campaign, showCreator = false, onClick, d
             Ủng hộ ngay
           </button>
           <button
-            className="p-2 border border-gray-300 hover:border-gray-400 rounded-lg transition-all"
+            className="p-2 border border-gray-300 hover:border-gray-400 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleShare}
+            disabled={isSharing}
             title="Chia sẻ"
           >
             <Share2 className="w-4 h-4 text-gray-600" />

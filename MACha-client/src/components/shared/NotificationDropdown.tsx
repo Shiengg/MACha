@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import Image from 'next/image';
@@ -9,6 +10,7 @@ import { getNotifications, Notification, markAllAsRead } from '@/services/notifi
 import PostModal from './PostModal';
 
 export default function NotificationDropdown() {
+  const router = useRouter();
   const { socket, isConnected } = useSocket();
   const { isAuthenticated } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -142,6 +144,20 @@ export default function NotificationDropdown() {
   };
 
   const handleNotificationClick = (notification: Notification) => {
+    // Nếu notification có liên quan đến campaign, redirect đến campaign
+    if (notification.campaign && notification.campaign._id) {
+      router.push(`/campaigns/${notification.campaign._id}`);
+      setIsOpen(false); // Đóng dropdown
+      return;
+    }
+    
+    // Nếu notification có liên quan đến event, redirect đến event
+    if (notification.event && notification.event._id) {
+      router.push(`/events/${notification.event._id}`);
+      setIsOpen(false); // Đóng dropdown
+      return;
+    }
+    
     // Nếu notification có liên quan đến post, mở modal
     if (notification.post && notification.post._id) {
       setSelectedPostId(notification.post._id);
@@ -255,6 +271,13 @@ export default function NotificationDropdown() {
                         {notification.campaign && (
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
                             "{notification.campaign.title}"
+                          </p>
+                        )}
+
+                        {/* Event Preview */}
+                        {notification.event && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
+                            "{notification.event.title}"
                           </p>
                         )}
 
