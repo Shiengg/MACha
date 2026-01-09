@@ -469,6 +469,7 @@ function EventDetails() {
                     )}
                   </div>
                 )}
+              </div>
             </div>
 
             {event.description && (
