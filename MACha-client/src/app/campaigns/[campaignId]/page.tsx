@@ -453,7 +453,7 @@ function CampaignDetails() {
 
     // Withdrawal Request Handlers
     const handleCreateRequest = () => {
-        if (!user || !campaign) return;
+        if (!user || !campaign || !campaign.creator) return;
         const isCreator = user._id === campaign.creator._id || user.id === campaign.creator._id;
         if (!isCreator) {
             Swal.fire({
@@ -1543,7 +1543,7 @@ function CampaignDetails() {
                                         </div>
                                     )}
 
-                                    {activeTab === 'updates' && <UpdatesTab campaignId={campaignId} updates={updates} setUpdates={setUpdates} updatesLoading={updatesLoading} isCreator={!!(user && campaign && user._id === campaign.creator._id)} />}
+                                    {activeTab === 'updates' && <UpdatesTab campaignId={campaignId} updates={updates} setUpdates={setUpdates} updatesLoading={updatesLoading} isCreator={!!(user && campaign && campaign.creator && (user._id === campaign.creator._id || user.id === campaign.creator._id))} />}
 
                                     {activeTab === 'withdrawals' && (
                                         <div className="space-y-6" data-tab="withdrawals">
@@ -1557,7 +1557,7 @@ function CampaignDetails() {
                                                         Quản lý các yêu cầu rút tiền và vote cho withdrawal requests
                                                     </p>
                                                 </div>
-                                                {user && campaign && (user._id === campaign.creator._id || user.id === campaign.creator._id) && (
+                                                {user && campaign && campaign.creator && (user._id === campaign.creator._id || user.id === campaign.creator._id) && (
                                                     <button
                                                         onClick={handleCreateRequest}
                                                         className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all flex items-center gap-2 shadow-md hover:shadow-lg"
@@ -1638,7 +1638,7 @@ function CampaignDetails() {
                                                             </div>
                                                         ) : (
                                                             activeRequests.map((escrow) => {
-                                                                const isCreator = user && campaign && (user._id === campaign.creator._id || user.id === campaign.creator._id);
+                                                                const isCreator = user && campaign && campaign.creator && (user._id === campaign.creator._id || user.id === campaign.creator._id);
                                                                 const userVoteForRequest =
                                                                     escrow._id === activeWithdrawalRequest?._id ? userVote : null;
 
