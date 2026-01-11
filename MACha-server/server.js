@@ -45,12 +45,28 @@ app.use(cors({
             return callback(null, true);
         }
         const normalizedOrigin = origin.replace(/\/$/, '');
+        
         if (normalizedOrigin === allowedOrigin) {
-            callback(null, true);
-        } else {
-            console.warn(`⚠️  CORS blocked origin: ${origin}, expected: ${allowedOrigin}`);
-            callback(new Error(`CORS: Origin ${origin} not allowed. Expected: ${allowedOrigin}`));
+            return callback(null, true);
         }
+
+        const mobileOrigins = [
+            'http://localhost',
+            'http://127.0.0.1',
+            'exp://localhost',
+            'exp://127.0.0.1',
+        ];
+        
+        const isMobileOrigin = mobileOrigins.some(mobileOrigin => 
+            normalizedOrigin.startsWith(mobileOrigin)
+        );
+        
+        if (isMobileOrigin) {
+            return callback(null, true);
+        }
+        
+        console.warn(`⚠️  CORS blocked origin: ${origin}, expected: ${allowedOrigin}`);
+        callback(new Error(`CORS: Origin ${origin} not allowed. Expected: ${allowedOrigin}`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
