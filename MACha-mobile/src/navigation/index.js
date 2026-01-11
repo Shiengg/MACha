@@ -1,8 +1,16 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import SplashScreen from '../screens/splash/SplashScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
-import HomeScreen from '../screens/home/HomeScreen';
+import RegisterScreen from '../screens/auth/RegisterScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import BottomTabNavigator from './BottomTabNavigator';
+import SettingsScreen from '../screens/profile/SettingsScreen';
+import TermsScreen from '../screens/profile/TermsScreen';
+import ChangePasswordScreen from '../screens/profile/ChangePasswordScreen';
+import EditProfileScreen from '../screens/profile/EditProfileScreen';
+import MapScreen from '../screens/map/MapScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -10,13 +18,21 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Login"
+        initialRouteName="Splash"
         screenOptions={{
           headerShown: false,
         }}
       >
+        <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="Terms" component={TermsScreen} />
+        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+        <Stack.Screen name="Map" component={MapScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

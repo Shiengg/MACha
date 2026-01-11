@@ -19,13 +19,11 @@ const normalizeApiUrl = (url) => {
   return normalized;
 };
 
-// Get API URL based on platform
 const getApiUrl = () => {
   if (process.env.EXPO_PUBLIC_API_URL) {
     return normalizeApiUrl(process.env.EXPO_PUBLIC_API_URL);
   }
   
-  // Fallback (should not happen if .env is configured correctly)
   console.warn('⚠️ EXPO_PUBLIC_API_URL not set in .env, using default localhost');
   return 'http://localhost:8887';
 };

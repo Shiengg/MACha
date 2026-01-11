@@ -380,9 +380,13 @@ export const sendForgotPasswordEmail = async (to, data) => {
     </div>
     `;
   
-    return await sendEmail(to, subject, text, htmlContent);
+    const result = await sendEmail(to, subject, text, htmlContent);
+    if (!result.success) {
+        throw new Error(`Failed to send forgot password email: ${result.error}`);
+    }
+    return result;
 };
-  
+
 export const sendOtpSignupEmail = async (to, data) => {
     const { username, otp, expiresIn } = data;
   

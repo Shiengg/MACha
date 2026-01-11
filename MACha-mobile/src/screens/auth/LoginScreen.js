@@ -7,12 +7,16 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
 import apiClient from '../../services/apiClient';
 import { LOGIN_ROUTE } from '../../constants/api';
+import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 
 export default function LoginScreen({ navigation }) {
   const { login: refreshUser, setUser } = useAuth();
@@ -97,8 +101,8 @@ export default function LoginScreen({ navigation }) {
           {
             text: 'OK',
             onPress: () => {
-              // Navigate to HomeScreen
-              navigation.replace('Home');
+              // Navigate to MainTabs
+              navigation.replace('MainTabs');
             },
           },
         ]);
@@ -139,53 +143,120 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Đăng nhập</Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
+      >
+        <View style={styles.content}>
+          <View style={styles.card}>
+            {/* Header Section */}
+            <View style={styles.headerSection}>
+              <Image
+                source={require('../../../assets/images/charity_icon.png')}
+                style={styles.headerImage}
+                resizeMode="contain"
+              />
+            </View>
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={[styles.input, errors.email && styles.inputError]}
-            placeholder="Email"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              if (errors.email) setErrors({ ...errors, email: '' });
-            }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!isSubmitting}
-          />
-          {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
+            {/* Form Section */}
+            <View style={styles.formSection}>
+              <Text style={styles.formTitle}>Đăng nhập</Text>
+
+              {/* Email Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    errors.email && styles.inputError,
+                  ]}
+                  placeholder="Email"
+                  placeholderTextColor="#9CA3AF"
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    if (errors.email) setErrors({ ...errors, email: '' });
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isSubmitting}
+                />
+                {errors.email ? (
+                  <Text style={styles.errorText}>{errors.email}</Text>
+                ) : null}
+              </View>
+
+              {/* Password Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Password</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    errors.password && styles.inputError,
+                  ]}
+                  placeholder="Password"
+                  placeholderTextColor="#9CA3AF"
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (errors.password) setErrors({ ...errors, password: '' });
+                  }}
+                  secureTextEntry
+                  editable={!isSubmitting}
+                />
+                {errors.password ? (
+                  <Text style={styles.errorText}>{errors.password}</Text>
+                ) : null}
+              </View>
+
+              {/* Forgot Password Link */}
+              <TouchableOpacity
+                style={styles.forgotPasswordLink}
+                onPress={() => {
+                  navigation.navigate('ForgotPassword');
+                }}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.forgotPasswordText}>Quên mật khẩu ?</Text>
+              </TouchableOpacity>
+
+              {/* Login Button */}
+              <TouchableOpacity
+                style={[
+                  styles.loginButton,
+                  isSubmitting && styles.loginButtonDisabled,
+                ]}
+                onPress={handleLogin}
+                disabled={isSubmitting}
+                activeOpacity={0.8}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : null}
+                <Text style={styles.loginButtonText}>
+                  {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Sign Up Section */}
+              <View style={styles.signupSection}>
+                <Text style={styles.signupTitle}>Đăng ký</Text>
+                <Text style={styles.signupText}>Không có tài khoản ? Đăng ký</Text>
+                <TouchableOpacity
+                  style={styles.signupButton}
+                  onPress={() => {
+                    navigation.navigate('Register');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.signupButtonText}>Đăng ký</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
         </View>
-
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={[styles.input, errors.password && styles.inputError]}
-            placeholder="Mật khẩu"
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (errors.password) setErrors({ ...errors, password: '' });
-            }}
-            secureTextEntry
-            editable={!isSubmitting}
-          />
-          {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
-        </View>
-
-        <TouchableOpacity
-          style={[styles.loginButton, isSubmitting && styles.loginButtonDisabled]}
-          onPress={handleLogin}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.loginButtonText}>Đăng nhập</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -193,50 +264,135 @@ export default function LoginScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F3F4F6',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   content: {
     flex: 1,
-    padding: 20,
+    padding: scale(12),
     justifyContent: 'center',
   },
-  title: {
-    fontSize: 24,
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: scale(24),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: verticalScale(4),
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: scale(12),
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  headerSection: {
+    paddingTop: verticalScale(16),
+    paddingHorizontal: scale(20),
+    paddingBottom: verticalScale(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerImage: {
+    width: scale(200),
+    height: verticalScale(150),
+  },
+  formSection: {
+    padding: scale(20),
+  },
+  formTitle: {
+    fontSize: moderateScale(28),
     fontWeight: 'bold',
-    marginBottom: 40,
-    textAlign: 'center',
+    color: '#111827',
+    marginBottom: verticalScale(20),
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: verticalScale(16),
+  },
+  label: {
+    fontSize: moderateScale(14),
+    fontWeight: '500',
+    color: '#111827',
+    marginBottom: verticalScale(6),
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    borderRadius: scale(999),
+    paddingHorizontal: scale(20),
+    paddingVertical: verticalScale(12),
+    fontSize: moderateScale(16),
+    color: '#111827',
+    backgroundColor: '#FFFFFF',
   },
   inputError: {
-    borderColor: '#dc2626',
+    borderColor: '#EF4444',
   },
   errorText: {
-    color: '#dc2626',
-    fontSize: 14,
-    marginTop: 4,
+    color: '#EF4444',
+    fontSize: moderateScale(12),
+    marginTop: verticalScale(4),
+  },
+  forgotPasswordLink: {
+    alignSelf: 'flex-start',
+    marginBottom: verticalScale(16),
+  },
+  forgotPasswordText: {
+    color: '#3B82F6',
+    fontSize: moderateScale(14),
   },
   loginButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 16,
+    backgroundColor: '#2563EB',
+    borderRadius: scale(16),
+    paddingVertical: verticalScale(14),
     alignItems: 'center',
-    marginTop: 20,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: scale(8),
+    marginBottom: verticalScale(24),
+    shadowColor: '#2563EB',
+    shadowOffset: {
+      width: 0,
+      height: verticalScale(2),
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: scale(4),
+    elevation: 3,
   },
   loginButtonDisabled: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: '#93C5FD',
   },
   loginButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+  },
+  signupSection: {
+    width: '100%',
+  },
+  signupTitle: {
+    fontSize: moderateScale(20),
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: verticalScale(8),
+  },
+  signupText: {
+    fontSize: moderateScale(14),
+    color: '#6B7280',
+    marginBottom: verticalScale(16),
+  },
+  signupButton: {
+    borderWidth: 2,
+    borderColor: '#2563EB',
+    borderRadius: scale(16),
+    paddingVertical: verticalScale(14),
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  signupButtonText: {
+    color: '#2563EB',
+    fontSize: moderateScale(16),
     fontWeight: '600',
   },
 });

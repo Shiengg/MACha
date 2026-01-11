@@ -11,3 +11,10 @@ export const VERIFY_OTP_ROUTE = `${AUTH_ROUTE}/verify-otp`;
 export const CHANGE_PASSWORD_ROUTE = `${AUTH_ROUTE}/change-password`;
 export const FORGOT_PASSWORD_ROUTE = `${AUTH_ROUTE}/forgot-password`;
 
+export const CAMPAIGN_ROUTE = "api/campaigns";
+export const GET_CAMPAIGNS_FOR_MAP_ROUTE = `${CAMPAIGN_ROUTE}/map`;
+export const GET_CAMPAIGN_MAP_STATISTICS_ROUTE = `${CAMPAIGN_ROUTE}/map/statistics`;
+
+export const EVENT_ROUTE = "api/events";
+export const GET_EVENTS_FOR_MAP_ROUTE = `${EVENT_ROUTE}/map`;
+
