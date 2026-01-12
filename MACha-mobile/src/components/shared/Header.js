@@ -1,39 +1,89 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigation } from '@react-navigation/native';
+import { useSocket } from '../../contexts/SocketContext';
+import { notificationService } from '../../services/notification.service';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 
 export default function Header() {
-  const { user, isAuthenticated, loading, logout } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const navigation = useNavigation();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const { socket, isConnected } = useSocket();
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      const query = searchQuery.trim();
-      if (query.startsWith('#')) {
-        const hashtagName = query.substring(1).trim().toLowerCase();
-        if (hashtagName) {
-          // Navigate to hashtag page if needed
-          console.log('Navigate to hashtag:', hashtagName);
-        }
-      } else {
-        // Navigate to search page
-        console.log('Navigate to search:', query);
-      }
-      setSearchQuery('');
-      setIsSearchExpanded(false);
+  // Load unread count khi component mount hoặc khi authenticated
+  const loadUnreadCount = useCallback(async () => {
+    if (!isAuthenticated) {
+      setUnreadCount(0);
+      return;
     }
-  };
+
+    try {
+      const notifications = await notificationService.getNotifications();
+      const unread = notifications.filter((n) => !n.is_read).length;
+      setUnreadCount(unread);
+    } catch (error) {
+      console.error('Failed to load unread count:', error);
+    }
+  }, [isAuthenticated]);
+
+  // Load unread count khi mount hoặc khi authenticated thay đổi
+  useEffect(() => {
+    loadUnreadCount();
+  }, [loadUnreadCount]);
+
+  // Reload unread count khi quay lại từ NotificationScreen
+  useEffect(() => {
+    if (!navigation) return;
+
+    // Lắng nghe khi navigation state thay đổi
+    const unsubscribe = navigation.addListener('state', (e) => {
+      // Reload unread count khi quay lại từ NotificationScreen
+      try {
+        const state = navigation.getState();
+        if (state) {
+          // Lấy route hiện tại từ navigation state
+          const routes = state.routes || [];
+          const currentRoute = routes[state.index];
+          
+          // Nếu không phải đang ở NotificationScreen, reload unread count
+          if (currentRoute && currentRoute.name !== 'Notifications') {
+            // Delay một chút để đảm bảo NotificationScreen đã cập nhật xong
+            setTimeout(() => {
+              loadUnreadCount();
+            }, 300);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting navigation state:', error);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, loadUnreadCount]);
+
+  // Lắng nghe notification mới từ Socket.IO
+  useEffect(() => {
+    if (!socket || !isConnected || !isAuthenticated) return;
+
+    const handleNewNotification = (notification) => {
+      console.log('🔔 New notification received in Header:', notification);
+      setUnreadCount((prev) => prev + 1);
+    };
+
+    socket.on('new-notification', handleNewNotification);
+
+    return () => {
+      socket.off('new-notification', handleNewNotification);
+    };
+  }, [socket, isConnected, isAuthenticated]);
 
   if (loading) {
     return (
@@ -64,7 +114,11 @@ export default function Header() {
         <View style={styles.rightButtons}>
           {/* Search Icon */}
           <TouchableOpacity
-            onPress={() => setIsSearchExpanded(!isSearchExpanded)}
+            onPress={() => {
+              if (navigation) {
+                navigation.navigate('Search');
+              }
+            }}
             style={styles.iconButton}
           >
             <MaterialCommunityIcons name="magnify" size={24} color="#374151" />
@@ -74,8 +128,7 @@ export default function Header() {
           <TouchableOpacity
             onPress={() => {
               if (navigation) {
-                // Navigate to messages if route exists
-                console.log('Navigate to messages');
+                navigation.navigate('Messages');
               }
             }}
             style={styles.iconButton}
@@ -86,42 +139,26 @@ export default function Header() {
           {/* Notifications */}
           <TouchableOpacity
             onPress={() => {
-              // Handle notifications
-              console.log('Notifications pressed');
+              if (navigation) {
+                navigation.navigate('Notifications');
+              }
             }}
             style={styles.iconButton}
           >
-            <MaterialCommunityIcons name="bell-outline" size={24} color="#374151" />
+            <View style={styles.notificationIconContainer}>
+              <MaterialCommunityIcons name="bell-outline" size={24} color="#374151" />
+              {/* Unread Badge */}
+              {unreadCount > 0 && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadBadgeText}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* Expanded Search Bar */}
-      {isSearchExpanded && (
-        <View style={styles.searchContainer}>
-          <View style={styles.searchInputContainer}>
-            <MaterialCommunityIcons name="magnify" size={20} color="#9CA3AF" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Tìm kiếm chiến dịch, quỹ..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onSubmitEditing={handleSearch}
-              autoFocus
-            />
-            <TouchableOpacity
-              onPress={() => {
-                setSearchQuery('');
-                setIsSearchExpanded(false);
-              }}
-              style={styles.closeSearchButton}
-            >
-              <MaterialCommunityIcons name="close" size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
     </View>
   );
 }
@@ -166,31 +203,27 @@ const styles = StyleSheet.create({
   iconButton: {
     padding: scale(8),
   },
-  searchContainer: {
-    paddingHorizontal: scale(16),
-    paddingTop: scale(8),
-    paddingBottom: scale(4),
+  notificationIconContainer: {
+    position: 'relative',
   },
-  searchInputContainer: {
-    flexDirection: 'row',
+  unreadBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: scale(18),
+    height: scale(18),
+    borderRadius: scale(9),
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: scale(20),
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    paddingHorizontal: scale(12),
+    paddingHorizontal: scale(4),
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
-  searchIcon: {
-    marginRight: scale(8),
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: moderateScale(14),
-    color: '#111827',
-    paddingVertical: scale(10),
-  },
-  closeSearchButton: {
-    padding: scale(4),
+  unreadBadgeText: {
+    fontSize: moderateScale(10),
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   menuOverlay: {
     flex: 1,

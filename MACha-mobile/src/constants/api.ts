@@ -62,6 +62,10 @@ export const DELETE_EVENT_UPDATE_ROUTE = (eventId: string, updateId: string) => 
 
 export const KYC_ROUTE = "api/kyc";
 export const GET_KYC_STATUS_ROUTE = `${KYC_ROUTE}/status`;
+export const SUBMIT_KYC_VNPT_ROUTE = `${KYC_ROUTE}/submit-vnpt`;
+export const VNPT_VERIFY_QUALITY_ROUTE = `${KYC_ROUTE}/vnpt/verify-quality`;
+export const VNPT_OCR_ROUTE = `${KYC_ROUTE}/vnpt/ocr`;
+export const VNPT_COMPARE_FACES_ROUTE = `${KYC_ROUTE}/vnpt/compare-faces`;
 
 export const REPORT_ROUTE = "api/reports";
 export const CREATE_REPORT_ROUTE = `${REPORT_ROUTE}`;
@@ -77,7 +81,41 @@ export const DELETE_POST_ROUTE = (id: string) => `${POST_ROUTE}/${id}`;
 export const LIKE_POST_ROUTE = (postId: string) => `api/likes/${postId}/like`;
 export const UNLIKE_POST_ROUTE = (postId: string) => `api/likes/${postId}/unlike`;
 
+// Post search routes
+export const SEARCH_POSTS_BY_HASHTAG_ROUTE = `${POST_ROUTE}/search`;
+export const SEARCH_POSTS_BY_TITLE_ROUTE = `${POST_ROUTE}/search/title`;
+export const GET_POSTS_BY_HASHTAG_ROUTE = (name: string) => `${POST_ROUTE}/hashtag/${name}`;
+
 export const RECOMMENDATION_ROUTE = "api/recommendations";
 export const GET_RECOMMENDED_CAMPAIGNS_ROUTE = `${RECOMMENDATION_ROUTE}`;
 export const GET_ANONYMOUS_RECOMMENDATIONS_ROUTE = `${RECOMMENDATION_ROUTE}/anonymous`;
+
+// Campaign search routes
+export const SEARCH_CAMPAIGNS_BY_HASHTAG_ROUTE = `${CAMPAIGN_ROUTE}/search/hashtag`;
+export const SEARCH_CAMPAIGNS_BY_TITLE_ROUTE = `${CAMPAIGN_ROUTE}/search/title`;
+
+// Global search + history routes
+export const SEARCH_ROUTE = "api/search";
+export const SAVE_SEARCH_HISTORY_ROUTE = `${SEARCH_ROUTE}/history`;
+export const GET_SEARCH_HISTORY_ROUTE = `${SEARCH_ROUTE}/history`;
+export const GET_ALL_SEARCH_HISTORY_ROUTE = `${SEARCH_ROUTE}/history/all`;
+export const DELETE_SEARCH_HISTORY_ROUTE = `${SEARCH_ROUTE}/history`;
+export const DELETE_ALL_SEARCH_HISTORY_ROUTE = `${SEARCH_ROUTE}/history/all`;
+
+// Notification routes
+export const NOTIFICATION_ROUTE = "api/notifications";
+export const GET_NOTIFICATIONS_ROUTE = `${NOTIFICATION_ROUTE}`;
+export const MARK_AS_READ_ROUTE = (notificationId: string) => `${NOTIFICATION_ROUTE}/${notificationId}/read`;
+export const MARK_ALL_AS_READ_ROUTE = `${NOTIFICATION_ROUTE}/read-all`;
+export const DELETE_NOTIFICATION_ROUTE = (notificationId: string) => `${NOTIFICATION_ROUTE}/${notificationId}`;
+
+// Conversation routes
+export const CONVERSATION_ROUTE = "api/conversations";
+export const CREATE_CONVERSATION_PRIVATE_ROUTE = (userId2: string) => `${CONVERSATION_ROUTE}/private/${userId2}`;
+export const GET_CONVERSATIONS_ROUTE = `${CONVERSATION_ROUTE}`;
+
+// Message routes
+export const MESSAGE_ROUTE = "api/messages";
+export const SEND_MESSAGE_ROUTE = (conversationId: string) => `${MESSAGE_ROUTE}/${conversationId}`;
+export const GET_MESSAGES_ROUTE = (conversationId: string) => `${MESSAGE_ROUTE}/${conversationId}`;
 

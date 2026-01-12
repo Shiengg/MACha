@@ -9,6 +9,8 @@ import {
   CREATE_CAMPAIGN_UPDATE_ROUTE,
   GET_CAMPAIGN_UPDATES_ROUTE,
   DELETE_CAMPAIGN_UPDATE_ROUTE,
+  SEARCH_CAMPAIGNS_BY_TITLE_ROUTE,
+  SEARCH_CAMPAIGNS_BY_HASHTAG_ROUTE,
 } from '../constants/api';
 
 export const campaignService = {
@@ -95,6 +97,32 @@ export const campaignService = {
       return campaign.current_amount - totalReleased;
     } catch (error) {
       console.error('Error calculating available amount:', error);
+      throw error;
+    }
+  },
+
+  async searchCampaignsByTitle(query, limit) {
+    try {
+      const normalizedSearch = (query || '').toLowerCase().trim();
+      const response = await apiClient.get(SEARCH_CAMPAIGNS_BY_TITLE_ROUTE, {
+        params: { q: normalizedSearch, ...(limit ? { limit } : {}) },
+      });
+      return response.data?.campaigns || [];
+    } catch (error) {
+      console.error('Error searching campaigns by title:', error);
+      throw error;
+    }
+  },
+
+  async searchCampaignsByHashtag(hashtag) {
+    try {
+      const normalizedHashtag = (hashtag || '').toLowerCase().trim();
+      const response = await apiClient.get(SEARCH_CAMPAIGNS_BY_HASHTAG_ROUTE, {
+        params: { hashtag: normalizedHashtag },
+      });
+      return response.data?.campaigns || [];
+    } catch (error) {
+      console.error('Error searching campaigns by hashtag:', error);
       throw error;
     }
   },

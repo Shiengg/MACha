@@ -15,6 +15,11 @@ import EventDetailScreen from '../screens/events/EventDetailScreen';
 import CampaignDetailScreen from '../screens/campaigns/CampaignDetailScreen';
 import DonateScreen from '../screens/campaigns/DonateScreen';
 import CreateCampaignScreen from '../screens/campaigns/CreateCampaignScreen';
+import SearchScreen from '../screens/search/SearchScreen';
+import SearchHistoryScreen from '../screens/search/SearchHistoryScreen';
+import NotificationScreen from '../screens/notifications/NotificationScreen';
+import MessagesScreen from '../screens/messages/MessagesScreen';
+import KYCScreen from '../screens/kyc/KYCScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -41,6 +46,11 @@ export default function AppNavigator() {
         <Stack.Screen name="CampaignDetail" component={CampaignDetailScreen} />
         <Stack.Screen name="Donate" component={DonateScreen} />
         <Stack.Screen name="CreateCampaign" component={CreateCampaignScreen} />
+        <Stack.Screen name="Search" component={SearchScreen} />
+        <Stack.Screen name="SearchHistory" component={SearchHistoryScreen} />
+        <Stack.Screen name="Notifications" component={NotificationScreen} />
+        <Stack.Screen name="Messages" component={MessagesScreen} />
+        <Stack.Screen name="KYC" component={KYCScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
