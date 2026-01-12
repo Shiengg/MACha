@@ -352,9 +352,9 @@ function DiscoverContent() {
           <>
             <div className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600">
               {selectedCategory === 'all' ? (
-                <>Tìm thấy <span className="font-bold text-gray-800">{total}</span> chiến dịch</>
+                <>Tìm thấy <span className="font-bold text-gray-800">{filteredCampaigns.length}</span> chiến dịch</>
               ) : (
-                <>Tìm thấy <span className="font-bold text-gray-800">{total}</span> chiến dịch trong danh mục này</>
+                <>Tìm thấy <span className="font-bold text-gray-800">{filteredCampaigns.length}</span> chiến dịch trong danh mục này</>
               )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">

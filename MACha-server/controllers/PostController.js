@@ -30,7 +30,9 @@ export const getPosts = async (req, res) => {
     try {
         const userId = req.user ? req.user._id : null;
         const userRole = req.user ? req.user.role : null;
-        const posts = await postService.getPosts(userId, userRole);
+        const page = parseInt(req.query.page || 0, 10);
+        const limit = parseInt(req.query.limit || 20, 10);
+        const posts = await postService.getPosts(userId, userRole, page, limit);
 
         return res.status(HTTP_STATUS.OK).json(posts);
     } catch (error) {

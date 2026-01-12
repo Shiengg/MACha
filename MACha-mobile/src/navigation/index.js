@@ -11,6 +11,10 @@ import TermsScreen from '../screens/profile/TermsScreen';
 import ChangePasswordScreen from '../screens/profile/ChangePasswordScreen';
 import EditProfileScreen from '../screens/profile/EditProfileScreen';
 import MapScreen from '../screens/map/MapScreen';
+import EventDetailScreen from '../screens/events/EventDetailScreen';
+import CampaignDetailScreen from '../screens/campaigns/CampaignDetailScreen';
+import DonateScreen from '../screens/campaigns/DonateScreen';
+import CreateCampaignScreen from '../screens/campaigns/CreateCampaignScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -33,6 +37,10 @@ export default function AppNavigator() {
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         <Stack.Screen name="Map" component={MapScreen} />
+        <Stack.Screen name="EventDetail" component={EventDetailScreen} />
+        <Stack.Screen name="CampaignDetail" component={CampaignDetailScreen} />
+        <Stack.Screen name="Donate" component={DonateScreen} />
+        <Stack.Screen name="CreateCampaign" component={CreateCampaignScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

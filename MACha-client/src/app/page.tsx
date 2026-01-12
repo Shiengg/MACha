@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import ProtectedRoute from "@/components/guards/ProtectedRoute";
 import PostCard from "@/components/shared/PostCard";
@@ -13,17 +13,24 @@ import { FaSync, FaUser, FaComments, FaShieldAlt, FaFileContract, FaUndo } from 
 import { Menu, X } from "lucide-react";
 import Image from "next/image";
 
+const POSTS_PER_PAGE = 20;
+
 function HomeContent() {
   const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showRefreshButton, setShowRefreshButton] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -31,43 +38,94 @@ function HomeContent() {
     }
   }, [user, router]);
 
-  const fetchPosts = async (isRefresh = false) => {
+  const fetchPosts = useCallback(async (page = 0, isRefresh = false) => {
+    // Prevent multiple simultaneous requests
+    if (isFetchingRef.current) {
+      return;
+    }
+
     try {
+      isFetchingRef.current = true;
       if (isRefresh) {
         setIsRefreshing(true);
-      } else {
+      } else if (page === 0) {
         setLoading(true);
+      } else {
+        setLoadingMore(true);
       }
       setError(null);
-      const data = await getPosts();
-      setPosts(data);
+      
+      const data = await getPosts(page, POSTS_PER_PAGE);
+      
+      if (isRefresh || page === 0) {
+        setPosts(data);
+        setCurrentPage(0);
+      } else {
+        setPosts((prev) => [...prev, ...data]);
+      }
+      
+      // Check if there are more posts to load
+      setHasMore(data.length === POSTS_PER_PAGE);
+      setCurrentPage(page);
     } catch (err) {
       console.error("Error loading posts:", err);
       setError("Không thể tải bài viết. Vui lòng thử lại sau.");
     } finally {
+      isFetchingRef.current = false;
       if (isRefresh) {
         setIsRefreshing(false);
-      } else {
+      } else if (page === 0) {
         setLoading(false);
+      } else {
+        setLoadingMore(false);
       }
     }
-  };
+  }, []);
 
   const handleRefresh = async () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setShowRefreshButton(true);
-    await fetchPosts(true);
+    await fetchPosts(0, true);
   };
 
+  const loadMorePosts = useCallback(() => {
+    if (!loadingMore && hasMore && !isFetchingRef.current) {
+      fetchPosts(currentPage + 1);
+    }
+  }, [loadingMore, hasMore, currentPage, fetchPosts]);
+
+  // Intersection Observer for infinite scroll
   useEffect(() => {
-    fetchPosts();
-  }, []);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !isFetchingRef.current) {
+          loadMorePosts();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [hasMore, loadingMore, loadMorePosts, posts.length]);
+
+  useEffect(() => {
+    fetchPosts(0);
+  }, [fetchPosts]);
 
   useEffect(() => {
     const handleRefreshEvent = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setShowRefreshButton(true);
-      fetchPosts(true);
+      fetchPosts(0, true);
     };
 
     window.addEventListener('refreshPosts', handleRefreshEvent);
@@ -101,7 +159,7 @@ function HomeContent() {
     } catch (error) {
       console.error('Error removing post from list:', error);
       // If error, refresh the entire list
-      await fetchPosts();
+      await fetchPosts(0);
     }
   };
 
@@ -114,7 +172,7 @@ function HomeContent() {
     } catch (error) {
       console.error('Error updating post in list:', error);
       // If error, refresh the entire list
-      await fetchPosts();
+      await fetchPosts(0);
     }
   };
 
@@ -561,6 +619,25 @@ function HomeContent() {
                     onUpdate={handleUpdatePost}
                   />
                 ))}
+                
+                {/* Infinite scroll trigger */}
+                {hasMore && (
+                  <div ref={loadMoreRef} className="py-8 flex justify-center">
+                    {loadingMore && (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 border-4 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Đang tải thêm...</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* End of feed message */}
+                {!hasMore && posts.length > 0 && (
+                  <div className="py-8 text-center text-gray-500 dark:text-gray-400">
+                    <p className="text-sm">Đã hiển thị tất cả bài viết</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -582,7 +659,7 @@ function HomeContent() {
         isOpen={isCreatePostOpen}
         onClose={() => setIsCreatePostOpen(false)}
         onPostCreated={async () => {
-          await fetchPosts(true);
+          await fetchPosts(0, true);
         }}
       />
     </div>

@@ -1,17 +1,37 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../contexts/AuthContext';
+import CreateEventModal from '../../components/event/CreateEventModal';
 
 export default function CreateScreen({ navigation }) {
+  const { user } = useAuth();
+  const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
+
   const handleCreateCampaign = () => {
-    // TODO: Navigate to create campaign screen
-    console.log('Navigate to create campaign');
+    if (!user) {
+      Alert.alert('Cần đăng nhập', 'Vui lòng đăng nhập để tạo chiến dịch', [
+        { text: 'OK', onPress: () => navigation.navigate('Login') },
+      ]);
+      return;
+    }
+    navigation.navigate('CreateCampaign');
   };
 
   const handleCreateEvent = () => {
-    // TODO: Navigate to create event screen
-    console.log('Navigate to create event');
+    if (!user) {
+      Alert.alert('Cần đăng nhập', 'Vui lòng đăng nhập để tạo sự kiện', [
+        { text: 'OK', onPress: () => navigation.navigate('Login') },
+      ]);
+      return;
+    }
+    setIsCreateEventModalOpen(true);
+  };
+
+  const handleEventCreated = () => {
+    setIsCreateEventModalOpen(false);
+    // Event created successfully, modal will close
   };
 
   const handleOpenMap = () => {
@@ -69,6 +89,13 @@ export default function CreateScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Create Event Modal */}
+      <CreateEventModal
+        isOpen={isCreateEventModalOpen}
+        onClose={() => setIsCreateEventModalOpen(false)}
+        onEventCreated={handleEventCreated}
+      />
     </SafeAreaView>
   );
 }
