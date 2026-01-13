@@ -70,20 +70,15 @@ export default function ProfileScreen({ route }) {
       });
       setCampaigns(campaignsResponse.data.campaigns || []);
 
-      // Fetch companion campaigns if own profile
-      const currentId = currentUser?._id || currentUser?.id;
-      const isOwn = !!(currentId && (currentId === userId || currentId === userData._id));
-      
-      if (isOwn) {
-        try {
-          setCompanionCampaignsLoading(true);
-          const companionData = await campaignCompanionService.getUserCompanionCampaigns(userId);
-          setCompanionCampaigns(companionData.campaigns || []);
-        } catch (err) {
-          console.error('Error loading companion campaigns:', err);
-        } finally {
-          setCompanionCampaignsLoading(false);
-        }
+      // Fetch companion campaigns for any user profile
+      try {
+        setCompanionCampaignsLoading(true);
+        const companionData = await campaignCompanionService.getUserCompanionCampaigns(userId);
+        setCompanionCampaigns(companionData.campaigns || []);
+      } catch (err) {
+        console.error('Error loading companion campaigns:', err);
+      } finally {
+        setCompanionCampaignsLoading(false);
       }
     } catch (err) {
       console.error('Error loading user:', err);
@@ -507,17 +502,15 @@ export default function ProfileScreen({ route }) {
                 </Text>
                 {activeTab === 'about' && <View style={styles.tabIndicator} />}
               </TouchableOpacity>
-              {isOwnProfile && (
-                <TouchableOpacity
-                  style={[styles.tab, activeTab === 'companions' && styles.activeTab]}
-                  onPress={() => setActiveTab('companions')}
-                >
-                  <Text style={[styles.tabText, activeTab === 'companions' && styles.activeTabText]}>
-                    Đồng hành
-                  </Text>
-                  {activeTab === 'companions' && <View style={styles.tabIndicator} />}
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'companions' && styles.activeTab]}
+                onPress={() => setActiveTab('companions')}
+              >
+                <Text style={[styles.tabText, activeTab === 'companions' && styles.activeTabText]}>
+                  Đồng hành
+                </Text>
+                {activeTab === 'companions' && <View style={styles.tabIndicator} />}
+              </TouchableOpacity>
             </ScrollView>
           </View>
 
@@ -671,7 +664,7 @@ export default function ProfileScreen({ route }) {
                     <MaterialCommunityIcons name="account-group-outline" size={64} color="#9CA3AF" />
                     <Text style={styles.emptyStateTitle}>Chưa có chiến dịch đồng hành</Text>
                     <Text style={styles.emptyStateText}>
-                      Bạn chưa đồng hành với chiến dịch nào
+                      {isOwnProfile ? 'Bạn chưa đồng hành với chiến dịch nào' : 'Người dùng này chưa đồng hành với chiến dịch nào'}
                     </Text>
                   </View>
                 ) : (

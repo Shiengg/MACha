@@ -160,7 +160,12 @@ function CreateCampaignContent() {
           confirmButtonText: status.kyc_status === 'unverified' ? 'Đi đến KYC' : 'Đóng',
         }).then((result) => {
           if (result.isConfirmed && status.kyc_status === 'unverified') {
-            router.push('/kyc-vnpt');
+            // Check user role: organization -> /kyc, user -> /kyc-vnpt
+            if (user?.role === 'organization') {
+              router.push('/kyc');
+            } else {
+              router.push('/kyc-vnpt');
+            }
           } else {
             router.push('/');
           }

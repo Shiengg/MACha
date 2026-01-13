@@ -63,19 +63,15 @@ function ProfileContent() {
         const userCampaigns = await campaignService.getCampaignsByCreator(userId);
         setCampaigns(userCampaigns);
 
-        const currentId = currentUser?._id || currentUser?.id;
-        const isOwn = !!(currentId && (currentId === userId || currentId === userData._id));
-        
-        if (isOwn) {
-          try {
-            setCompanionCampaignsLoading(true);
-            const companionData = await campaignCompanionService.getUserCompanionCampaigns(userId);
-            setCompanionCampaigns(companionData.campaigns);
-          } catch (err) {
-            console.error("Error loading companion campaigns:", err);
-          } finally {
-            setCompanionCampaignsLoading(false);
-          }
+        // Fetch companion campaigns for any user profile
+        try {
+          setCompanionCampaignsLoading(true);
+          const companionData = await campaignCompanionService.getUserCompanionCampaigns(userId);
+          setCompanionCampaigns(companionData.campaigns);
+        } catch (err) {
+          console.error("Error loading companion campaigns:", err);
+        } finally {
+          setCompanionCampaignsLoading(false);
         }
       } catch (err) {
         console.error("Error loading user:", err);
@@ -609,20 +605,18 @@ function ProfileContent() {
                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-full" />
                   )}
                 </button>
-                {isOwnProfile && (
-                  <button
-                    onClick={() => setActiveTab('companions')}
-                    className={`relative px-4 md:px-6 py-3 text-sm md:text-base font-medium transition-colors ${activeTab === 'companions'
-                      ? 'text-emerald-600'
-                      : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                  >
-                    Chiến dịch đồng hành
-                    {activeTab === 'companions' && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-full" />
-                    )}
-                  </button>
-                )}
+                <button
+                  onClick={() => setActiveTab('companions')}
+                  className={`relative px-4 md:px-6 py-3 text-sm md:text-base font-medium transition-colors ${activeTab === 'companions'
+                    ? 'text-emerald-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                  Chiến dịch đồng hành
+                  {activeTab === 'companions' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-full" />
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -783,7 +777,9 @@ function ProfileContent() {
                     <Users className="w-8 h-8 text-gray-400" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">Chưa có chiến dịch đồng hành</h3>
-                  <p className="text-gray-500 text-sm">Bạn chưa đồng hành với chiến dịch nào</p>
+                  <p className="text-gray-500 text-sm">
+                    {isOwnProfile ? 'Bạn chưa đồng hành với chiến dịch nào' : 'Người dùng này chưa đồng hành với chiến dịch nào'}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

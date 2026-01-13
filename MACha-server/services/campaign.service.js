@@ -79,7 +79,7 @@ export const getCampaignById = async (campaignId) => {
 
     // 2. Cache miss - Query database
     const campaign = await Campaign.findById(campaignId)
-        .populate("creator", "username fullname avatar")
+        .populate("creator", "username fullname avatar role")
         .populate("hashtag", "name");
     if (!campaign) {
         return null;
