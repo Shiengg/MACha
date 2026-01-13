@@ -13,12 +13,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import axios from 'axios';
 import { campaignService } from '../../services/campaign.service';
 import { postService } from '../../services/post.service';
+import { userService } from '../../services/user.service';
 import { searchService } from '../../services/search.service';
 import { useAuth } from '../../contexts/AuthContext';
 import CampaignCard from '../../components/campaign/CampaignCard';
 import PostCard from '../../components/post/PostCard';
+import UserSearchResult from '../../components/shared/UserSearchResult';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 
 // Format number with K/M/B suffix
@@ -51,10 +54,17 @@ export default function SearchScreen() {
   const [decodedQuery, setDecodedQuery] = useState(initialQuery);
   const [campaigns, setCampaigns] = useState([]);
   const [posts, setPosts] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [postsLoading, setPostsLoading] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [error, setError] = useState(null);
   const [postsError, setPostsError] = useState(null);
+  const [usersError, setUsersError] = useState(null);
+  
+  // Debounce and cancel token for user search
+  const userSearchTimeoutRef = useRef(null);
+  const userSearchCancelTokenRef = useRef(null);
   
   // Search history dropdown
   const [history, setHistory] = useState([]);
@@ -127,6 +137,8 @@ export default function SearchScreen() {
     setDecodedQuery(normalizedQuery);
     
     // Save search history if authenticated
+    // Note: This saves with type "keyword" (default), not USER_SEARCH
+    // USER_SEARCH history is only saved when explicitly searching users via /api/users/search
     if (isAuthenticated) {
       try {
         await searchService.saveSearchHistory(normalizedQuery);
@@ -152,6 +164,13 @@ export default function SearchScreen() {
     
     // Search posts by title
     fetchPostsByTitle(normalizedQuery);
+    
+    // Search users (only if not hashtag)
+    // Note: This does NOT save USER_SEARCH history - it's just for displaying results
+    // USER_SEARCH history is only saved when calling /api/users/search endpoint directly
+    if (!normalizedQuery.startsWith('#')) {
+      fetchUsers(normalizedQuery);
+    }
   };
 
   const fetchCampaignsByTitle = async (searchTerm) => {
@@ -219,6 +238,69 @@ export default function SearchScreen() {
     }
   };
 
+  const fetchUsers = async (searchTerm) => {
+    // Clear previous timeout
+    if (userSearchTimeoutRef.current) {
+      clearTimeout(userSearchTimeoutRef.current);
+      userSearchTimeoutRef.current = null;
+    }
+
+    // Cancel previous request if exists
+    if (userSearchCancelTokenRef.current) {
+      userSearchCancelTokenRef.current.cancel('New search initiated');
+      userSearchCancelTokenRef.current = null;
+    }
+
+    // Debounce user search (400ms)
+    userSearchTimeoutRef.current = setTimeout(async () => {
+      try {
+        setUsersLoading(true);
+        setUsersError(null);
+        
+        // Create cancel token for this request
+        const CancelToken = axios.CancelToken;
+        const source = CancelToken.source();
+        userSearchCancelTokenRef.current = source;
+
+        const normalizedSearch = searchTerm.toLowerCase().trim();
+        const result = await userService.searchUsers(normalizedSearch, 50);
+        
+        // Check if request was cancelled
+        if (source.token.reason) {
+          return;
+        }
+
+        setUsers(result.users || []);
+      } catch (err) {
+        // Check if request was cancelled
+        if (axios.isCancel && axios.isCancel(err)) {
+          return;
+        }
+        console.error('Error fetching users:', err);
+        setUsersError('Không thể tải kết quả tìm kiếm người dùng. Vui lòng thử lại sau.');
+        setUsers([]);
+      } finally {
+        // Only update loading state if this is still the current request
+        if (userSearchCancelTokenRef.current) {
+          setUsersLoading(false);
+          userSearchCancelTokenRef.current = null;
+        }
+      }
+    }, 400);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (userSearchTimeoutRef.current) {
+        clearTimeout(userSearchTimeoutRef.current);
+      }
+      if (userSearchCancelTokenRef.current) {
+        userSearchCancelTokenRef.current.cancel('Component unmounted');
+      }
+    };
+  }, []);
+
   const handleSearch = () => {
     if (searchQuery.trim()) {
       setShowHistoryDropdown(false);
@@ -254,7 +336,8 @@ export default function SearchScreen() {
 
   const campaignsCount = campaigns.length;
   const postsCount = posts.length;
-  const totalCount = campaignsCount + postsCount;
+  const usersCount = users.length;
+  const totalCount = campaignsCount + postsCount + usersCount;
 
   const displayedHistory = history.slice(0, 10);
 
@@ -274,7 +357,7 @@ export default function SearchScreen() {
           <TextInput
             ref={searchInputRef}
             style={styles.searchInput}
-            placeholder="Tìm kiếm chiến dịch, bài viết..."
+            placeholder="Tìm kiếm chiến dịch, bài viết, người dùng..."
             placeholderTextColor="#9CA3AF"
             value={searchQuery}
             onChangeText={(text) => {
@@ -308,6 +391,16 @@ export default function SearchScreen() {
                 setDecodedQuery('');
                 setCampaigns([]);
                 setPosts([]);
+                setUsers([]);
+                // Clear user search timeout and cancel token
+                if (userSearchTimeoutRef.current) {
+                  clearTimeout(userSearchTimeoutRef.current);
+                  userSearchTimeoutRef.current = null;
+                }
+                if (userSearchCancelTokenRef.current) {
+                  userSearchCancelTokenRef.current.cancel('Search cleared');
+                  userSearchCancelTokenRef.current = null;
+                }
                 // Show history dropdown again when clearing search
                 if (isAuthenticated) {
                   setShowHistoryDropdown(true);
@@ -395,7 +488,7 @@ export default function SearchScreen() {
         {decodedQuery && (
           <View style={styles.searchInfo}>
             <Text style={styles.searchInfoText}>
-              {loading || postsLoading ? (
+              {loading || postsLoading || usersLoading ? (
                 'Đang tải...'
               ) : (
                 `Tìm thấy ${formatNumber(totalCount)} kết quả cho: "${decodedQuery}"`
@@ -404,99 +497,117 @@ export default function SearchScreen() {
           </View>
         )}
 
-        {/* Campaigns Section */}
+        {/* Unified Results - Mixed Users, Campaigns, and Posts */}
         {decodedQuery && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Danh sách chiến dịch</Text>
-            {loading ? (
+            {/* Loading State */}
+            {(loading || postsLoading || usersLoading) && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#F97E2C" />
-                <Text style={styles.loadingText}>Đang tải...</Text>
+                <Text style={styles.loadingText}>Đang tải kết quả...</Text>
               </View>
-            ) : error ? (
+            )}
+
+            {/* Error States */}
+            {error && !loading && (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>
               </View>
-            ) : campaigns.length > 0 ? (
-              <FlatList
-                data={campaigns}
-                keyExtractor={(item) => item._id}
-                renderItem={({ item }) => (
-                  <CampaignCard
-                    campaign={item}
-                    onPress={() => {
-                      navigation.navigate('CampaignDetail', { campaignId: item._id });
-                    }}
-                    showCreator={true}
-                  />
-                )}
-                scrollEnabled={false}
-                contentContainerStyle={styles.campaignsList}
-              />
-            ) : !loading && (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>
-                  Không tìm thấy chiến dịch nào với từ khóa "{decodedQuery}"
-                </Text>
-              </View>
             )}
-          </View>
-        )}
-
-        {/* Posts Section */}
-        {decodedQuery && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Bài viết</Text>
-            {postsLoading && posts.length === 0 ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#F97E2C" />
-                <Text style={styles.loadingText}>Đang tải bài viết...</Text>
-              </View>
-            ) : postsError ? (
+            {postsError && !postsLoading && (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{postsError}</Text>
               </View>
-            ) : posts.length > 0 ? (
-              <FlatList
-                data={posts}
-                keyExtractor={(item) => item._id}
-                renderItem={({ item }) => (
-                  <PostCard
-                    post={item}
-                    navigation={navigation}
-                    onDelete={() => {
-                      setPosts(prev => prev.filter(p => p._id !== item._id));
-                    }}
-                    onUpdate={(postId, updatedPost) => {
-                      setPosts(prev =>
-                        prev.map(p => (p._id === postId ? updatedPost : p))
-                      );
-                    }}
-                  />
-                )}
-                scrollEnabled={false}
-                contentContainerStyle={styles.postsList}
-              />
-            ) : !postsLoading && (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>
-                  Không tìm thấy bài viết nào với từ khóa "{decodedQuery}"
+            )}
+            {usersError && !usersLoading && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{usersError}</Text>
+              </View>
+            )}
+
+            {/* Users Results */}
+            {!decodedQuery.startsWith('#') && users.length > 0 && (
+              <View style={styles.resultsGroup}>
+                <FlatList
+                  data={users}
+                  keyExtractor={(item) => `user-${item._id}`}
+                  renderItem={({ item }) => (
+                    <UserSearchResult
+                      user={item}
+                      query={decodedQuery}
+                      onPress={() => {
+                        navigation.navigate('Profile', { userId: item._id });
+                      }}
+                    />
+                  )}
+                  scrollEnabled={false}
+                  contentContainerStyle={styles.usersList}
+                />
+              </View>
+            )}
+
+            {/* Campaigns Results */}
+            {campaigns.length > 0 && (
+              <View style={styles.resultsGroup}>
+                <FlatList
+                  data={campaigns}
+                  keyExtractor={(item) => `campaign-${item._id}`}
+                  renderItem={({ item }) => (
+                    <CampaignCard
+                      campaign={item}
+                      onPress={() => {
+                        navigation.navigate('CampaignDetail', { campaignId: item._id });
+                      }}
+                      showCreator={true}
+                    />
+                  )}
+                  scrollEnabled={false}
+                  contentContainerStyle={styles.campaignsList}
+                />
+              </View>
+            )}
+
+            {/* Posts Results */}
+            {posts.length > 0 && (
+              <View style={styles.resultsGroup}>
+                <FlatList
+                  data={posts}
+                  keyExtractor={(item) => `post-${item._id}`}
+                  renderItem={({ item }) => (
+                    <PostCard
+                      post={item}
+                      navigation={navigation}
+                      onDelete={() => {
+                        setPosts(prev => prev.filter(p => p._id !== item._id));
+                      }}
+                      onUpdate={(postId, updatedPost) => {
+                        setPosts(prev =>
+                          prev.map(p => (p._id === postId ? updatedPost : p))
+                        );
+                      }}
+                    />
+                  )}
+                  scrollEnabled={false}
+                  contentContainerStyle={styles.postsList}
+                />
+              </View>
+            )}
+
+            {/* No Results Message */}
+            {!loading && !postsLoading && !usersLoading && 
+             !error && !postsError && !usersError &&
+             campaigns.length === 0 && posts.length === 0 && 
+             (decodedQuery.startsWith('#') || users.length === 0) && (
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="magnify" size={64} color="#9CA3AF" />
+                <Text style={styles.emptyStateTitle}>
+                  Không tìm thấy nội dung nào
+                </Text>
+                <Text style={styles.emptyStateText}>
+                  Không tìm thấy nội dung nào với từ khóa "{decodedQuery}"
                 </Text>
               </View>
             )}
-          </View>
-        )}
-
-        {/* No content message */}
-        {!loading && !postsLoading && decodedQuery && campaigns.length === 0 && posts.length === 0 && !error && !postsError && (
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="magnify" size={64} color="#9CA3AF" />
-            <Text style={styles.emptyStateTitle}>
-              Không tìm thấy nội dung nào
-            </Text>
-            <Text style={styles.emptyStateText}>
-              Không tìm thấy nội dung nào với từ khóa "{decodedQuery}"
-            </Text>
           </View>
         )}
 
@@ -632,6 +743,9 @@ const styles = StyleSheet.create({
   section: {
     padding: scale(16),
   },
+  resultsGroup: {
+    marginBottom: scale(16),
+  },
   sectionTitle: {
     fontSize: moderateScale(18),
     fontWeight: 'bold',
@@ -670,6 +784,9 @@ const styles = StyleSheet.create({
     gap: scale(12),
   },
   postsList: {
+    gap: scale(12),
+  },
+  usersList: {
     gap: scale(12),
   },
   emptyState: {

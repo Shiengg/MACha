@@ -10,7 +10,7 @@ import {
 export interface SearchHistoryItem {
   _id: string;
   keyword: string;
-  type: "hashtag" | "keyword";
+  type: "hashtag" | "keyword" | "USER_SEARCH";
   searchedAt: string;
 }
 

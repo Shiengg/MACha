@@ -4,6 +4,7 @@ import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
 import * as userService from "../services/user.service.js";
 import * as recommendationService from "../services/recommendation.service.js";
+import * as searchService from "../services/search.service.js";
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 
 export const getAllCampaigns = async (req, res) => {
@@ -172,6 +173,17 @@ export const searchCampaignsByTitle = async (req, res) => {
 
         const limitNum = limit ? parseInt(limit) : 50;
         const campaigns = await campaignService.searchCampaignsByTitle(searchTerm, limitNum);
+        
+        // Save search history with type "keyword" (async, don't wait for it)
+        // This tracks campaign searches separately from user searches (USER_SEARCH type)
+        const userId = req.user?._id;
+        if (userId) {
+            searchService.saveSearchHistory(userId, searchTerm, "keyword")
+                .catch(err => {
+                    console.error('Error saving campaign search history:', err);
+                    // Don't fail the request if history save fails
+                });
+        }
         
         res.status(HTTP_STATUS.OK).json({
             query: searchTerm,

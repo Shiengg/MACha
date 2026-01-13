@@ -1,5 +1,6 @@
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as userService from "../services/user.service.js";
+import * as searchService from "../services/search.service.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
 
@@ -158,9 +159,26 @@ export const getPublicAdmins = async (req, res) => {
 
 export const searchUsers = async (req, res) => {
     try {
-        const query = req.query.query;
+        const { q, query, limit } = req.query;
+        
+        // Support multiple parameter names: q, query (consistent with campaign search)
+        const searchTerm = q || query;
 
-        const result = await userService.searchUsers(query);
+        if (!searchTerm || searchTerm.trim() === "") {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Search term is required"
+            });
+        }
+
+        // Validate minimum search length
+        if (searchTerm.trim().length < 1) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Search term is too short"
+            });
+        }
+
+        const limitNum = limit ? parseInt(limit) : 50;
+        const result = await userService.searchUsers(searchTerm, limitNum);
 
         if (!result.success) {
             if (result.error === 'EMPTY_QUERY') {
@@ -168,9 +186,33 @@ export const searchUsers = async (req, res) => {
                     message: "Search keyword is missing."
                 });
             }
+            if (result.error === 'QUERY_TOO_SHORT') {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "Search term is too short"
+                });
+            }
+            return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+                message: "Search failed"
+            });
         }
 
-        return res.status(HTTP_STATUS.OK).json({ results: result.users });
+        // Save search history with USER_SEARCH type (async, don't wait for it)
+        // This is only called when explicitly searching users via /api/users/search endpoint
+        // General search page that also searches users should NOT save USER_SEARCH history
+        const userId = req.user?._id;
+        if (userId) {
+            searchService.saveSearchHistory(userId, searchTerm, "USER_SEARCH")
+                .catch(err => {
+                    console.error('Error saving user search history:', err);
+                    // Don't fail the request if history save fails
+                });
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            query: searchTerm,
+            count: result.users.length,
+            users: result.users
+        });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
     }

@@ -35,6 +35,7 @@ export const GET_CAMPAIGN_COMPANIONS_ROUTE = (campaignId: string) => `${CAMPAIGN
 export const GET_USER_COMPANION_CAMPAIGNS_ROUTE = (userId: string) => `${CAMPAIGN_COMPANION_ROUTE}/users/${userId}/companion-campaigns`;
 
 export const USER_ROUTE = "api/users";
+export const SEARCH_USERS_ROUTE = `${USER_ROUTE}/search`;
 
 export const ESCROW_ROUTE = "api/escrow";
 export const CREATE_WITHDRAWAL_REQUEST_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/withdrawal-requests`;
