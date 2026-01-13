@@ -20,13 +20,14 @@ import apiClient from '../../services/apiClient';
 import { INIT_SEPAY_PAYMENT_ROUTE } from '../../constants/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { donationService } from '../../services/donation.service';
+import { cacheService } from '../../services/cache.service';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 
 export default function DonateScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const { campaignId } = route.params || {};
-  const { user } = useAuth();
+  const { user, fetchCurrentUser } = useAuth();
 
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,6 +36,7 @@ export default function DonateScreen() {
   const [paymentHtml, setPaymentHtml] = useState('');
   const [orderInvoiceNumber, setOrderInvoiceNumber] = useState(null);
   const webViewRef = useRef(null);
+  const isProcessingRef = useRef(false); // Flag to prevent multiple alerts
 
   useEffect(() => {
     if (!user) {
@@ -385,11 +387,15 @@ export default function DonateScreen() {
               }
             }}
             onNavigationStateChange={async (navState) => {
+              // Prevent multiple processing
+              if (isProcessingRef.current) return;
+              
               // Check if navigation is to success/error/cancel URLs
               const url = navState.url || '';
               
               // Detect redirect to server callback URLs
               if (url.includes('/api/donations/sepay/success') || url.includes('/api/donations/sepay/error') || url.includes('/api/donations/sepay/cancel')) {
+                isProcessingRef.current = true;
                 // Server is processing the payment, wait a bit then check donation status
                 const isSuccess = url.includes('/sepay/success');
                 const isError = url.includes('/sepay/error');
@@ -400,23 +406,66 @@ export default function DonateScreen() {
                   // Poll donation status if we have order invoice number
                   if (orderInvoiceNumber) {
                     try {
-                      // Get donations for this campaign and find the one with matching order_invoice_number
-                      const donations = await donationService.getDonationsByCampaign(campaignId);
-                      const donation = donations.find(d => d.order_invoice_number === orderInvoiceNumber);
+                      // Clear cache to force fresh fetch
+                      cacheService.delete(`donations:${campaignId}`);
+                      cacheService.delete(`campaign:${campaignId}`);
+                      
+                      // Poll with retry logic
+                      let donation = null;
+                      let retries = 0;
+                      const maxRetries = 5;
+                      
+                      while (retries < maxRetries) {
+                        // Wait before each retry (exponential backoff)
+                        if (retries > 0) {
+                          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+                        }
+                        
+                        // Clear cache before each fetch
+                        cacheService.delete(`donations:${campaignId}`);
+                        
+                        // Get donations for this campaign and find the one with matching order_invoice_number
+                        const donations = await donationService.getDonationsByCampaign(campaignId);
+                        donation = donations.find(d => d.order_invoice_number === orderInvoiceNumber);
+                        
+                        // If found donation and it's completed, exit loop
+                        if (donation && donation.payment_status === 'completed') {
+                          break; // Found completed donation, exit loop
+                        }
+                        
+                        // If found donation but not completed yet, continue retrying
+                        // If not found, also continue retrying
+                        retries++;
+                      }
                       
                       if (donation) {
                         setShowWebView(false);
                         setPaymentHtml('');
                         setOrderInvoiceNumber(null);
                         
-                        if (donation.payment_status === 'completed') {
+                        if (donation && donation.payment_status === 'completed') {
+                          // Clear all related caches
+                          cacheService.delete(`donations:${campaignId}`);
+                          cacheService.delete(`campaign:${campaignId}`);
+                          cacheService.invalidatePattern(`campaigns.*`);
+                          
+                          // Refresh user data to update balance
+                          try {
+                            await fetchCurrentUser();
+                          } catch (error) {
+                            console.error('Error refreshing user data:', error);
+                          }
+                          
                           Alert.alert(
                             'Thành công',
                             'Thanh toán đã được xử lý thành công. Cảm ơn bạn đã ủng hộ!',
                             [
                               {
                                 text: 'OK',
-                                onPress: () => navigation.goBack(),
+                                onPress: () => {
+                                  isProcessingRef.current = false;
+                                  navigation.goBack();
+                                },
                               },
                             ]
                           );
@@ -467,6 +516,7 @@ export default function DonateScreen() {
                                 {
                                   text: 'OK',
                                   onPress: () => {
+                                    isProcessingRef.current = false;
                                     // Stay on screen to retry
                                   },
                                 },
@@ -480,6 +530,7 @@ export default function DonateScreen() {
                                 {
                                   text: 'OK',
                                   onPress: () => {
+                                    isProcessingRef.current = false;
                                     // Stay on screen
                                   },
                                 },
@@ -500,7 +551,10 @@ export default function DonateScreen() {
                             [
                               {
                                 text: 'OK',
-                                onPress: () => navigation.goBack(),
+                                onPress: () => {
+                                  isProcessingRef.current = false;
+                                  navigation.goBack();
+                                },
                               },
                             ]
                           );
@@ -512,6 +566,7 @@ export default function DonateScreen() {
                               {
                                 text: 'OK',
                                 onPress: () => {
+                                  isProcessingRef.current = false;
                                   // Stay on screen to retry
                                 },
                               },
@@ -525,6 +580,7 @@ export default function DonateScreen() {
                               {
                                 text: 'OK',
                                 onPress: () => {
+                                  isProcessingRef.current = false;
                                   // Stay on screen
                                 },
                               },
@@ -546,10 +602,15 @@ export default function DonateScreen() {
                           [
                             {
                               text: 'OK',
-                              onPress: () => navigation.goBack(),
+                              onPress: () => {
+                                isProcessingRef.current = false;
+                                navigation.goBack();
+                              },
                             },
                           ]
                         );
+                      } else {
+                        isProcessingRef.current = false;
                       }
                     }
                   } else {
@@ -564,7 +625,10 @@ export default function DonateScreen() {
                         [
                           {
                             text: 'OK',
-                            onPress: () => navigation.goBack(),
+                            onPress: () => {
+                              isProcessingRef.current = false;
+                              navigation.goBack();
+                            },
                           },
                         ]
                       );
@@ -576,6 +640,7 @@ export default function DonateScreen() {
                           {
                             text: 'OK',
                             onPress: () => {
+                              isProcessingRef.current = false;
                               // Stay on screen to retry
                             },
                           },
@@ -589,6 +654,7 @@ export default function DonateScreen() {
                           {
                             text: 'OK',
                             onPress: () => {
+                              isProcessingRef.current = false;
                               // Stay on screen
                             },
                           },
@@ -597,29 +663,75 @@ export default function DonateScreen() {
                     }
                   }
                 }, 2000); // Wait 2 seconds for server to process
+                return; // Exit early to prevent duplicate processing
               }
               
               // Also detect frontend redirect URLs (server redirects to frontend with donation query param)
-              if (url.includes('donation=success') || url.includes('donation=error') || url.includes('donation=cancelled')) {
+              if ((url.includes('donation=success') || url.includes('donation=error') || url.includes('donation=cancelled')) && !isProcessingRef.current) {
+                isProcessingRef.current = true;
                 // Poll donation status when redirecting to frontend
                 if (orderInvoiceNumber) {
                   setTimeout(async () => {
                     try {
-                      const donations = await donationService.getDonationsByCampaign(campaignId);
-                      const donation = donations.find(d => d.order_invoice_number === orderInvoiceNumber);
+                      // Clear cache to force fresh fetch
+                      cacheService.delete(`donations:${campaignId}`);
+                      cacheService.delete(`campaign:${campaignId}`);
+                      
+                      // Poll with retry logic
+                      let donation = null;
+                      let retries = 0;
+                      const maxRetries = 5;
+                      
+                      while (retries < maxRetries) {
+                        // Wait before each retry (exponential backoff)
+                        if (retries > 0) {
+                          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+                        }
+                        
+                        // Clear cache before each fetch
+                        cacheService.delete(`donations:${campaignId}`);
+                        
+                        // Get donations for this campaign and find the one with matching order_invoice_number
+                        const donations = await donationService.getDonationsByCampaign(campaignId);
+                        donation = donations.find(d => d.order_invoice_number === orderInvoiceNumber);
+                        
+                        // If found donation and it's completed, exit loop
+                        if (donation && donation.payment_status === 'completed') {
+                          break; // Found completed donation, exit loop
+                        }
+                        
+                        // If found donation but not completed yet, continue retrying
+                        // If not found, also continue retrying
+                        retries++;
+                      }
                       
                       setShowWebView(false);
                       setPaymentHtml('');
                       setOrderInvoiceNumber(null);
                       
                       if (donation && donation.payment_status === 'completed') {
+                        // Clear all related caches
+                        cacheService.delete(`donations:${campaignId}`);
+                        cacheService.delete(`campaign:${campaignId}`);
+                        cacheService.invalidatePattern(`campaigns.*`);
+                        
+                        // Refresh user data to update balance
+                        try {
+                          await fetchCurrentUser();
+                        } catch (error) {
+                          console.error('Error refreshing user data:', error);
+                        }
+                        
                         Alert.alert(
                           'Thành công',
                           'Thanh toán đã được xử lý thành công. Cảm ơn bạn đã ủng hộ!',
                           [
                             {
                               text: 'OK',
-                              onPress: () => navigation.goBack(),
+                              onPress: () => {
+                                isProcessingRef.current = false;
+                                navigation.goBack();
+                              },
                             },
                           ]
                         );
@@ -630,7 +742,10 @@ export default function DonateScreen() {
                           [
                             {
                               text: 'OK',
-                              onPress: () => navigation.goBack(),
+                              onPress: () => {
+                                isProcessingRef.current = false;
+                                navigation.goBack();
+                              },
                             },
                           ]
                         );
@@ -642,6 +757,7 @@ export default function DonateScreen() {
                             {
                               text: 'OK',
                               onPress: () => {
+                                isProcessingRef.current = false;
                                 // Stay on screen to retry
                               },
                             },
@@ -655,6 +771,7 @@ export default function DonateScreen() {
                             {
                               text: 'OK',
                               onPress: () => {
+                                isProcessingRef.current = false;
                                 // Stay on screen
                               },
                             },
@@ -674,10 +791,15 @@ export default function DonateScreen() {
                           [
                             {
                               text: 'OK',
-                              onPress: () => navigation.goBack(),
+                              onPress: () => {
+                                isProcessingRef.current = false;
+                                navigation.goBack();
+                              },
                             },
                           ]
                         );
+                      } else {
+                        isProcessingRef.current = false;
                       }
                     }
                   }, 2000);
@@ -692,7 +814,10 @@ export default function DonateScreen() {
                       [
                         {
                           text: 'OK',
-                          onPress: () => navigation.goBack(),
+                          onPress: () => {
+                            isProcessingRef.current = false;
+                            navigation.goBack();
+                          },
                         },
                       ]
                     );
@@ -704,6 +829,7 @@ export default function DonateScreen() {
                         {
                           text: 'OK',
                           onPress: () => {
+                            isProcessingRef.current = false;
                             // Stay on screen to retry
                           },
                         },
@@ -717,6 +843,7 @@ export default function DonateScreen() {
                         {
                           text: 'OK',
                           onPress: () => {
+                            isProcessingRef.current = false;
                             // Stay on screen
                           },
                         },

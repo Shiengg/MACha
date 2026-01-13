@@ -81,6 +81,12 @@ export const DELETE_POST_ROUTE = (id: string) => `${POST_ROUTE}/${id}`;
 export const LIKE_POST_ROUTE = (postId: string) => `api/likes/${postId}/like`;
 export const UNLIKE_POST_ROUTE = (postId: string) => `api/likes/${postId}/unlike`;
 
+// Comment routes
+export const COMMENT_ROUTE = "api/comments";
+export const ADD_COMMENT_ROUTE = (postId: string) => `${COMMENT_ROUTE}/${postId}/comments`;
+export const GET_COMMENTS_ROUTE = (postId: string) => `${COMMENT_ROUTE}/${postId}/comments`;
+export const DELETE_COMMENT_ROUTE = (commentId: string) => `${COMMENT_ROUTE}/comments/${commentId}`;
+
 // Post search routes
 export const SEARCH_POSTS_BY_HASHTAG_ROUTE = `${POST_ROUTE}/search`;
 export const SEARCH_POSTS_BY_TITLE_ROUTE = `${POST_ROUTE}/search/title`;
@@ -118,4 +124,10 @@ export const GET_CONVERSATIONS_ROUTE = `${CONVERSATION_ROUTE}`;
 export const MESSAGE_ROUTE = "api/messages";
 export const SEND_MESSAGE_ROUTE = (conversationId: string) => `${MESSAGE_ROUTE}/${conversationId}`;
 export const GET_MESSAGES_ROUTE = (conversationId: string) => `${MESSAGE_ROUTE}/${conversationId}`;
+
+// Recovery routes
+export const RECOVERY_ROUTE = "api/recovery";
+export const GET_RECOVERY_CASES_BY_CREATOR_ROUTE = `${RECOVERY_ROUTE}/creator`;
+export const GET_RECOVERY_CASE_BY_ID_ROUTE = (recoveryCaseId: string) => `${RECOVERY_ROUTE}/${recoveryCaseId}`;
+export const INIT_SEPAY_RECOVERY_PAYMENT_ROUTE = (recoveryCaseId: string) => `${RECOVERY_ROUTE}/${recoveryCaseId}/sepay/init`;
 

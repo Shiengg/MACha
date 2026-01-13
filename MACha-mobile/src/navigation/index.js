@@ -20,6 +20,8 @@ import SearchHistoryScreen from '../screens/search/SearchHistoryScreen';
 import NotificationScreen from '../screens/notifications/NotificationScreen';
 import MessagesScreen from '../screens/messages/MessagesScreen';
 import KYCScreen from '../screens/kyc/KYCScreen';
+import PostDetailScreen from '../screens/posts/PostDetailScreen';
+import RecoveryCasesScreen from '../screens/creator/RecoveryCasesScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -51,6 +53,8 @@ export default function AppNavigator() {
         <Stack.Screen name="Notifications" component={NotificationScreen} />
         <Stack.Screen name="Messages" component={MessagesScreen} />
         <Stack.Screen name="KYC" component={KYCScreen} />
+        <Stack.Screen name="PostDetail" component={PostDetailScreen} />
+        <Stack.Screen name="RecoveryCases" component={RecoveryCasesScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

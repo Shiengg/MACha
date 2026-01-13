@@ -35,6 +35,10 @@ export default function SettingsScreen() {
     navigation.navigate('Terms');
   };
 
+  const handleRecoveryCases = () => {
+    navigation.navigate('RecoveryCases');
+  };
+
   const handleLogout = () => {
     Alert.alert(
       'Đăng xuất',
@@ -94,6 +98,14 @@ export default function SettingsScreen() {
       onPress: handleTerms,
       color: '#6B7280',
     },
+    ...(user?.role === 'org' || user?.role === 'user' ? [{
+      id: 'recoveryCases',
+      icon: 'trending-down',
+      title: 'Các trường hợp hoàn tiền',
+      subtitle: 'Quản lý các trường hợp cần hoàn tiền từ campaign đã hủy',
+      onPress: handleRecoveryCases,
+      color: '#F97316',
+    }] : []),
     {
       id: 'logout',
       icon: 'logout',

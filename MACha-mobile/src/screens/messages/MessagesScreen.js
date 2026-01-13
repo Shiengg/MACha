@@ -5,10 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   Modal,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
 import ConversationList from '../../components/message/ConversationList';
 import ChatWindow from '../../components/message/ChatWindow';
@@ -18,7 +19,8 @@ import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 
 export default function MessagesScreen() {
   const navigation = useNavigation();
-  const { isAuthenticated } = useAuth();
+  const route = useRoute();
+  const { isAuthenticated, user } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [conversations, setConversations] = useState([]);
@@ -52,6 +54,17 @@ export default function MessagesScreen() {
     loadConversations();
   }, [isAuthenticated, navigation]);
 
+  // Handle conversationId from route params (when navigating from ShareModal)
+  useEffect(() => {
+    const conversationId = route.params?.conversationId;
+    if (conversationId && conversations.length > 0) {
+      const conversation = conversations.find((conv) => conv._id === conversationId);
+      if (conversation) {
+        setSelectedConversation(conversation);
+      }
+    }
+  }, [route.params?.conversationId, conversations]);
+
   const handleSelectConversation = (conversation) => {
     setSelectedConversation(conversation);
     setShowInfoPanel(false);
@@ -65,6 +78,23 @@ export default function MessagesScreen() {
   const handleToggleInfoPanel = () => {
     setShowInfoPanel(!showInfoPanel);
   };
+
+  const getOtherParticipant = (conversation) => {
+    if (!conversation || !conversation.members || conversation.members.length === 0) {
+      return {
+        _id: 'unknown',
+        username: 'Người dùng',
+        fullname: 'Người dùng',
+        avatar: undefined,
+        email: '',
+      };
+    }
+    const currentUserId = user?._id || user?.id;
+    if (!currentUserId) return conversation.members[0];
+    return conversation.members.find((m) => m._id !== currentUserId) || conversation.members[0];
+  };
+
+  const otherParticipant = selectedConversation ? getOtherParticipant(selectedConversation) : null;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -82,12 +112,46 @@ export default function MessagesScreen() {
         >
           <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
         </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <View style={styles.headerTitleWrapper}>
-            <Text style={styles.headerTitle}>Tin nhắn</Text>
-          </View>
-        </View>
-        <View style={styles.placeholder} />
+        {selectedConversation && otherParticipant ? (
+          <>
+            <View style={styles.headerAvatarContainer}>
+              {otherParticipant.avatar ? (
+                <Image
+                  source={{ uri: otherParticipant.avatar }}
+                  style={styles.headerAvatar}
+                />
+              ) : (
+                <View style={styles.headerAvatarPlaceholder}>
+                  <Text style={styles.headerAvatarText}>
+                    {otherParticipant.fullname?.charAt(0).toUpperCase() ||
+                      otherParticipant.username?.charAt(0).toUpperCase() ||
+                      'U'}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerName} numberOfLines={1}>
+                {otherParticipant.fullname || otherParticipant.username || 'Người dùng'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleToggleInfoPanel}
+              style={styles.infoButton}
+            >
+              <Text style={styles.infoButtonText}>i</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <View style={styles.headerTitleContainer}>
+              <View style={styles.headerTitleWrapper}>
+                <Text style={styles.headerTitle}>Tin nhắn</Text>
+              </View>
+            </View>
+            <View style={styles.placeholder} />
+          </>
+        )}
       </View>
 
       {/* Main Content */}
@@ -102,8 +166,6 @@ export default function MessagesScreen() {
         ) : (
           <ChatWindow
             conversation={selectedConversation}
-            onToggleInfoPanel={handleToggleInfoPanel}
-            onBackToList={handleBackToList}
           />
         )}
       </View>
@@ -163,6 +225,46 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: scale(32),
+  },
+  headerAvatarContainer: {
+    marginRight: scale(12),
+  },
+  headerAvatar: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+  },
+  headerAvatarPlaceholder: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    backgroundColor: '#D1D5DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerAvatarText: {
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  headerName: {
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+    color: '#111827',
+  },
+  infoButton: {
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(16),
+    backgroundColor: '#F97E2C',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: scale(8),
+  },
+  infoButtonText: {
+    fontSize: moderateScale(14),
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   content: {
     flex: 1,

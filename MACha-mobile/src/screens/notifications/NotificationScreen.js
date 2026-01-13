@@ -18,8 +18,6 @@ import { useNavigation } from '@react-navigation/native';
 import { notificationService } from '../../services/notification.service';
 import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { postService } from '../../services/post.service';
-import PostCard from '../../components/post/PostCard';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 
 const formatTimeAgo = (dateString) => {
@@ -81,8 +79,6 @@ export default function NotificationScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [markingAllAsRead, setMarkingAllAsRead] = useState(false);
-  const [selectedPost, setSelectedPost] = useState(null);
-  const [showPostModal, setShowPostModal] = useState(false);
 
   const loadNotifications = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -174,16 +170,9 @@ export default function NotificationScreen() {
       return;
     }
 
-    // Nếu notification có liên quan đến post, mở modal
+    // Nếu notification có liên quan đến post, navigate đến PostDetailScreen
     if (notification.post && notification.post._id) {
-      try {
-        const post = await postService.getPostById(notification.post._id);
-        setSelectedPost(post);
-        setShowPostModal(true);
-      } catch (error) {
-        console.error('Failed to load post:', error);
-        Alert.alert('Lỗi', 'Không thể tải bài viết. Vui lòng thử lại sau.');
-      }
+      navigation.navigate('PostDetail', { postId: notification.post._id });
     }
     // TODO: Handle other notification types (follow, etc.)
   };
@@ -359,39 +348,6 @@ export default function NotificationScreen() {
         }
         showsVerticalScrollIndicator={false}
       />
-
-      {/* Post Modal */}
-      <Modal
-        visible={showPostModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
-          setShowPostModal(false);
-          setSelectedPost(null);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Bài viết</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowPostModal(false);
-                  setSelectedPost(null);
-                }}
-                style={styles.modalCloseButton}
-              >
-                <MaterialCommunityIcons name="close" size={24} color="#374151" />
-              </TouchableOpacity>
-            </View>
-            {selectedPost && (
-              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-                <PostCard post={selectedPost} navigation={navigation} />
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }

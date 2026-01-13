@@ -17,6 +17,8 @@ import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 import CampaignCard from '../campaign/CampaignCard';
+import CommentModal from '../shared/CommentModal';
+import ShareModal from '../shared/ShareModal';
 
 export default function PostCard({ post, onDelete, onUpdate, navigation }) {
   const { socket, isConnected } = useSocket();
@@ -32,6 +34,8 @@ export default function PostCard({ post, onDelete, onUpdate, navigation }) {
   const [imageViewerIndex, setImageViewerIndex] = useState(0);
   const [fullCampaign, setFullCampaign] = useState(null);
   const [isLoadingCampaign, setIsLoadingCampaign] = useState(false);
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const currentUserId = user?._id || user?.id;
   const isOwner = currentUserId === post.user?._id;
@@ -53,13 +57,29 @@ export default function PostCard({ post, onDelete, onUpdate, navigation }) {
 
     const handleCommentAdded = (event) => {
       if (event.postId !== post._id) return;
-      if (event.userId === currentUserId) return;
+      
+      const eventUserId = event.userId;
+      // Skip if it's the current user's comment (already updated optimistically)
+      if (eventUserId === currentUserId) {
+        console.log('👤 Đó là bạn vừa comment (đã có trong list)');
+        return;
+      }
+
+      console.log('💬 Real-time: Có comment mới từ người khác');
       setCommentsCount((prev) => prev + 1);
     };
 
     const handleCommentDeleted = (event) => {
       if (event.postId !== post._id) return;
-      if (event.userId === currentUserId) return;
+      
+      const eventUserId = event.userId;
+      // Skip if it's the current user's comment (already updated optimistically)
+      if (eventUserId === currentUserId) {
+        console.log('👤 Đó là bạn vừa xóa comment (đã optimistic update)');
+        return;
+      }
+
+      console.log('🗑️ Real-time: Comment bị xóa:', event.commentId);
       setCommentsCount((prev) => Math.max(0, prev - 1));
     };
 
@@ -385,8 +405,7 @@ export default function PostCard({ post, onDelete, onUpdate, navigation }) {
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => {
-            // Navigate to comments if needed
-            console.log('Comment pressed');
+            setShowCommentModal(true);
           }}
         >
           <MaterialCommunityIcons name="comment-outline" size={24} color="#6B7280" />
@@ -396,8 +415,7 @@ export default function PostCard({ post, onDelete, onUpdate, navigation }) {
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => {
-            // Share functionality
-            console.log('Share pressed');
+            setShowShareModal(true);
           }}
         >
           <MaterialCommunityIcons name="share-outline" size={24} color="#6B7280" />
@@ -473,6 +491,34 @@ export default function PostCard({ post, onDelete, onUpdate, navigation }) {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Comment Modal */}
+      <CommentModal
+        postId={post._id}
+        isOpen={showCommentModal}
+        onClose={() => setShowCommentModal(false)}
+        onCommentAdded={() => {
+          setCommentsCount((prev) => prev + 1);
+          if (onUpdate) {
+            // Trigger update to refresh post data
+            onUpdate(post._id, { ...post, commentsCount: commentsCount + 1 });
+          }
+        }}
+        onCommentDeleted={() => {
+          setCommentsCount((prev) => Math.max(0, prev - 1));
+          if (onUpdate) {
+            // Trigger update to refresh post data
+            onUpdate(post._id, { ...post, commentsCount: Math.max(0, commentsCount - 1) });
+          }
+        }}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        postId={post._id}
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
     </View>
   );
 }

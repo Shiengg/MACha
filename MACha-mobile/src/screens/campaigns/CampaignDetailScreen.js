@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { campaignService } from '../../services/campaign.service';
 import { donationService } from '../../services/donation.service';
@@ -77,6 +77,43 @@ export default function CampaignDetailScreen() {
   // Refresh
   const [refreshing, setRefreshing] = useState(false);
 
+  const fetchCampaign = async () => {
+    try {
+      setLoading(true);
+      const data = await campaignService.getCampaignById(campaignId);
+      setCampaign(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error loading campaign:', err);
+      setError(err.response?.data?.message || 'Không thể tải thông tin chiến dịch');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDonations = async () => {
+    try {
+      const data = await donationService.getDonationsByCampaign(campaignId);
+      const completedDonations = data.filter(
+        (donation) => donation.payment_status === 'completed' && !donation.is_anonymous
+      );
+      setDonations(completedDonations);
+    } catch (err) {
+      console.error('Error loading donations:', err);
+      setDonations([]);
+    }
+  };
+
+  const fetchUpdates = async () => {
+    try {
+      const data = await campaignService.getCampaignUpdates(campaignId);
+      setUpdates(data);
+    } catch (err) {
+      console.error('Error loading updates:', err);
+      setUpdates([]);
+    }
+  };
+
   // Load campaign data
   useEffect(() => {
     if (campaignId) {
@@ -85,6 +122,17 @@ export default function CampaignDetailScreen() {
       fetchUpdates();
     }
   }, [campaignId]);
+
+  // Refresh data when screen is focused (e.g., returning from DonateScreen)
+  useFocusEffect(
+    useCallback(() => {
+      if (campaignId) {
+        // Refresh campaign and donations when returning to screen
+        fetchCampaign();
+        fetchDonations();
+      }
+    }, [campaignId])
+  );
 
   // Load withdrawal data when campaign and user are available
   useEffect(() => {
@@ -183,43 +231,6 @@ export default function CampaignDetailScreen() {
       console.log(`🚪 Left campaign room: ${campaignRoom}`);
     };
   }, [socket, isConnected, campaignId, campaign]);
-
-  const fetchCampaign = async () => {
-    try {
-      setLoading(true);
-      const data = await campaignService.getCampaignById(campaignId);
-      setCampaign(data);
-      setError(null);
-    } catch (err) {
-      console.error('Error loading campaign:', err);
-      setError(err.response?.data?.message || 'Không thể tải thông tin chiến dịch');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchDonations = async () => {
-    try {
-      const data = await donationService.getDonationsByCampaign(campaignId);
-      const completedDonations = data.filter(
-        (donation) => donation.payment_status === 'completed' && !donation.is_anonymous
-      );
-      setDonations(completedDonations);
-    } catch (err) {
-      console.error('Error loading donations:', err);
-      setDonations([]);
-    }
-  };
-
-  const fetchUpdates = async () => {
-    try {
-      const data = await campaignService.getCampaignUpdates(campaignId);
-      setUpdates(data);
-    } catch (err) {
-      console.error('Error loading updates:', err);
-      setUpdates([]);
-    }
-  };
 
   const fetchWithdrawalData = async () => {
     if (!campaignId || !user) return;

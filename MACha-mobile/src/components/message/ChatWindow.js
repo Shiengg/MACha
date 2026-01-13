@@ -20,7 +20,7 @@ import { messageService } from '../../services/message.service';
 import { cloudinaryService } from '../../services/cloudinary.service';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 
-export default function ChatWindow({ conversation, onToggleInfoPanel, onBackToList }) {
+export default function ChatWindow({ conversation }) {
   const { user } = useAuth();
   const { socket, isConnected } = useSocket();
   const [message, setMessage] = useState('');
@@ -31,23 +31,23 @@ export default function ChatWindow({ conversation, onToggleInfoPanel, onBackToLi
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [expandedMessageIds, setExpandedMessageIds] = useState(new Set());
   const messagesEndRef = useRef(null);
   const sentMessageIdsRef = useRef(new Set());
 
   const currentUserId = user?._id || user?.id;
   const conversationId = conversation?._id ?? null;
 
-  const getOtherParticipant = (members, currentUserId) => {
-    if (!members || members.length === 0) {
-      return {
-        _id: 'unknown',
-        username: 'Người dùng',
-        avatar: undefined,
-        email: '',
-      };
-    }
-    if (!currentUserId) return members[0];
-    return members.find((m) => m._id !== currentUserId) || members[0];
+  const toggleMessageTime = (messageId) => {
+    setExpandedMessageIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(messageId)) {
+        newSet.delete(messageId);
+      } else {
+        newSet.add(messageId);
+      }
+      return newSet;
+    });
   };
 
   const scrollToBottom = () => {
@@ -296,58 +296,12 @@ export default function ChatWindow({ conversation, onToggleInfoPanel, onBackToLi
     );
   }
 
-  const otherParticipant = getOtherParticipant(conversation.members, currentUserId);
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      {/* Chat Header */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          {onBackToList && (
-            <TouchableOpacity
-              onPress={onBackToList}
-              style={styles.backButton}
-            >
-              <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
-            </TouchableOpacity>
-          )}
-          <View style={styles.avatarContainer}>
-            {otherParticipant.avatar ? (
-              <Image
-                source={{ uri: otherParticipant.avatar }}
-                style={styles.headerAvatar}
-              />
-            ) : (
-              <View style={styles.headerAvatarPlaceholder}>
-                <Text style={styles.headerAvatarText}>
-                  {otherParticipant.fullname?.charAt(0).toUpperCase() ||
-                    otherParticipant.username?.charAt(0).toUpperCase() ||
-                    'U'}
-                </Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.headerName} numberOfLines={1}>
-              {otherParticipant.fullname || otherParticipant.username || 'Người dùng'}
-            </Text>
-            <Text style={styles.headerStatus}>Offline</Text>
-          </View>
-          {onToggleInfoPanel && (
-            <TouchableOpacity
-              onPress={onToggleInfoPanel}
-              style={styles.infoButton}
-            >
-              <Text style={styles.infoButtonText}>i</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
       {/* Messages Area */}
       <ScrollView
         style={styles.messagesContainer}
@@ -393,55 +347,116 @@ export default function ChatWindow({ conversation, onToggleInfoPanel, onBackToLi
             const isFirstOfGroup = !prev || prevSenderId !== senderId;
             const isLastOfGroup = !next || nextSenderId !== senderId;
 
+            const isTimeExpanded = expandedMessageIds.has(String(msg._id));
+
+            // Tính toán border radius dựa trên vị trí trong nhóm
+            const getBubbleBorderRadius = (isOwn, isFirst, isLast) => {
+              const baseRadius = scale(16);
+              if (isFirst && isLast) {
+                // Tin nhắn duy nhất: bo tròn tất cả các góc
+                return {
+                  borderTopLeftRadius: baseRadius,
+                  borderTopRightRadius: baseRadius,
+                  borderBottomLeftRadius: baseRadius,
+                  borderBottomRightRadius: baseRadius,
+                };
+              } else if (isFirst) {
+                // Tin nhắn đầu tiên: bo tròn ở trên và một bên
+                return {
+                  borderTopLeftRadius: baseRadius,
+                  borderTopRightRadius: baseRadius,
+                  borderBottomLeftRadius: isOwn ? baseRadius : 0,
+                  borderBottomRightRadius: isOwn ? 0 : baseRadius,
+                };
+              } else if (isLast) {
+                // Tin nhắn cuối cùng: bo tròn ở dưới và một bên
+                return {
+                  borderTopLeftRadius: isOwn ? baseRadius : 0,
+                  borderTopRightRadius: isOwn ? 0 : baseRadius,
+                  borderBottomLeftRadius: baseRadius,
+                  borderBottomRightRadius: baseRadius,
+                };
+              } else {
+                // Tin nhắn giữa: chỉ bo tròn một bên
+                return {
+                  borderTopLeftRadius: isOwn ? baseRadius : 0,
+                  borderTopRightRadius: isOwn ? 0 : baseRadius,
+                  borderBottomLeftRadius: isOwn ? baseRadius : 0,
+                  borderBottomRightRadius: isOwn ? 0 : baseRadius,
+                };
+              }
+            };
+
+            const bubbleBorderRadius = getBubbleBorderRadius(isOwnMessage, isFirstOfGroup, isLastOfGroup);
+
             if (isOwnMessage) {
               return (
-                <View key={msg._id} style={styles.messageRowRight}>
-                  <View style={styles.messageBubbleRight}>
-                    {msg.type === 'image' ? (
-                      <Image source={{ uri: msg.content }} style={styles.messageImage} />
-                    ) : (
-                      <Text style={styles.messageTextRight}>
-                        {renderMessageContent(msg.content)}
-                      </Text>
-                    )}
+                <TouchableOpacity
+                  key={msg._id}
+                  onPress={() => toggleMessageTime(String(msg._id))}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.messageRowRight, !isLastOfGroup && styles.messageRowGrouped]}>
+                    <View style={styles.messageBubbleContainerRight}>
+                      <View style={[styles.messageBubbleRight, bubbleBorderRadius]}>
+                        {msg.type === 'image' ? (
+                          <Image source={{ uri: msg.content }} style={styles.messageImage} />
+                        ) : (
+                          <Text style={styles.messageTextRight}>
+                            {renderMessageContent(msg.content)}
+                          </Text>
+                        )}
+                      </View>
+                      {isTimeExpanded && (
+                        <Text style={styles.messageTimeRight}>
+                          {formatMessageTimeWithDate(msg.createdAt)}
+                        </Text>
+                      )}
+                    </View>
                   </View>
-                  <Text style={styles.messageTimeRight}>
-                    {formatMessageTimeWithDate(msg.createdAt)}
-                  </Text>
-                </View>
+                </TouchableOpacity>
               );
             }
 
             return (
-              <View key={msg._id} style={styles.messageRowLeft}>
-                {isLastOfGroup && (
-                  <View style={styles.messageAvatar}>
-                    {sender.avatar ? (
-                      <Image source={{ uri: sender.avatar }} style={styles.avatarImage} />
-                    ) : (
-                      <View style={styles.avatarPlaceholder}>
-                        <Text style={styles.avatarText}>
-                          {sender.username?.charAt(0).toUpperCase() || 'U'}
+              <TouchableOpacity
+                key={msg._id}
+                onPress={() => toggleMessageTime(String(msg._id))}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.messageRowLeft, !isLastOfGroup && styles.messageRowGrouped]}>
+                  {isLastOfGroup && (
+                    <View style={styles.messageAvatar}>
+                      {sender.avatar ? (
+                        <Image source={{ uri: sender.avatar }} style={styles.avatarImage} />
+                      ) : (
+                        <View style={styles.avatarPlaceholder}>
+                          <Text style={styles.avatarText}>
+                            {sender.username?.charAt(0).toUpperCase() || 'U'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                  {!isLastOfGroup && <View style={styles.messageAvatarSpacer} />}
+                  <View style={styles.messageBubbleContainerLeft}>
+                    <View style={[styles.messageBubbleLeft, bubbleBorderRadius]}>
+                      {msg.type === 'image' ? (
+                        <Image source={{ uri: msg.content }} style={styles.messageImage} />
+                      ) : (
+                        <Text style={styles.messageTextLeft}>
+                          {renderMessageContent(msg.content)}
                         </Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-                <View style={styles.messageContentLeft}>
-                  <View style={styles.messageBubbleLeft}>
-                    {msg.type === 'image' ? (
-                      <Image source={{ uri: msg.content }} style={styles.messageImage} />
-                    ) : (
-                      <Text style={styles.messageTextLeft}>
-                        {renderMessageContent(msg.content)}
+                      )}
+                    </View>
+                    {isTimeExpanded && (
+                      <Text style={styles.messageTimeLeft}>
+                        {formatMessageTimeWithDate(msg.createdAt)}
                       </Text>
                     )}
                   </View>
-                  <Text style={styles.messageTimeLeft}>
-                    {formatMessageTimeWithDate(msg.createdAt)}
-                  </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })
         )}
@@ -529,70 +544,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
   },
-  header: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(16),
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    marginRight: scale(12),
-    padding: scale(4),
-  },
-  avatarContainer: {
-    marginRight: scale(12),
-  },
-  headerAvatar: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
-  },
-  headerAvatarPlaceholder: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
-    backgroundColor: '#D1D5DB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerAvatarText: {
-    fontSize: moderateScale(16),
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  headerTextContainer: {
-    flex: 1,
-    minWidth: 0,
-  },
-  headerName: {
-    fontSize: moderateScale(16),
-    fontWeight: '600',
-    color: '#111827',
-  },
-  headerStatus: {
-    fontSize: moderateScale(12),
-    color: '#6B7280',
-    marginTop: scale(2),
-  },
-  infoButton: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(16),
-    backgroundColor: '#F97E2C',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: scale(8),
-  },
-  infoButtonText: {
-    fontSize: moderateScale(14),
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
   messagesContainer: {
     flex: 1,
   },
@@ -635,29 +586,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     marginBottom: scale(8),
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   messageRowLeft: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
     marginBottom: scale(8),
+    alignItems: 'flex-start',
+  },
+  messageRowGrouped: {
+    marginBottom: scale(2),
+  },
+  messageBubbleContainerRight: {
     alignItems: 'flex-end',
+    maxWidth: '75%',
+  },
+  messageBubbleContainerLeft: {
+    alignItems: 'flex-start',
+    maxWidth: '75%',
   },
   messageBubbleRight: {
     backgroundColor: '#F97E2C',
-    borderRadius: scale(16),
     paddingHorizontal: scale(12),
     paddingVertical: scale(8),
-    maxWidth: '75%',
   },
   messageBubbleLeft: {
     backgroundColor: '#FFFFFF',
-    borderRadius: scale(16),
     paddingHorizontal: scale(12),
     paddingVertical: scale(8),
-    maxWidth: '75%',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  messageAvatarSpacer: {
+    width: scale(24),
+    marginRight: scale(8),
   },
   messageTextRight: {
     fontSize: moderateScale(14),
@@ -670,17 +632,14 @@ const styles = StyleSheet.create({
   messageTimeRight: {
     fontSize: moderateScale(10),
     color: '#6B7280',
-    marginLeft: scale(8),
+    marginTop: scale(4),
     marginRight: scale(4),
   },
   messageTimeLeft: {
     fontSize: moderateScale(10),
     color: '#6B7280',
+    marginTop: scale(4),
     marginLeft: scale(8),
-  },
-  messageContentLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
   },
   messageAvatar: {
     width: scale(24),
@@ -749,7 +708,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: scale(16),
-    paddingVertical: scale(12),
+    paddingTop: scale(12),
+    paddingBottom: scale(20),
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
