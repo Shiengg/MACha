@@ -1,0 +1,40 @@
+# Prometheus Configuration cho Production Server
+# Scrape metrics từ production backend trên Railway: https://macha-production-4144.up.railway.app
+
+global:
+  scrape_interval: 10s      # Scrape metrics mỗi 10 giây (nhanh hơn cho load test)
+  evaluation_interval: 10s  # Evaluate rules mỗi 10 giây
+  external_labels:
+    cluster: 'macha-cluster'
+    environment: 'production'
+
+# Scrape configurations
+scrape_configs:
+  # Scrape Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # Scrape Production Backend Application Metrics
+  - job_name: 'macha-backend-production'
+    metrics_path: '/metrics'
+    scrape_interval: 10s  # Scrape backend metrics thường xuyên hơn (10s)
+    static_configs:
+      - targets: ['macha-production-4144.up.railway.app']
+        labels:
+          service: 'macha-backend'
+          environment: 'production'
+          instance: 'railway-production'
+    scheme: https  # Production sử dụng HTTPS
+    # Note: Nếu metrics endpoint cần authentication, uncomment và điền thông tin:
+    # basic_auth:
+    #   username: 'your-username'
+    #   password: 'your-password'
+    # Hoặc sử dụng bearer token:
+    # bearer_token: 'your-bearer-token'
+    # Nếu cần skip SSL verification (không khuyến khích):
+    # tls_config:
+    #   insecure_skip_verify: true
+

@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import jwt from 'jsonwebtoken';
 import connectDB from './config/db.js';
 import { connectRedis, closeSubscriber, getConnectionInfo } from './config/redis.js';
@@ -73,6 +74,19 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     exposedHeaders: ['Set-Cookie'], // Expose Set-Cookie header for debugging
+}));
+
+// Enable gzip compression for all responses
+app.use(compression({
+    level: 6, // Compression level (1-9), 6 is a good balance
+    filter: (req, res) => {
+        // Don't compress responses if this request header is present
+        if (req.headers['x-no-compression']) {
+            return false;
+        }
+        // Use compression filter function
+        return compression.filter(req, res);
+    }
 }));
 
 app.use(express.json({ limit: '50mb' }));

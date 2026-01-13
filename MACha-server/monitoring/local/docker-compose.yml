@@ -1,12 +1,12 @@
-# Docker Compose cho Monitoring Stack
-# Chạy cùng với docker-compose.yml chính
-# Usage: docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+# Docker Compose cho Monitoring Stack - Local Development
+# Scrape từ localhost:8887
+# Usage: docker-compose -f docker-compose.yml up -d
 
 services:
   # Prometheus - Metrics Collection & Storage
   prometheus:
     image: prom/prometheus:latest
-    container_name: MACha-prometheus
+    container_name: MACha-prometheus-local
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
@@ -26,7 +26,7 @@ services:
       - macha-network
     environment:
       - BACKEND_HOST=${BACKEND_HOST:-host.docker.internal}
-      - BACKEND_PORT=${BACKEND_PORT:-5000}
+      - BACKEND_PORT=${BACKEND_PORT:-8887}
       - METRICS_PATH=${METRICS_PATH:-/metrics}
       - NODE_EXPORTER_HOST=${NODE_EXPORTER_HOST:-node-exporter}
       - NODE_EXPORTER_PORT=${NODE_EXPORTER_PORT:-9100}
@@ -41,7 +41,7 @@ services:
   # Node Exporter - Infrastructure Metrics (CPU, Memory, Disk, Network)
   node-exporter:
     image: prom/node-exporter:latest
-    container_name: MACha-node-exporter
+    container_name: MACha-node-exporter-local
     ports:
       - "${NODE_EXPORTER_PORT:-9100}:9100"
     command:
@@ -60,13 +60,13 @@ services:
   # Grafana - Visualization & Dashboards
   grafana:
     image: grafana/grafana:latest
-    container_name: MACha-grafana
+    container_name: MACha-grafana-local
     ports:
       - "${GRAFANA_PORT:-3001}:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ../../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../grafana/dashboards:/var/lib/grafana/dashboards:ro
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}

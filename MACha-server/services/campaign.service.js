@@ -37,13 +37,16 @@ export const getCampaigns = async (page = 0, limit = 20, userId = null) => {
     }
 
     // 2. Cache miss - Query database
+    // Optimized: Use select() to reduce payload size and use index efficiently
     const [campaigns, total] = await Promise.all([
         Campaign.find()
+            .select('-contact_info -expected_timeline -milestones') // Exclude heavy fields for list view
             .populate("creator", "username fullname avatar")
             .populate("hashtag", "name")
-            .sort({ createdAt: -1 })
+            .sort({ createdAt: -1 }) // Uses index: { status: 1, createdAt: -1 }
             .skip(page * limit)
-            .limit(limit),
+            .limit(limit)
+            .lean(), // Use lean() for better performance
         Campaign.countDocuments()
     ]);
 
@@ -926,6 +929,7 @@ export const getCampaignsForMap = async () => {
     }
 
     // Query campaigns with location data and active status
+    // Optimized: Use index and select only needed fields
     const campaigns = await Campaign.find({
         status: 'active',
         'location.latitude': { $exists: true, $ne: null },
@@ -934,7 +938,7 @@ export const getCampaignsForMap = async () => {
         .select('title location category current_amount goal_amount banner_image creator hashtag status')
         .populate("creator", "username fullname avatar")
         .populate("hashtag", "name")
-        .lean();
+        .lean(); // Already using lean()
 
     // Cache for 5 minutes
     await redisClient.setEx(cacheKey, 300, JSON.stringify(campaigns));

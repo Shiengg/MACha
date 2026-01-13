@@ -6,9 +6,9 @@ dotenv.config();
 export const rateLimit = (options = {}) => {
     // Cho phép tắt toàn bộ rate limit khi testing (ví dụ với k6)
     // Đặt RATE_LIMIT_ENABLED=false trong .env hoặc env runtime
-    if (process.env.RATE_LIMIT_ENABLED === 'false') {
-        return (req, res, next) => next();
-    }
+    // if (process.env.RATE_LIMIT_ENABLED === 'false') {
+    //     return (req, res, next) => next();
+    // }
 
     const {
         maxRequests = 5,

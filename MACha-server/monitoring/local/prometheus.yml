@@ -1,12 +1,12 @@
-# Prometheus Configuration
-# Scrape metrics từ backend và Node Exporter
+# Prometheus Configuration cho Local Development
+# Scrape metrics từ backend localhost:8887 và Node Exporter
 
 global:
   scrape_interval: 15s      # Scrape metrics mỗi 15 giây
   evaluation_interval: 15s  # Evaluate rules mỗi 15 giây
   external_labels:
     cluster: 'macha-cluster'
-    environment: '${ENVIRONMENT}'
+    environment: '${ENVIRONMENT:-development}'
 
 # Alertmanager configuration (optional - có thể thêm sau)
 # alerting:
@@ -27,21 +27,22 @@ scrape_configs:
         labels:
           service: 'prometheus'
 
-  # Scrape Backend Application Metrics
-  - job_name: 'macha-backend'
-    metrics_path: '${METRICS_PATH}'
+  # Scrape Backend Application Metrics (Local)
+  - job_name: 'macha-backend-local'
+    metrics_path: '${METRICS_PATH:-/metrics}'
     scrape_interval: 10s  # Scrape backend metrics thường xuyên hơn (10s)
     static_configs:
-      - targets: ['${BACKEND_HOST}:${BACKEND_PORT}']
+      - targets: ['${BACKEND_HOST:-host.docker.internal}:${BACKEND_PORT:-8887}']
         labels:
           service: 'macha-backend'
-          environment: '${ENVIRONMENT}'
+          environment: 'development'
+          instance: 'local'
 
   # Scrape Node Exporter (Infrastructure Metrics)
   - job_name: 'node-exporter'
     scrape_interval: 15s
     static_configs:
-      - targets: ['${NODE_EXPORTER_HOST}:${NODE_EXPORTER_PORT}']
+      - targets: ['${NODE_EXPORTER_HOST:-node-exporter}:${NODE_EXPORTER_PORT:-9100}']
         labels:
           service: 'node-exporter'
           instance: 'macha-server'

@@ -18,5 +18,8 @@ const likeSchema = new mongoose.Schema({
 )
 
 likeSchema.index({ post: 1, user: 1 }, { unique: true });
+likeSchema.index({ post: 1, createdAt: -1 }); // Likes by post for counting
+likeSchema.index({ user: 1, createdAt: -1 }); // User likes
+
 const Like = mongoose.model("Like", likeSchema);
 export default Like;
