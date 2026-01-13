@@ -4,8 +4,10 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { campaignService, Campaign } from '@/services/campaign.service';
 import { searchPostsByTitle, getPostsByHashtag, Post } from '@/services/post.service';
+import { useUserSearch } from '@/hooks/useUserSearch';
 import CampaignCard from '@/components/campaign/CampaignCard';
 import PostCard from '@/components/shared/PostCard';
+import UserSearchResult from '@/components/shared/UserSearchResult';
 
 // Format number with K/M/B suffix
 const formatNumber = (num: number): string => {
@@ -37,12 +39,29 @@ function SearchContent() {
     const [postsLoading, setPostsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [postsError, setPostsError] = useState<string | null>(null);
+    
+    // User search hook - lưu history để track user searches
+    const {
+        query: userQuery,
+        setQuery: setUserQuery,
+        users,
+        loading: usersLoading,
+        error: usersError,
+    } = useUserSearch({
+        debounceMs: 400,
+        minQueryLength: 1,
+        limit: 50,
+        autoSaveHistory: true, // Lưu USER_SEARCH history
+    });
 
     useEffect(() => {
         if (query) {
             const decoded = decodeURIComponent(query);
             setDecodedQuery(decoded);
             setPosts([]);
+            
+            // Sync user search query
+            setUserQuery(decoded);
             
             // Check if query is a hashtag (starts with #)
             if (decoded.startsWith('#')) {
@@ -67,8 +86,9 @@ function SearchContent() {
             setPostsLoading(false);
             setError(null);
             setPostsError(null);
+            setUserQuery('');
         }
-    }, [query]);
+    }, [query, setUserQuery]);
 
     const fetchCampaignsByTitle = async (searchTerm: string) => {
         try {
@@ -137,7 +157,8 @@ function SearchContent() {
 
     const campaignsCount = campaigns.length;
     const postsCount = posts.length;
-    const totalCount = campaignsCount + postsCount;
+    const usersCount = users.length;
+    const totalCount = campaignsCount + postsCount + usersCount;
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -163,64 +184,78 @@ function SearchContent() {
                 </div>
             </div>
             
-            {/* Content area */}
-            <div className="max-w-4xl mx-auto px-6 py-6 space-y-8">
-                {/* Campaigns Section */}
-                {loading ? (
+            {/* Content area - Unified Results */}
+            <div className="max-w-4xl mx-auto px-6 py-6">
+                {/* Loading State */}
+                {(loading || postsLoading || usersLoading) && (
                     <div className="text-center py-12">
                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                        <p className="mt-4 text-gray-500">Đang tải...</p>
-                    </div>
-                ) : error ? (
-                    <div className="text-center py-12">
-                        <p className="text-red-500">{error}</p>
-                    </div>
-                ) : !decodedQuery ? (
-                    <div className="text-center py-12 text-gray-500">
-                        <p>Nhập từ khóa để tìm kiếm</p>
-                    </div>
-                ) : campaigns.length > 0 ? (
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-4">Danh sách chiến dịch</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {campaigns.map((campaign) => (
-                                <CampaignCard key={campaign._id} campaign={campaign} />
-                            ))}
-                        </div>
-                    </div>
-                ) : null}
-
-                {/* Posts Section */}
-                {decodedQuery && (
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-4">Bài viết</h2>
-                        {postsLoading && posts.length === 0 ? (
-                            <div className="text-center py-12">
-                                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                                <p className="mt-4 text-gray-500">Đang tải bài viết...</p>
-                            </div>
-                        ) : postsError ? (
-                            <div className="text-center py-12">
-                                <p className="text-red-500">{postsError}</p>
-                            </div>
-                        ) : posts.length > 0 ? (
-                            <div className="space-y-4">
-                                {posts.map((post) => (
-                                    <PostCard key={post._id} post={post} />
-                                ))}
-                            </div>
-                        ) : !postsLoading && (
-                            <div className="text-center py-12 text-gray-500">
-                                <p>Không tìm thấy bài viết nào với từ khóa "{decodedQuery}"</p>
-                            </div>
-                        )}
+                        <p className="mt-4 text-gray-500">Đang tải kết quả...</p>
                     </div>
                 )}
 
-                {/* No content message - only show when everything is loaded and empty */}
-                {!loading && !postsLoading && decodedQuery && campaigns.length === 0 && posts.length === 0 && !error && !postsError && (
+                {/* Error States */}
+                {error && !loading && (
+                    <div className="text-center py-4 mb-4">
+                        <p className="text-red-500 text-sm">{error}</p>
+                    </div>
+                )}
+                {postsError && !postsLoading && (
+                    <div className="text-center py-4 mb-4">
+                        <p className="text-red-500 text-sm">{postsError}</p>
+                    </div>
+                )}
+                {usersError && !usersLoading && (
+                    <div className="text-center py-4 mb-4">
+                        <p className="text-red-500 text-sm">{usersError}</p>
+                    </div>
+                )}
+
+                {/* Empty State - No Query */}
+                {!decodedQuery && !loading && !postsLoading && !usersLoading && (
                     <div className="text-center py-12 text-gray-500">
-                        <p>Không tìm thấy nội dung nào với từ khóa "{decodedQuery}"</p>
+                        <p>Nhập từ khóa để tìm kiếm</p>
+                    </div>
+                )}
+
+                {/* Unified Results - Mixed Users, Campaigns, and Posts */}
+                {decodedQuery && !loading && !postsLoading && !usersLoading && (
+                    <div className="space-y-4">
+                        {/* Users Results */}
+                        {!decodedQuery.startsWith('#') && users.length > 0 && (
+                            <div className="space-y-3">
+                                {users.map((user) => (
+                                    <UserSearchResult key={`user-${user._id}`} user={user} query={decodedQuery} />
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Campaigns Results */}
+                        {campaigns.length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {campaigns.map((campaign) => (
+                                    <CampaignCard key={`campaign-${campaign._id}`} campaign={campaign} />
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Posts Results */}
+                        {posts.length > 0 && (
+                            <div className="space-y-4">
+                                {posts.map((post) => (
+                                    <PostCard key={`post-${post._id}`} post={post} />
+                                ))}
+                            </div>
+                        )}
+
+                        {/* No Results Message */}
+                        {!error && !postsError && !usersError && 
+                         campaigns.length === 0 && posts.length === 0 && 
+                         (decodedQuery.startsWith('#') || users.length === 0) && (
+                            <div className="text-center py-12 text-gray-500">
+                                <p>Không tìm thấy nội dung nào với từ khóa &quot;{decodedQuery}&quot;</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

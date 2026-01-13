@@ -9,7 +9,7 @@ const searchKeywordsSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ["hashtag", "keyword"],
+        enum: ["hashtag", "keyword", "USER_SEARCH"],
         required: true,
     },
     search_count: {

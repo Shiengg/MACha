@@ -4,6 +4,7 @@ import {
   GET_USER_BY_ID_ROUTE,
   UNFOLLOW_USER_ROUTE,
   GET_PUBLIC_ADMINS_ROUTE,
+  SEARCH_USERS_ROUTE,
 } from "@/constants/api";
 
 export interface User {
@@ -88,6 +89,24 @@ export const getPublicAdmins = async (page = 1, limit = 20): Promise<GetPublicAd
     return response.data;
   } catch (error: any) {
     console.error("Error fetching public admins:", error);
+    throw error;
+  }
+};
+
+export interface SearchUsersResponse {
+  query: string;
+  count: number;
+  users: User[];
+}
+
+export const searchUsers = async (query: string, limit: number = 50): Promise<SearchUsersResponse> => {
+  try {
+    const response = await apiClient.get<SearchUsersResponse>(SEARCH_USERS_ROUTE, {
+      params: { q: query, limit },
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error("Error searching users:", error);
     throw error;
   }
 };

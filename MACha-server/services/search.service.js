@@ -14,7 +14,7 @@ const normalizeQuery = (query) => {
     return query.trim().toLowerCase();
 };
 
-const parseSearchQuery = (query) => {
+const parseSearchQuery = (query, searchType = "keyword") => {
     const trimmed = query.trim();
     
     if (trimmed.startsWith('#')) {
@@ -27,19 +27,27 @@ const parseSearchQuery = (query) => {
         }
     }
     
+    // Support explicit search type (e.g., USER_SEARCH)
+    if (searchType === "USER_SEARCH") {
+        return {
+            keyword: trimmed.toLowerCase(),
+            type: "USER_SEARCH"
+        };
+    }
+    
     return {
         keyword: trimmed.toLowerCase(),
         type: "keyword"
     };
 };
 
-export const saveSearchHistory = async (userId, query) => {
+export const saveSearchHistory = async (userId, query, searchType = "keyword") => {
     try {
         if (!query || !query.trim()) {
             return { success: false, error: 'EMPTY_QUERY' };
         }
 
-        const { keyword, type } = parseSearchQuery(query);
+        const { keyword, type } = parseSearchQuery(query, searchType);
 
         let searchKeyword = await SearchKeywords.findOne({ keyword, type });
 

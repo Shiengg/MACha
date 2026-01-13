@@ -1,5 +1,10 @@
 import User from "../models/user.js";
 import { redisClient } from "../config/redis.js";
+import { 
+    calculateSimilarityScore, 
+    normalizeSearchTerm, 
+    splitSearchWords 
+} from "../utils/similarity.js";
 
 // ==================== HELPER FUNCTIONS ====================
 
@@ -244,30 +249,109 @@ export const getPublicAdmins = async (page = 1, limit = 20) => {
 };
 
 /**
- * Search users with Cache-Aside Pattern
+ * Search users with fuzzy matching and similarity scoring
+ * Searches by username and fullname, sorted by relevance score
+ * 
+ * @param {string} searchTerm - Search keyword
+ * @param {number} limit - Maximum number of results (default: 50)
+ * @returns {Promise<{success: boolean, users?: User[], error?: string}>}
  */
-export const searchUsers = async (searchQuery) => {
-    if (!searchQuery || searchQuery.trim() === "") {
+export const searchUsers = async (searchTerm, limit = 50) => {
+    if (!searchTerm || searchTerm.trim() === "") {
         return { success: false, error: 'EMPTY_QUERY' };
     }
+
+    // Normalize search term
+    const normalizedSearch = normalizeSearchTerm(searchTerm);
+    const searchWords = splitSearchWords(normalizedSearch);
     
-    const searchKey = `user:search:${searchQuery.toLowerCase()}`;
-    
-    const cached = await redisClient.get(searchKey);
-    if (cached) {
-        return { success: true, users: JSON.parse(cached) };
+    // Minimum search length validation
+    if (normalizedSearch.length < 1) {
+        return { success: false, error: 'QUERY_TOO_SHORT' };
     }
-    
-    const users = await User.find({
-        $or: [
-            { username: { $regex: searchQuery, $options: "i" } },
-            { email: { $regex: searchQuery, $options: "i" } },
-        ],
-    }).select("username fullname avatar bio");
-    
-    await redisClient.setEx(searchKey, 180, JSON.stringify(users));
-    
-    return { success: true, users };
+
+    // Escape special regex characters
+    const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = new RegExp(escapedSearch, 'i');
+
+    // Find all users that match the search term (username or fullname)
+    // Exclude banned users
+    const allUsers = await User.find({
+        $and: [
+            {
+                $or: [
+                    { username: searchRegex },
+                    { fullname: searchRegex }
+                ]
+            },
+            { is_banned: false }
+        ]
+    })
+        .select("username fullname avatar bio is_verified role")
+        .lean();
+
+    // Calculate relevance score for each user
+    // Score both username and fullname, take the higher score
+    const usersWithScore = allUsers.map(user => {
+        const usernameScore = calculateSimilarityScore(
+            user.username || "",
+            normalizedSearch,
+            searchWords,
+            user.is_verified ? 50 : 0 // Bonus for verified users
+        );
+        
+        const fullnameScore = calculateSimilarityScore(
+            user.fullname || "",
+            normalizedSearch,
+            searchWords,
+            user.is_verified ? 50 : 0 // Bonus for verified users
+        );
+
+        // Use the higher score between username and fullname
+        // Username matches are typically more important, so give slight preference
+        const finalScore = Math.max(usernameScore, fullnameScore);
+        
+        // If username matches, add small bonus
+        if (usernameScore > 0) {
+            return {
+                ...user,
+                relevanceScore: finalScore + 20
+            };
+        }
+        
+        return {
+            ...user,
+            relevanceScore: finalScore
+        };
+    });
+
+    // Sort by relevance score (descending), then by creation date (descending)
+    usersWithScore.sort((a, b) => {
+        if (b.relevanceScore !== a.relevanceScore) {
+            return b.relevanceScore - a.relevanceScore;
+        }
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+
+    // Limit results and remove score field
+    const results = usersWithScore
+        .slice(0, limit)
+        .map(({ relevanceScore, ...user }) => user);
+
+    // Convert back to Mongoose documents (optional, can return lean objects)
+    const userIds = results.map(u => u._id);
+    const populatedUsers = await User.find({ 
+        _id: { $in: userIds },
+        is_banned: false
+    })
+        .select("username fullname avatar bio is_verified role");
+
+    // Maintain the relevance order
+    const orderedUsers = userIds.map(id => 
+        populatedUsers.find(u => u._id.toString() === id.toString())
+    ).filter(Boolean);
+
+    return { success: true, users: orderedUsers };
 };
 
 /**

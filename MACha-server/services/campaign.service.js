@@ -2,6 +2,11 @@ import Campaign from "../models/campaign.js";
 import Hashtag from "../models/Hashtag.js";
 import { redisClient } from "../config/redis.js";
 import { geocodeLocation } from "./geocoding.service.js";
+import { 
+    calculateSimilarityScore, 
+    normalizeSearchTerm, 
+    splitSearchWords 
+} from "../utils/similarity.js";
 
 export const getTotalCampaignsCount = async () => {
     const totalKey = `campaigns:all:total`;
@@ -584,42 +589,11 @@ export const searchCampaignsByHashtag = async (hashtagName) => {
     return campaigns;
 }
 
+// Legacy function kept for backward compatibility
+// Now uses the generic similarity utility
 const calculateRelevanceScore = (title, searchTerm, searchWords, isActive) => {
-    const titleLower = title.toLowerCase();
-    let score = 0;
-
-    if (titleLower.startsWith(searchTerm)) {
-        score += 1000;
-    }
-
-    if (titleLower.includes(searchTerm) && !titleLower.startsWith(searchTerm)) {
-        score += 500;
-    }
-
-    const titleWords = titleLower.split(/\s+/);
-    const matchedWords = new Set();
-    searchWords.forEach(word => {
-        if (titleWords.includes(word)) {
-            matchedWords.add(word);
-        }
-    });
-    score += matchedWords.size * 100;
-
-    searchWords.forEach(word => {
-        if (!matchedWords.has(word)) {
-            titleWords.forEach(titleWord => {
-                if (titleWord.includes(word) || word.includes(titleWord)) {
-                    score += 10;
-                }
-            });
-        }
-    });
-
-    if (isActive) {
-        score += 50;
-    }
-
-    return score;
+    const bonus = isActive ? 50 : 0;
+    return calculateSimilarityScore(title, searchTerm, searchWords, bonus);
 };
 
 export const searchCampaignsByTitle = async (searchTerm, limit = 50) => {
@@ -627,8 +601,8 @@ export const searchCampaignsByTitle = async (searchTerm, limit = 50) => {
         return [];
     }
 
-    const normalizedSearch = searchTerm.toLowerCase().trim();
-    const searchWords = normalizedSearch.split(/\s+/).filter(word => word.length > 0);
+    const normalizedSearch = normalizeSearchTerm(searchTerm);
+    const searchWords = splitSearchWords(normalizedSearch);
     
     const escapedSearch = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const searchRegex = new RegExp(escapedSearch, 'i');
