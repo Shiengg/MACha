@@ -1,0 +1,92 @@
+# Docker Compose cho Monitoring Stack - Local Development
+# Scrape từ localhost:8887
+# Usage: docker-compose -f docker-compose.yml up -d
+
+services:
+  # Prometheus - Metrics Collection & Storage
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: MACha-prometheus-local
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml.template:ro
+      - ./prometheus-entrypoint.sh:/docker-entrypoint.sh:ro
+      - prometheus_data:/prometheus
+    entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'  # Giữ metrics 30 ngày
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'  # Cho phép reload config qua API
+    restart: unless-stopped
+    networks:
+      - macha-network
+    environment:
+      - BACKEND_HOST=${BACKEND_HOST:-host.docker.internal}
+      - BACKEND_PORT=${BACKEND_PORT:-8887}
+      - METRICS_PATH=${METRICS_PATH:-/metrics}
+      - NODE_EXPORTER_HOST=${NODE_EXPORTER_HOST:-node-exporter}
+      - NODE_EXPORTER_PORT=${NODE_EXPORTER_PORT:-9100}
+      - ENVIRONMENT=${NODE_ENV:-development}
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Node Exporter - Infrastructure Metrics (CPU, Memory, Disk, Network)
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: MACha-node-exporter-local
+    ports:
+      - "${NODE_EXPORTER_PORT:-9100}:9100"
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    restart: unless-stopped
+    networks:
+      - macha-network
+
+  # Grafana - Visualization & Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: MACha-grafana-local
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+      - GF_INSTALL_PLUGINS=
+      - GF_DATABASE_PROVISIONING_MAX_RETRY=30
+      - GF_DATASOURCES_PROVISIONING_MAX_RETRY=30
+    restart: unless-stopped
+    networks:
+      - macha-network
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  macha-network:
+    driver: bridge
+

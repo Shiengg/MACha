@@ -33,13 +33,75 @@ const getPostCounts = async (postId) => {
 
     const [likesCount, commentsCount] = await Promise.all([
         Like.countDocuments({ post: postId }),
-        Comment.countDocuments({ post: postId })
+        Comment.countDocuments({ post: postId, is_hidden: { $ne: true } }) // Exclude hidden comments
     ]);
 
     const counts = { likesCount, commentsCount };
     await redisClient.setEx(countKey, 120, JSON.stringify(counts));
 
     return counts;
+};
+
+/**
+ * Batch get post counts for multiple posts (fixes N+1 query issue)
+ * @param {Array<string>} postIds - Array of post IDs
+ * @returns {Promise<Map<string, {likesCount: number, commentsCount: number}>>} Map of postId -> counts
+ */
+const batchGetPostCounts = async (postIds) => {
+    if (!postIds || postIds.length === 0) {
+        return new Map();
+    }
+
+    const resultMap = new Map();
+    
+    // Try to get from cache first
+    const cacheKeys = postIds.map(postId => `post:counts:${postId}`);
+    const cachedResults = await Promise.all(
+        cacheKeys.map(key => redisClient.get(key))
+    );
+    
+    const uncachedPostIds = [];
+    cachedResults.forEach((cached, index) => {
+        if (cached) {
+            resultMap.set(postIds[index].toString(), JSON.parse(cached));
+        } else {
+            uncachedPostIds.push(postIds[index]);
+        }
+    });
+
+    // Batch query for uncached posts
+    if (uncachedPostIds.length > 0) {
+        const [likesCounts, commentsCounts] = await Promise.all([
+            Like.aggregate([
+                { $match: { post: { $in: uncachedPostIds } } },
+                { $group: { _id: "$post", count: { $sum: 1 } } }
+            ]),
+            Comment.aggregate([
+                { $match: { post: { $in: uncachedPostIds }, is_hidden: { $ne: true } } },
+                { $group: { _id: "$post", count: { $sum: 1 } } }
+            ])
+        ]);
+
+        const likesMap = new Map(likesCounts.map(item => [item._id.toString(), item.count]));
+        const commentsMap = new Map(commentsCounts.map(item => [item._id.toString(), item.count]));
+
+        // Set results and cache
+        const cachePromises = [];
+        uncachedPostIds.forEach(postId => {
+            const counts = {
+                likesCount: likesMap.get(postId.toString()) || 0,
+                commentsCount: commentsMap.get(postId.toString()) || 0
+            };
+            resultMap.set(postId.toString(), counts);
+            cachePromises.push(
+                redisClient.setEx(`post:counts:${postId}`, 120, JSON.stringify(counts))
+            );
+        });
+        
+        await Promise.all(cachePromises);
+    }
+
+    return resultMap;
 };
 
 const checkUserLiked = async (postId, userId) => {
@@ -56,6 +118,59 @@ const checkUserLiked = async (postId, userId) => {
     await redisClient.setEx(likeKey, 300, isLiked.toString());
 
     return isLiked;
+};
+
+/**
+ * Batch check if user liked multiple posts (fixes N+1 query issue)
+ * @param {Array<string>} postIds - Array of post IDs
+ * @param {string} userId - User ID
+ * @returns {Promise<Map<string, boolean>>} Map of postId -> isLiked
+ */
+const batchCheckUserLiked = async (postIds, userId) => {
+    if (!userId || !postIds || postIds.length === 0) {
+        return new Map();
+    }
+
+    const resultMap = new Map();
+    
+    // Try to get from cache first
+    const cacheKeys = postIds.map(postId => `post:liked:${postId}:${userId}`);
+    const cachedResults = await Promise.all(
+        cacheKeys.map(key => redisClient.get(key))
+    );
+    
+    const uncachedPostIds = [];
+    cachedResults.forEach((cached, index) => {
+        if (cached !== null) {
+            resultMap.set(postIds[index].toString(), cached === 'true');
+        } else {
+            uncachedPostIds.push(postIds[index]);
+        }
+    });
+
+    // Batch query for uncached posts
+    if (uncachedPostIds.length > 0) {
+        const likes = await Like.find({
+            post: { $in: uncachedPostIds },
+            user: userId
+        }).select('post').lean();
+
+        const likedPostIds = new Set(likes.map(like => like.post.toString()));
+        
+        // Set results and cache
+        const cachePromises = [];
+        uncachedPostIds.forEach(postId => {
+            const isLiked = likedPostIds.has(postId.toString());
+            resultMap.set(postId.toString(), isLiked);
+            cachePromises.push(
+                redisClient.setEx(`post:liked:${postId}:${userId}`, 300, isLiked.toString())
+            );
+        });
+        
+        await Promise.all(cachePromises);
+    }
+
+    return resultMap;
 };
 
 const enrichPostWithMetadata = async (post, userId = null) => {
@@ -174,14 +289,14 @@ export const getPosts = async (userId = null, userRole = null, page = 0, limit =
             return false;
         });
 
-        // Add isLiked status if user is logged in
+        // Add isLiked status if user is logged in (batch query to avoid N+1)
         if (userId) {
-            const enrichedPosts = await Promise.all(
-                filteredPosts.map(async (post) => ({
-                    ...post,
-                    isLiked: await checkUserLiked(post._id, userId)
-                }))
-            );
+            const postIds = filteredPosts.map(p => p._id.toString());
+            const likedMap = await batchCheckUserLiked(postIds, userId);
+            const enrichedPosts = filteredPosts.map(post => ({
+                ...post,
+                isLiked: likedMap.get(post._id.toString()) || false
+            }));
             return enrichedPosts;
         }
 
@@ -198,10 +313,9 @@ export const getPosts = async (userId = null, userRole = null, page = 0, limit =
     const recommendedCampaignIds = await getRecommendedCampaignIds(userId, 50);
 
     // Step 2: Get posts with counts
-    // We fetch a reasonable number of posts to calculate scores and sort
-    // For pagination, we fetch enough posts to cover multiple pages
-    // This is a trade-off: more posts = better sorting but slower query
-    const fetchLimit = Math.max(limit * 10, 500); // Fetch enough for 10 pages or at least 500 posts
+    // Optimized: Fetch only what we need for scoring (limit * 3 pages for better scoring)
+    // This reduces memory usage and query time significantly
+    const fetchLimit = Math.min(limit * 3, 200); // Fetch 3 pages worth or max 200 posts
     const allPosts = await getPostsWithCounts(query, 0, fetchLimit);
 
     // Step 3: Calculate score for each post
@@ -232,15 +346,17 @@ export const getPosts = async (userId = null, userRole = null, page = 0, limit =
     // Step 6: Remove score field and enrich with metadata
     const postsWithoutScore = paginatedPosts.map(({ score, ...post }) => post);
     
-    const postsWithMetadata = await Promise.all(
-        postsWithoutScore.map(async (post) => {
-            const isLiked = userId ? await checkUserLiked(post._id, userId) : false;
-            return {
-                ...post,
-                isLiked
-            };
-        })
-    );
+    // Batch check user likes to avoid N+1 queries
+    const postIds = postsWithoutScore.map(p => p._id.toString());
+    const likedMap = userId ? await batchCheckUserLiked(postIds, userId) : new Map();
+    
+    const postsWithMetadata = postsWithoutScore.map((post) => {
+        const isLiked = userId ? (likedMap.get(post._id.toString()) || false) : false;
+        return {
+            ...post,
+            isLiked
+        };
+    });
 
     // Step 7: Cache the results (without isLiked for user-specific data)
     const postsToCache = postsWithMetadata.map(post => ({
@@ -460,12 +576,13 @@ export const searchPostsByHashtag = async (searchTerm, userId = null, userRole =
         });
 
         if (userId) {
-            const enrichedPosts = await Promise.all(
-                filteredPosts.map(async (post) => ({
-                    ...post,
-                    isLiked: await checkUserLiked(post._id, userId)
-                }))
-            );
+            // Batch check user likes to avoid N+1 queries
+            const postIds = filteredPosts.map(p => p._id.toString());
+            const likedMap = await batchCheckUserLiked(postIds, userId);
+            const enrichedPosts = filteredPosts.map(post => ({
+                ...post,
+                isLiked: likedMap.get(post._id.toString()) || false
+            }));
             return { success: true, posts: enrichedPosts };
         }
 
@@ -614,8 +731,13 @@ const getRecommendedCampaignIds = async (userId = null, limit = 50) => {
 };
 
 const getPostsWithCounts = async (query, skip = 0, limit = 20) => {
+    // Optimized aggregation pipeline with better indexing usage
     const posts = await Post.aggregate([
         { $match: query },
+        // Sort early to use index efficiently
+        { $sort: { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limit },
         {
             $lookup: {
                 from: "likes",
@@ -643,10 +765,7 @@ const getPostsWithCounts = async (query, skip = 0, limit = 20) => {
                 likes: 0,
                 comments: 0
             }
-        },
-        { $sort: { createdAt: -1 } },
-        { $skip: skip },
-        { $limit: limit }
+        }
     ]);
 
     // Convert ObjectIds to proper format for population
@@ -654,7 +773,11 @@ const getPostsWithCounts = async (query, skip = 0, limit = 20) => {
     // We need to populate manually or use Post.find with the IDs
     const postIds = posts.map(p => p._id);
     
-    // Fetch full posts with population
+    if (postIds.length === 0) {
+        return [];
+    }
+    
+    // Fetch full posts with population (only selected fields to reduce payload)
     const fullPosts = await Post.find({ _id: { $in: postIds } })
         .populate("user", "username avatar fullname")
         .populate("hashtags", "name")
@@ -668,8 +791,16 @@ const getPostsWithCounts = async (query, skip = 0, limit = 20) => {
     }]));
 
     // Merge counts into full posts and filter out posts without user (user might be deleted)
+    // Maintain order from aggregation
+    const postOrderMap = new Map(posts.map((p, index) => [p._id.toString(), index]));
     const postsWithCounts = fullPosts
         .filter(post => post.user) // Filter out posts where user is null/deleted
+        .sort((a, b) => {
+            // Maintain aggregation order
+            const orderA = postOrderMap.get(a._id.toString()) ?? Infinity;
+            const orderB = postOrderMap.get(b._id.toString()) ?? Infinity;
+            return orderA - orderB;
+        })
         .map(post => ({
             ...post,
             likesCount: countsMap.get(post._id.toString())?.likesCount || 0,

@@ -5,12 +5,13 @@ import { useParams, useRouter } from 'next/navigation';
 import ProtectedRoute from "@/components/guards/ProtectedRoute";
 import { getUserById, followUser, unfollowUser } from '@/services/user.service';
 import { campaignService, type Campaign } from '@/services/campaign.service';
+import { campaignCompanionService, type CompanionCampaign } from '@/services/campaignCompanion.service';
 import CampaignCard from '@/components/campaign/CampaignCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
 import { createConversationPrivate } from '@/services/conversation.service';
 import ReportModal from '@/components/shared/ReportModal';
-import { MoreHorizontal, Flag } from 'lucide-react';
+import { MoreHorizontal, Flag, Users } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 import type { User } from '@/services/user.service';
@@ -28,11 +29,13 @@ function ProfileContent() {
 
   const [user, setUser] = useState<User | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [companionCampaigns, setCompanionCampaigns] = useState<CompanionCampaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'activity' | 'campaigns' | 'achievements' | 'about'>('campaigns');
+  const [activeTab, setActiveTab] = useState<'activity' | 'campaigns' | 'achievements' | 'about' | 'companions'>('campaigns');
   const [showDropdown, setShowDropdown] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [companionCampaignsLoading, setCompanionCampaignsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // So sánh ID: API trả về _id, nhưng AuthContext có thể có id hoặc _id
@@ -59,6 +62,21 @@ function ProfileContent() {
 
         const userCampaigns = await campaignService.getCampaignsByCreator(userId);
         setCampaigns(userCampaigns);
+
+        const currentId = currentUser?._id || currentUser?.id;
+        const isOwn = !!(currentId && (currentId === userId || currentId === userData._id));
+        
+        if (isOwn) {
+          try {
+            setCompanionCampaignsLoading(true);
+            const companionData = await campaignCompanionService.getUserCompanionCampaigns(userId);
+            setCompanionCampaigns(companionData.campaigns);
+          } catch (err) {
+            console.error("Error loading companion campaigns:", err);
+          } finally {
+            setCompanionCampaignsLoading(false);
+          }
+        }
       } catch (err) {
         console.error("Error loading user:", err);
         setError("Không thể tải thông tin người dùng. Vui lòng thử lại sau.");
@@ -424,7 +442,13 @@ function ProfileContent() {
                     <div className="flex items-center gap-3 w-full sm:w-auto">
                       {user.kyc_status === 'unverified' && (
                         <button
-                          onClick={() => router.push('/kyc-vnpt')}
+                          onClick={() => {
+                            if (user.role === 'organization') {
+                              router.push('/kyc/organization');
+                            } else {
+                              router.push('/kyc');
+                            }
+                          }}
                           className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-full border border-emerald-500 text-emerald-600 text-sm font-medium bg-white hover:bg-emerald-50 shadow-sm transition-colors w-full sm:w-auto"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -585,6 +609,20 @@ function ProfileContent() {
                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-full" />
                   )}
                 </button>
+                {isOwnProfile && (
+                  <button
+                    onClick={() => setActiveTab('companions')}
+                    className={`relative px-4 md:px-6 py-3 text-sm md:text-base font-medium transition-colors ${activeTab === 'companions'
+                      ? 'text-emerald-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                  >
+                    Chiến dịch đồng hành
+                    {activeTab === 'companions' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-full" />
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -727,6 +765,77 @@ function ProfileContent() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {activeTab === 'companions' && (
+            <div className="space-y-4">
+              {companionCampaignsLoading ? (
+                <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                  <p className="text-gray-500 text-sm">Đang tải...</p>
+                </div>
+              ) : companionCampaigns.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-10 text-center">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Users className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Chưa có chiến dịch đồng hành</h3>
+                  <p className="text-gray-500 text-sm">Bạn chưa đồng hành với chiến dịch nào</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {companionCampaigns.map((companionCampaign) => (
+                    <div
+                      key={companionCampaign._id}
+                      onClick={() => router.push(`/campaigns/${companionCampaign._id}?companion=true`)}
+                      className="bg-white rounded-2xl border border-gray-100 overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                    >
+                      {companionCampaign.banner_image && (
+                        <div className="relative w-full h-48 overflow-hidden">
+                          <img
+                            src={companionCampaign.banner_image}
+                            alt={companionCampaign.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="p-4">
+                        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
+                          {companionCampaign.title}
+                        </h3>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-500">Đã quyên góp</span>
+                            <span className="font-medium text-gray-900">
+                              {new Intl.NumberFormat('vi-VN').format(companionCampaign.current_amount)} VND
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-emerald-500 h-2 rounded-full"
+                              style={{
+                                width: `${Math.min((companionCampaign.current_amount / companionCampaign.goal_amount) * 100, 100)}%`
+                              }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>Mục tiêu: {new Intl.NumberFormat('vi-VN').format(companionCampaign.goal_amount)} VND</span>
+                            <span>{Math.round((companionCampaign.current_amount / companionCampaign.goal_amount) * 100)}%</span>
+                          </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <p className="text-xs text-gray-500">
+                            Đồng hành từ: {new Date(companionCampaign.joined_at).toLocaleDateString('vi-VN')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

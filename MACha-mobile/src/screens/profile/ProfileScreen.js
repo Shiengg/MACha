@@ -16,6 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../contexts/SocketContext';
 import apiClient from '../../services/apiClient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { campaignCompanionService } from '../../services/campaignCompanion.service';
 
 const USER_ROUTE = 'api/users';
 const CAMPAIGN_ROUTE = 'api/campaigns';
@@ -37,6 +38,8 @@ export default function ProfileScreen({ route }) {
   
   const [user, setUser] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
+  const [companionCampaigns, setCompanionCampaigns] = useState([]);
+  const [companionCampaignsLoading, setCompanionCampaignsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('campaigns');
@@ -66,13 +69,29 @@ export default function ProfileScreen({ route }) {
         params: { creatorId: userId },
       });
       setCampaigns(campaignsResponse.data.campaigns || []);
+
+      // Fetch companion campaigns if own profile
+      const currentId = currentUser?._id || currentUser?.id;
+      const isOwn = !!(currentId && (currentId === userId || currentId === userData._id));
+      
+      if (isOwn) {
+        try {
+          setCompanionCampaignsLoading(true);
+          const companionData = await campaignCompanionService.getUserCompanionCampaigns(userId);
+          setCompanionCampaigns(companionData.campaigns || []);
+        } catch (err) {
+          console.error('Error loading companion campaigns:', err);
+        } finally {
+          setCompanionCampaignsLoading(false);
+        }
+      }
     } catch (err) {
       console.error('Error loading user:', err);
       setError('Không thể tải thông tin người dùng. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
     }
-  }, [userId, authLoading]);
+  }, [userId, authLoading, currentUser]);
 
   // Fetch data on mount and when userId changes
   useEffect(() => {
@@ -488,6 +507,17 @@ export default function ProfileScreen({ route }) {
                 </Text>
                 {activeTab === 'about' && <View style={styles.tabIndicator} />}
               </TouchableOpacity>
+              {isOwnProfile && (
+                <TouchableOpacity
+                  style={[styles.tab, activeTab === 'companions' && styles.activeTab]}
+                  onPress={() => setActiveTab('companions')}
+                >
+                  <Text style={[styles.tabText, activeTab === 'companions' && styles.activeTabText]}>
+                    Đồng hành
+                  </Text>
+                  {activeTab === 'companions' && <View style={styles.tabIndicator} />}
+                </TouchableOpacity>
+              )}
             </ScrollView>
           </View>
 
@@ -624,6 +654,59 @@ export default function ProfileScreen({ route }) {
                         Đã xác minh danh tính
                       </Text>
                     </View>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {activeTab === 'companions' && (
+              <View style={styles.campaignsContent}>
+                {companionCampaignsLoading ? (
+                  <View style={styles.emptyState}>
+                    <ActivityIndicator size="large" color="#62AC4A" />
+                    <Text style={styles.emptyStateText}>Đang tải...</Text>
+                  </View>
+                ) : companionCampaigns.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <MaterialCommunityIcons name="account-group-outline" size={64} color="#9CA3AF" />
+                    <Text style={styles.emptyStateTitle}>Chưa có chiến dịch đồng hành</Text>
+                    <Text style={styles.emptyStateText}>
+                      Bạn chưa đồng hành với chiến dịch nào
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.campaignsList}>
+                    {companionCampaigns.map((companionCampaign) => (
+                      <TouchableOpacity
+                        key={companionCampaign._id}
+                        style={styles.campaignCard}
+                        onPress={() => navigation.navigate('CampaignDetail', { 
+                          campaignId: companionCampaign._id,
+                          companion: true 
+                        })}
+                      >
+                        {companionCampaign.banner_image && (
+                          <Image
+                            source={{ uri: companionCampaign.banner_image }}
+                            style={styles.campaignImage}
+                          />
+                        )}
+                        <View style={styles.campaignInfo}>
+                          <Text style={styles.campaignTitle} numberOfLines={2}>
+                            {companionCampaign.title}
+                          </Text>
+                          <View style={styles.campaignStats}>
+                            <Text style={styles.campaignAmount}>
+                              {new Intl.NumberFormat('vi-VN').format(companionCampaign.current_amount || 0)} /{' '}
+                              {new Intl.NumberFormat('vi-VN').format(companionCampaign.goal_amount || 0)} VNĐ
+                            </Text>
+                          </View>
+                          <Text style={styles.companionDate}>
+                            Đồng hành từ: {new Date(companionCampaign.joined_at).toLocaleDateString('vi-VN')}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
                   </View>
                 )}
               </View>
@@ -1058,6 +1141,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#62AC4A',
+  },
+  companionDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 8,
   },
   // Empty State
   emptyState: {

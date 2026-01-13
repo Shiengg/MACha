@@ -18,6 +18,7 @@ import ownerRoutes from "./OwnerRoute.js";
 import recoveryRoutes from "./RecoveryRoute.js";
 import recommendationRoutes from "./RecommendationRoute.js";
 import adminRoutes from "./AdminRoute.js";
+import campaignCompanionRoutes from "./CampaignCompanionRoute.js";
 
 export {
     authRoutes,
@@ -40,5 +41,6 @@ export {
     ownerRoutes,
     recoveryRoutes,
     recommendationRoutes,
-    adminRoutes
+    adminRoutes,
+    campaignCompanionRoutes
 }

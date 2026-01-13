@@ -1,19 +1,47 @@
 'use client';
 
-import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import ProtectedRoute from '@/components/guards/ProtectedRoute';
 import apiClient from '@/lib/api-client';
 import { INIT_SEPAY_PAYMENT_ROUTE } from '@/constants/api';
+import { campaignCompanionService } from '@/services/campaignCompanion.service';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function DonatePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const campaignId = params.campaignId as string;
+  const { user } = useAuth();
 
   const [amount, setAmount] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [companionId, setCompanionId] = useState<string | null>(null);
+  const [companionName, setCompanionName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const companionIdParam = searchParams.get('companion_id');
+    if (companionIdParam) {
+      setCompanionId(companionIdParam);
+    } else if (user && user.role === 'user') {
+      campaignCompanionService.checkIsCompanion(campaignId, user._id || user.id || '')
+        .then(async (isCompanion) => {
+          if (isCompanion) {
+            const companions = await campaignCompanionService.getCampaignCompanions(campaignId);
+            const userCompanion = companions.companions.find(
+              c => c.user._id === (user._id || user.id)
+            );
+            if (userCompanion) {
+              setCompanionId(userCompanion._id);
+              setCompanionName(userCompanion.user.fullname || userCompanion.user.username);
+            }
+          }
+        })
+        .catch(console.error);
+    }
+  }, [searchParams, user, campaignId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,14 +56,20 @@ export default function DonatePage() {
     try {
       setLoading(true);
 
+      const payload: any = {
+        amount: value,
+        currency: 'VND',
+        paymentMethod: 'BANK_TRANSFER',
+        is_anonymous: false,
+      };
+
+      if (companionId) {
+        payload.companion_id = companionId;
+      }
+
       const res = await apiClient.post(
         INIT_SEPAY_PAYMENT_ROUTE(campaignId),
-        {
-          amount: value,
-          currency: 'VND',
-          paymentMethod: 'BANK_TRANSFER',
-          is_anonymous: false,
-        }
+        payload
       );
 
       const { checkoutUrl, formFields } = res.data as {
@@ -87,6 +121,13 @@ export default function DonatePage() {
             <p className="text-gray-500 text-xs sm:text-sm">
               Nhập số tiền bạn muốn ủng hộ (VND)
             </p>
+            {companionId && companionName && (
+              <div className="mt-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-blue-700 text-xs sm:text-sm">
+                  <span className="font-medium">Đang donate qua:</span> {companionName}
+                </p>
+              </div>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">

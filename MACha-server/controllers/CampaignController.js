@@ -203,9 +203,17 @@ export const getCampaignMapStatistics = async (req, res) => {
 
 export const createCampaign = async (req, res) => {
     try {
-        if (req.user.kyc_status !== 'verified') {
+        if (req.user.role === 'user' && req.user.kyc_status !== 'verified') {
             return res.status(HTTP_STATUS.FORBIDDEN).json({
                 message: "You need to complete KYC verification before creating a campaign",
+                kyc_status: req.user.kyc_status,
+                kyc_rejection_reason: req.user.kyc_rejection_reason
+            });
+        }
+
+        if (req.user.role === 'organization' && req.user.kyc_status !== 'verified') {
+            return res.status(HTTP_STATUS.FORBIDDEN).json({
+                message: "Organization needs to complete KYC verification before creating a campaign",
                 kyc_status: req.user.kyc_status,
                 kyc_rejection_reason: req.user.kyc_rejection_reason
             });

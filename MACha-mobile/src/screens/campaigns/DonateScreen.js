@@ -20,13 +20,14 @@ import apiClient from '../../services/apiClient';
 import { INIT_SEPAY_PAYMENT_ROUTE } from '../../constants/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { donationService } from '../../services/donation.service';
+import { campaignCompanionService } from '../../services/campaignCompanion.service';
 import { cacheService } from '../../services/cache.service';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 
 export default function DonateScreen() {
   const route = useRoute();
   const navigation = useNavigation();
-  const { campaignId } = route.params || {};
+  const { campaignId, companion_id } = route.params || {};
   const { user, fetchCurrentUser } = useAuth();
 
   const [amount, setAmount] = useState('');
@@ -35,6 +36,8 @@ export default function DonateScreen() {
   const [showWebView, setShowWebView] = useState(false);
   const [paymentHtml, setPaymentHtml] = useState('');
   const [orderInvoiceNumber, setOrderInvoiceNumber] = useState(null);
+  const [companionId, setCompanionId] = useState(companion_id || null);
+  const [companionName, setCompanionName] = useState(null);
   const webViewRef = useRef(null);
   const isProcessingRef = useRef(false); // Flag to prevent multiple alerts
 
@@ -48,6 +51,40 @@ export default function DonateScreen() {
       ]);
     }
   }, [user, navigation]);
+
+  useEffect(() => {
+    const checkCompanion = async () => {
+      if (companion_id) {
+        setCompanionId(companion_id);
+        try {
+          const companions = await campaignCompanionService.getCampaignCompanions(campaignId);
+          const companion = companions.companions.find(c => c._id === companion_id);
+          if (companion) {
+            setCompanionName(companion.user.fullname || companion.user.username);
+          }
+        } catch (error) {
+          console.error('Error fetching companion:', error);
+        }
+      } else if (user && user.role === 'user') {
+        try {
+          const companions = await campaignCompanionService.getCampaignCompanions(campaignId);
+          const userCompanion = companions.companions.find(
+            c => c.user._id === (user._id || user.id)
+          );
+          if (userCompanion) {
+            setCompanionId(userCompanion._id);
+            setCompanionName(userCompanion.user.fullname || userCompanion.user.username);
+          }
+        } catch (error) {
+          console.error('Error checking companion:', error);
+        }
+      }
+    };
+
+    if (campaignId && user) {
+      checkCompanion();
+    }
+  }, [campaignId, user, companion_id]);
 
   const formatAmount = (value) => {
     // Remove all non-digit characters
@@ -91,12 +128,18 @@ export default function DonateScreen() {
     try {
       setLoading(true);
 
-      const res = await apiClient.post(INIT_SEPAY_PAYMENT_ROUTE(campaignId), {
+      const payload = {
         amount: value,
         currency: 'VND',
         paymentMethod: 'BANK_TRANSFER',
         is_anonymous: false,
-      });
+      };
+
+      if (companionId) {
+        payload.companion_id = companionId;
+      }
+
+      const res = await apiClient.post(INIT_SEPAY_PAYMENT_ROUTE(campaignId), payload);
 
       const { checkoutUrl, formFields, donation } = res.data;
 
@@ -248,6 +291,13 @@ export default function DonateScreen() {
               <Text style={styles.subtitle}>
                 Nhập số tiền bạn muốn ủng hộ (VND)
               </Text>
+              {companionId && companionName && (
+                <View style={styles.companionBadge}>
+                  <Text style={styles.companionBadgeText}>
+                    Đang donate qua: {companionName}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Form */}
@@ -982,6 +1032,20 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: moderateScale(14),
     color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: scale(8),
+  },
+  companionBadge: {
+    backgroundColor: '#DBEAFE',
+    paddingHorizontal: scale(12),
+    paddingVertical: scale(8),
+    borderRadius: scale(8),
+    marginTop: scale(8),
+  },
+  companionBadgeText: {
+    fontSize: moderateScale(12),
+    fontWeight: '500',
+    color: '#2563EB',
     textAlign: 'center',
   },
   form: {

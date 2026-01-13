@@ -355,3 +355,72 @@ export const compareFaces = async (req, res) => {
     }
 }
 
+export const submitOrganizationKYC = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const kycData = req.body;
+
+        const result = await kycService.submitOrganizationKYC(userId, kycData);
+
+        if (!result.success) {
+            if (result.error === 'USER_NOT_FOUND') {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    message: "User not found"
+                });
+            }
+            if (result.error === 'INVALID_ROLE') {
+                return res.status(HTTP_STATUS.FORBIDDEN).json({
+                    message: result.message
+                });
+            }
+            if (result.error === 'ALREADY_VERIFIED') {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "Your organization is already verified"
+                });
+            }
+            if (result.error === 'PENDING_REVIEW') {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: "Your organization KYC is already pending review"
+                });
+            }
+            if (result.error === 'MISSING_REQUIRED_FIELDS') {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: result.message,
+                    missingFields: result.missingFields
+                });
+            }
+        }
+
+        return res.status(HTTP_STATUS.CREATED).json({
+            success: true,
+            kyc: result.kyc,
+            message: result.message || "KYC đã được gửi để duyệt"
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+}
+
+export const getOrganizationKYCStatus = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const result = await kycService.getKYCStatus(userId);
+
+        if (result.error) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                message: "User not found"
+            });
+        }
+
+        const organizationKYC = result.kyc && result.kyc.kyc_type === 'organization' ? result.kyc : null;
+
+        return res.status(HTTP_STATUS.OK).json({
+            kyc_status: result.kyc_status,
+            kyc: organizationKYC,
+            user: result.user
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+}
+

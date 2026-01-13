@@ -22,6 +22,7 @@ import { donationService } from '../../services/donation.service';
 import { escrowService } from '../../services/escrow.service';
 import { reportService } from '../../services/report.service';
 import { cloudinaryService } from '../../services/cloudinary.service';
+import { campaignCompanionService } from '../../services/campaignCompanion.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
@@ -77,6 +78,11 @@ export default function CampaignDetailScreen() {
   // Refresh
   const [refreshing, setRefreshing] = useState(false);
 
+  // Companion state
+  const [isCompanion, setIsCompanion] = useState(false);
+  const [isJoiningCompanion, setIsJoiningCompanion] = useState(false);
+  const [companionId, setCompanionId] = useState(null);
+
   const fetchCampaign = async () => {
     try {
       setLoading(true);
@@ -122,6 +128,68 @@ export default function CampaignDetailScreen() {
       fetchUpdates();
     }
   }, [campaignId]);
+
+  // Check companion status
+  useEffect(() => {
+    const checkCompanionStatus = async () => {
+      if (!user || !campaign || user.role !== 'user') {
+        setIsCompanion(false);
+        setCompanionId(null);
+        return;
+      }
+
+      try {
+        const companions = await campaignCompanionService.getCampaignCompanions(campaignId);
+        const userCompanion = companions.companions.find(
+          c => c.user._id === (user._id || user.id)
+        );
+        if (userCompanion) {
+          setIsCompanion(true);
+          setCompanionId(userCompanion._id);
+        } else {
+          setIsCompanion(false);
+          setCompanionId(null);
+        }
+      } catch (error) {
+        console.error('Error checking companion status:', error);
+        setIsCompanion(false);
+        setCompanionId(null);
+      }
+    };
+
+    if (campaign && user) {
+      checkCompanionStatus();
+    }
+  }, [campaign, user, campaignId]);
+
+  const handleJoinCompanion = async () => {
+    if (!user || !campaign) return;
+
+    try {
+      setIsJoiningCompanion(true);
+      const result = await campaignCompanionService.joinCampaign(campaignId);
+      setIsCompanion(true);
+      setCompanionId(result._id);
+      
+      Alert.alert(
+        'Thành công!',
+        'Bạn đã đồng hành chiến dịch này. Bạn có thể chia sẻ link để mọi người donate qua bạn.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || 'Không thể đồng hành chiến dịch. Vui lòng thử lại.';
+      Alert.alert('Lỗi', message, [{ text: 'OK' }]);
+    } finally {
+      setIsJoiningCompanion(false);
+    }
+  };
+
+  const handleDonate = () => {
+    const params = companionId 
+      ? { campaignId, companion_id: companionId }
+      : { campaignId };
+    navigation.navigate('Donate', params);
+  };
 
   // Refresh data when screen is focused (e.g., returning from DonateScreen)
   useFocusEffect(
@@ -1158,13 +1226,35 @@ export default function CampaignDetailScreen() {
 
         {/* Donate Button */}
         {canDonate && (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Donate', { campaignId })}
-            style={styles.donateButton}
-          >
-            <MaterialCommunityIcons name="heart" size={moderateScale(20)} color="#FFFFFF" />
-            <Text style={styles.donateButtonText}>Ủng hộ ngay</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              onPress={handleDonate}
+              style={styles.donateButton}
+            >
+              <MaterialCommunityIcons name="heart" size={moderateScale(20)} color="#FFFFFF" />
+              <Text style={styles.donateButtonText}>
+                {isCompanion ? 'Ủng hộ qua bạn' : 'Ủng hộ ngay'}
+              </Text>
+            </TouchableOpacity>
+            {user && user.role === 'user' && campaign?.creator && typeof campaign.creator === 'object' && campaign.creator.role === 'organization' && !isCompanion && (
+              <TouchableOpacity
+                onPress={handleJoinCompanion}
+                disabled={isJoiningCompanion}
+                style={[styles.companionButton, isJoiningCompanion && styles.companionButtonDisabled]}
+              >
+                <MaterialCommunityIcons name="account-group" size={moderateScale(20)} color="#FFFFFF" />
+                <Text style={styles.companionButtonText}>
+                  {isJoiningCompanion ? 'Đang xử lý...' : 'Đồng hành chiến dịch'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {isCompanion && (
+              <View style={styles.companionBadge}>
+                <MaterialCommunityIcons name="account-group" size={moderateScale(16)} color="#2563EB" />
+                <Text style={styles.companionBadgeText}>Bạn đang đồng hành chiến dịch này</Text>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
 
@@ -1998,6 +2088,42 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginLeft: scale(8),
+  },
+  companionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2563EB',
+    marginHorizontal: scale(16),
+    marginBottom: scale(8),
+    padding: scale(16),
+    borderRadius: scale(8),
+  },
+  companionButtonDisabled: {
+    backgroundColor: '#93C5FD',
+    opacity: 0.6,
+  },
+  companionButtonText: {
+    fontSize: moderateScale(18),
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginLeft: scale(8),
+  },
+  companionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DBEAFE',
+    marginHorizontal: scale(16),
+    marginBottom: scale(8),
+    padding: scale(12),
+    borderRadius: scale(8),
+    gap: scale(8),
+  },
+  companionBadgeText: {
+    fontSize: moderateScale(14),
+    fontWeight: '500',
+    color: '#2563EB',
   },
   modalOverlay: {
     flex: 1,

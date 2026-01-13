@@ -1,13 +1,15 @@
 import { Router } from "express";
 import { getNotifications, markAsRead, markAllAsRead, deleteNotification } from "../controllers/NotificationController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { rateLimitByUserId } from "../middlewares/rateLimitMiddleware.js";
 
 const notificationRoute = Router();
 
-notificationRoute.get('/', authMiddleware, getNotifications);
-notificationRoute.patch('/:id/read', authMiddleware, markAsRead);
-notificationRoute.patch('/read-all', authMiddleware, markAllAsRead);
-notificationRoute.delete("/:id", authMiddleware, deleteNotification);
+// Đọc nhiều, nên để limit rộng; thao tác mark/delete vẫn theo user
+notificationRoute.get('/', authMiddleware, rateLimitByUserId(300, 60), getNotifications);
+notificationRoute.patch('/:id/read', authMiddleware, rateLimitByUserId(300, 60), markAsRead);
+notificationRoute.patch('/read-all', authMiddleware, rateLimitByUserId(120, 60), markAllAsRead);
+notificationRoute.delete("/:id", authMiddleware, rateLimitByUserId(120, 60), deleteNotification);
 
 /**
  * @swagger

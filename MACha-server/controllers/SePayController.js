@@ -6,7 +6,7 @@ export const initSepayPayment = async (req, res) => {
     try {
         const { campaignId } = req.params;
         const donorId = req.user._id;
-        const { amount, currency, paymentMethod, is_anonymous } = req.body;
+        const { amount, currency, paymentMethod, is_anonymous, companion_id } = req.body;
 
         if (!amount || amount <= 0) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: "Amount is required and must be greater than 0" });
@@ -16,7 +16,8 @@ export const initSepayPayment = async (req, res) => {
             amount,
             currency: currency || 'VND',
             paymentMethod: paymentMethod || 'BANK_TRANSFER',
-            is_anonymous: is_anonymous || false
+            is_anonymous: is_anonymous || false,
+            companion_id: companion_id || null
         };
 
         const result = await donationService.createSepayDonation(campaignId, donorId, donationData);

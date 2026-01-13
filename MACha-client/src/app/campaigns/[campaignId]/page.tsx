@@ -10,6 +10,7 @@ import { formatEscrowError } from '@/utils/escrow.utils';
 import { useSocket } from '@/contexts/SocketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { cloudinaryService } from '@/services/cloudinary.service';
+import { campaignCompanionService } from '@/services/campaignCompanion.service';
 import Image from 'next/image';
 import Swal from 'sweetalert2';
 import WithdrawalRequestCard from '@/components/escrow/WithdrawalRequestCard';
@@ -19,7 +20,7 @@ import CreatePostModal from '@/components/shared/CreatePostModal';
 import ReportModal from '@/components/shared/ReportModal';
 import { getReportsByItem } from '@/services/report.service';
 import { FaFlag } from 'react-icons/fa';
-import { ArrowLeft, Share2 } from 'lucide-react';
+import { ArrowLeft, Share2, Users } from 'lucide-react';
 import Link from 'next/link';
 
 function CampaignDetails() {
@@ -58,9 +59,43 @@ function CampaignDetails() {
     const [hasReported, setHasReported] = useState(false);
     const [isCheckingReport, setIsCheckingReport] = useState(false);
     const [isSharing, setIsSharing] = useState(false);
+    const [isCompanion, setIsCompanion] = useState(false);
+    const [isJoiningCompanion, setIsJoiningCompanion] = useState(false);
+    const [companionId, setCompanionId] = useState<string | null>(null);
 
     const handleDonate = () => {
-        router.push(`/campaigns/${campaignId}/donate`);
+        const url = companionId 
+            ? `/campaigns/${campaignId}/donate?companion_id=${companionId}`
+            : `/campaigns/${campaignId}/donate`;
+        router.push(url);
+    };
+
+    const handleJoinCompanion = async () => {
+        if (!user || !campaign) return;
+
+        try {
+            setIsJoiningCompanion(true);
+            const result = await campaignCompanionService.joinCampaign(campaignId);
+            setIsCompanion(true);
+            setCompanionId(result._id);
+            
+            Swal.fire({
+                title: 'Thành công!',
+                text: 'Bạn đã đồng hành chiến dịch này. Bạn có thể chia sẻ link để mọi người donate qua bạn.',
+                icon: 'success',
+                confirmButtonText: 'OK'
+            });
+        } catch (error: any) {
+            const message = error?.response?.data?.message || error?.message || 'Không thể đồng hành chiến dịch. Vui lòng thử lại.';
+            Swal.fire({
+                title: 'Lỗi',
+                text: message,
+                icon: 'error',
+                confirmButtonText: 'OK'
+            });
+        } finally {
+            setIsJoiningCompanion(false);
+        }
     };
 
     const handleShare = async () => {
@@ -146,8 +181,6 @@ function CampaignDetails() {
         const fetchCampaign = async () => {
             try {
                 setLoading(true);
-                // This will automatically track the campaign in user's recently_viewed_campaigns
-                // if user is authenticated (handled by server)
                 const data = await campaignService.getCampaignById(campaignId);
                 setCampaign(data);
             } catch (err: any) {
@@ -161,6 +194,38 @@ function CampaignDetails() {
             fetchCampaign();
         }
     }, [campaignId]);
+
+    useEffect(() => {
+        const checkCompanionStatus = async () => {
+            if (!user || !campaign || user.role !== 'user') {
+                setIsCompanion(false);
+                setCompanionId(null);
+                return;
+            }
+
+            try {
+                const companions = await campaignCompanionService.getCampaignCompanions(campaignId);
+                const userCompanion = companions.companions.find(
+                    c => c.user._id === (user._id || user.id)
+                );
+                if (userCompanion) {
+                    setIsCompanion(true);
+                    setCompanionId(userCompanion._id);
+                } else {
+                    setIsCompanion(false);
+                    setCompanionId(null);
+                }
+            } catch (error) {
+                console.error('Error checking companion status:', error);
+                setIsCompanion(false);
+                setCompanionId(null);
+            }
+        };
+
+        if (campaign && user) {
+            checkCompanionStatus();
+        }
+    }, [campaign, user, campaignId]);
 
     useEffect(() => {
         const fetchDonations = async () => {
@@ -1939,6 +2004,9 @@ function CampaignDetails() {
                                         
                                         // Check campaign status
                                         const allowedStatuses = ['active', 'voting', 'approved'];
+                                        const isCreatorOrganization = campaign.creator && typeof campaign.creator === 'object' && campaign.creator.role === 'organization';
+                                        const canJoinCompanion = user && user.role === 'user' && isCreatorOrganization && !isCompanion;
+                                        
                                         if (allowedStatuses.includes(campaign.status)) {
                                             return (
                                                 <>
@@ -1949,8 +2017,24 @@ function CampaignDetails() {
                                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                         </svg>
-                                                        Ủng hộ ngay
+                                                        {isCompanion ? 'Ủng hộ qua bạn' : 'Ủng hộ ngay'}
                                                     </button>
+                                                    {canJoinCompanion && (
+                                                        <button 
+                                                            onClick={handleJoinCompanion}
+                                                            disabled={isJoiningCompanion}
+                                                            className="w-full py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold rounded-xl hover:from-blue-600 hover:to-blue-700 transition shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            <Users className="w-5 h-5" />
+                                                            {isJoiningCompanion ? 'Đang xử lý...' : 'Đồng hành chiến dịch'}
+                                                        </button>
+                                                    )}
+                                                    {isCompanion && (
+                                                        <div className="w-full py-3 px-4 bg-blue-50 border-2 border-blue-200 rounded-xl flex items-center justify-center gap-2">
+                                                            <Users className="w-5 h-5 text-blue-600" />
+                                                            <span className="text-blue-700 font-medium text-sm">Bạn đang đồng hành chiến dịch này</span>
+                                                        </div>
+                                                    )}
                                                     <button 
                                                         onClick={() => setIsCreatePostOpen(true)}
                                                         className="w-full py-4 bg-white border-2 border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-400 transition flex items-center justify-center gap-2"

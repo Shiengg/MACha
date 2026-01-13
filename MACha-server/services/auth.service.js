@@ -293,3 +293,39 @@ export const cleanupUnverifiedUsers = async (days = 0) => {
         createdAt: { $lt: thresholdDate }
     });
 }
+
+export const createOrganizationUser = async (payload) => {
+    const { organization_name, username, password, email } = payload;
+
+    if (!organization_name || !username || !password) {
+        throw new Error("Organization name, username, and password are required");
+    }
+
+    const existingUser = await User.findOne({
+        $or: [{ username: username.trim() }, ...(email ? [{ email: email.trim().toLowerCase() }] : [])]
+    });
+
+    if (existingUser) {
+        throw new Error("Username or email already exists");
+    }
+
+    const user = new User({
+        username: username.trim(),
+        email: email ? email.trim().toLowerCase() : `${username.trim()}@organization.local`,
+        password: password,
+        fullname: organization_name,
+        role: "organization",
+        is_verified: true
+    });
+
+    await user.save();
+
+    return {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        fullname: user.fullname,
+        is_verified: user.is_verified
+    };
+}

@@ -92,6 +92,12 @@ const donationSchema = new mongoose.Schema({
         default: false,
         index: true
     },
+    companion: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "CampaignCompanion",
+        default: null,
+        index: true
+    },
     notes: {
         type: String,
         default: null

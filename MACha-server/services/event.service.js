@@ -58,11 +58,14 @@ export const getEvents = async (filters = {}) => {
     if (category) query.category = category;
     if (city) query['location.city'] = city;
     
+    // Optimized: Use select() to reduce payload and lean() for performance
     const events = await Event.find(query)
+        .select('-description -gallery_images') // Exclude heavy fields for list view
         .populate("creator", "username fullname avatar")
         .skip(page * limit)
         .limit(limit)
-        .sort({ [sort]: -1 });
+        .sort({ [sort]: -1 }) // Uses appropriate index based on sort field
+        .lean();
     
     await redisClient.setEx(cacheKey, 300, JSON.stringify(events));
     return events;
@@ -794,6 +797,7 @@ export const getEventsForMap = async () => {
     }
 
     // Query events with location data and published status
+    // Optimized: Use index and select only needed fields
     const events = await Event.find({
         status: 'published',
         'location.latitude': { $exists: true, $ne: null },
@@ -801,7 +805,7 @@ export const getEventsForMap = async () => {
     })
         .select('title location category banner_image creator start_date end_date status')
         .populate("creator", "username fullname avatar")
-        .lean();
+        .lean(); // Already using lean()
 
     // Cache for 5 minutes
     await redisClient.setEx(cacheKey, 300, JSON.stringify(events));

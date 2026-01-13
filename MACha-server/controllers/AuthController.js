@@ -481,3 +481,59 @@ export const forgotPassword = async (req, res) => {
         });
     }
 }
+
+export const signupOrganization = async (req, res) => {
+    try {
+        const { organization_name, username, password, confirm_password, email } = req.body;
+
+        if (!organization_name || !username || !password) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Organization name, username, and password are required"
+            });
+        }
+
+        if (password !== confirm_password) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Password and confirm password do not match"
+            });
+        }
+
+        if (password.length < 6) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Password must be at least 6 characters long."
+            });
+        }
+
+        const user = await authService.createOrganizationUser({
+            organization_name,
+            username,
+            password,
+            email
+        });
+
+        const token = createToken(user.id, user.username, user.role, user.fullname);
+        res.cookie("jwt", token, getCookieOptions());
+
+        return res.status(HTTP_STATUS.CREATED).json({
+            success: true,
+            message: "Đăng ký tổ chức thành công",
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role,
+                is_verified: user.is_verified,
+                fullname: user.fullname
+            },
+            token: token
+        });
+    } catch (error) {
+        if (error.message.includes("already exists")) {
+            return res.status(HTTP_STATUS.CONFLICT).json({
+                message: error.message
+            });
+        }
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message
+        });
+    }
+}

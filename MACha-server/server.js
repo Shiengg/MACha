@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import jwt from 'jsonwebtoken';
 import connectDB from './config/db.js';
 import { connectRedis, closeSubscriber, getConnectionInfo } from './config/redis.js';
@@ -17,6 +18,7 @@ import './jobs/processExpiredEvents.job.js';
 import { initSubscribers } from './subscribers/initSubscriber.js';
 import User from './models/user.js';
 import * as onlineService from './services/online.service.js';
+import { metricsMiddleware, register, updateWebSocketConnections } from './middlewares/metricsMiddleware.js';
 
 const app = express();
 dotenv.config();
@@ -74,9 +76,29 @@ app.use(cors({
     exposedHeaders: ['Set-Cookie'], // Expose Set-Cookie header for debugging
 }));
 
+// Enable gzip compression for all responses
+app.use(compression({
+    level: 6, // Compression level (1-9), 6 is a good balance
+    filter: (req, res) => {
+        // Don't compress responses if this request header is present
+        if (req.headers['x-no-compression']) {
+            return false;
+        }
+        // Use compression filter function
+        return compression.filter(req, res);
+    }
+}));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
+
+// Metrics middleware - phải đặt trước routes để capture tất cả requests
+// Chỉ enable nếu METRICS_ENABLED=true trong .env
+if (process.env.METRICS_ENABLED === 'true') {
+    app.use(metricsMiddleware);
+    console.log('📊 Metrics enabled - Prometheus metrics available at /metrics');
+}
 
 app.use("/api/auth", routes.authRoutes);
 app.use("/api/users", routes.userRoutes);
@@ -98,6 +120,7 @@ app.use("/api/search", routes.searchRoutes);
 app.use("/api/events", routes.eventRoutes);
 app.use("/api/owner", routes.ownerRoutes);
 app.use("/api/recovery", routes.recoveryRoutes);
+app.use("/api", routes.campaignCompanionRoutes);
 app.use("/api/recommendations", routes.recommendationRoutes);
 
 const server = http.createServer(app);
@@ -159,6 +182,11 @@ io.on('connection', async (socket) => {
 
     //console.log(`✅ Socket connected: ${socket.id} (User: ${username})`);
 
+    // Update WebSocket connections metric
+    if (process.env.METRICS_ENABLED === 'true') {
+        updateWebSocketConnections(io.sockets.sockets.size);
+    }
+
     if (userId) {
         const userRoom = `user:${userId}`;
         socket.join(userRoom);
@@ -189,6 +217,11 @@ io.on('connection', async (socket) => {
     socket.on('disconnect', async () => {
         //console.log(`❌ Socket disconnected: ${socket.id} (User: ${username})`);
 
+        // Update WebSocket connections metric
+        if (process.env.METRICS_ENABLED === 'true') {
+            updateWebSocketConnections(io.sockets.sockets.size);
+        }
+
         if (userId) {
             // Set user offline khi socket disconnect
             await onlineService.setUserOffline(userId);
@@ -216,6 +249,23 @@ app.get('/health', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
+
+// Prometheus metrics endpoint
+// Chỉ expose nếu METRICS_ENABLED=true
+if (process.env.METRICS_ENABLED === 'true') {
+    const metricsPath = process.env.METRICS_PATH || '/metrics';
+    app.get(metricsPath, async (req, res) => {
+        try {
+            res.set('Content-Type', register.contentType);
+            const metrics = await register.metrics();
+            res.end(metrics);
+        } catch (error) {
+            console.error('❌ Error generating metrics:', error);
+            res.status(500).end('Error generating metrics');
+        }
+    });
+    console.log(`📊 Metrics endpoint available at ${metricsPath}`);
+}
 
 // Init subscribers (pass Socket.IO instance)
 initSubscribers(io).then(() => {

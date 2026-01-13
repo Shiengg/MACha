@@ -6,21 +6,22 @@ import { rateLimitByEmail, rateLimitByIP, rateLimitByUserId } from "../middlewar
 
 const authRoutes = Router();
 
-// Rate limit: 5 requests per 60 seconds per email
-authRoutes.post('/signup', rateLimitByEmail(5, 60), AuthController.signup);
-authRoutes.post('/login', rateLimitByEmail(5, 60), AuthController.login);
-authRoutes.post('/verify-user-account', rateLimitByIP(30, 60), AuthController.verifyUserAccount);
-authRoutes.post('/logout', rateLimitByIP(50, 60), AuthController.logout);
+// Rate limit: tightened for abuse but still OK for load test
+authRoutes.post('/signup', rateLimitByEmail(15, 60), AuthController.signup);
+authRoutes.post('/signup/organization', rateLimitByEmail(15, 60), AuthController.signupOrganization);
+authRoutes.post('/login', rateLimitByEmail(20, 60), AuthController.login);
+authRoutes.post('/verify-user-account', rateLimitByIP(150, 60), AuthController.verifyUserAccount);
+authRoutes.post('/logout', rateLimitByIP(150, 60), AuthController.logout);
 
-// Rate limit: 20 requests per 60 seconds per user
-authRoutes.get('/me', authMiddleware, AuthController.getCurrentUser);
-authRoutes.get('/:id', authMiddleware, rateLimitByUserId(20, 60), AuthController.getUserById);
-authRoutes.patch('/:id', authMiddleware, rateLimitByUserId(10, 60), checkRole("user", "admin"), AuthController.updateUser)
-authRoutes.patch('/:id/onboarding', authMiddleware, rateLimitByUserId(10, 60), checkRole("user", "admin"), AuthController.completeOnboarding)
-authRoutes.post('/otp', authMiddleware, rateLimitByUserId(10, 60), AuthController.sendOtp);
-authRoutes.post('/verify-otp', authMiddleware, rateLimitByUserId(10, 60), AuthController.verifyOtpChangePassword);
-authRoutes.post('/change-password', authMiddleware, rateLimitByUserId(10, 60), AuthController.changePassword);
-authRoutes.post('/forgot-password', rateLimitByEmail(5, 60), AuthController.forgotPassword);
+// Authenticated routes
+authRoutes.get('/me', authMiddleware, rateLimitByUserId(300, 60), AuthController.getCurrentUser);
+authRoutes.get('/:id', authMiddleware, rateLimitByUserId(300, 60), AuthController.getUserById);
+authRoutes.patch('/:id', authMiddleware, rateLimitByUserId(150, 60), checkRole("user", "admin"), AuthController.updateUser)
+authRoutes.patch('/:id/onboarding', authMiddleware, rateLimitByUserId(60, 60), checkRole("user", "admin"), AuthController.completeOnboarding)
+authRoutes.post('/otp', authMiddleware, rateLimitByUserId(30, 300), AuthController.sendOtp);
+authRoutes.post('/verify-otp', authMiddleware, rateLimitByUserId(30, 300), AuthController.verifyOtpChangePassword);
+authRoutes.post('/change-password', authMiddleware, rateLimitByUserId(30, 300), AuthController.changePassword);
+authRoutes.post('/forgot-password', rateLimitByEmail(10, 300), AuthController.forgotPassword);
 /**
  * @swagger
  * components:
