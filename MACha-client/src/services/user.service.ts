@@ -16,6 +16,7 @@ export interface User {
   bio?: string;
   role?: string;
   kyc_status?: string;
+  is_verified?: boolean;
   followers_count?: number;
   following_count?: number;
   followers?: string[]; // Array of user IDs who follow this user
