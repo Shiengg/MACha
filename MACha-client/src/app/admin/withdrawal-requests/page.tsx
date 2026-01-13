@@ -389,17 +389,20 @@ export default function AdminWithdrawalRequests() {
     }
   };
 
-  const getCampaignTitle = (campaign: string | Campaign): string => {
+  const getCampaignTitle = (campaign: string | Campaign | null | undefined): string => {
+    if (!campaign) return 'N/A';
     if (typeof campaign === 'string') return 'N/A';
     return campaign.title || 'N/A';
   };
 
-  const getCreatorInfo = (requestedBy: string | User): string => {
+  const getCreatorInfo = (requestedBy: string | User | null | undefined): string => {
+    if (!requestedBy) return 'N/A';
     if (typeof requestedBy === 'string') return 'N/A';
     return requestedBy.fullname || requestedBy.username || 'N/A';
   };
 
-  const getCreatorEmail = (requestedBy: string | User): string => {
+  const getCreatorEmail = (requestedBy: string | User | null | undefined): string => {
+    if (!requestedBy) return 'N/A';
     if (typeof requestedBy === 'string') return 'N/A';
     return requestedBy.email || 'N/A';
   };
@@ -637,8 +640,8 @@ export default function AdminWithdrawalRequests() {
                   <div>
                     <p className="text-gray-600 text-sm mb-1">Tên Campaign</p>
                     <p className="text-gray-900 font-medium">
-                      {typeof selectedRequest.campaign === 'object'
-                        ? selectedRequest.campaign.title
+                      {selectedRequest.campaign && typeof selectedRequest.campaign === 'object'
+                        ? selectedRequest.campaign.title || 'N/A'
                         : 'N/A'}
                     </p>
                   </div>
