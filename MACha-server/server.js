@@ -98,6 +98,7 @@ app.use("/api/search", routes.searchRoutes);
 app.use("/api/events", routes.eventRoutes);
 app.use("/api/owner", routes.ownerRoutes);
 app.use("/api/recovery", routes.recoveryRoutes);
+app.use("/api", routes.campaignCompanionRoutes);
 app.use("/api/recommendations", routes.recommendationRoutes);
 
 const server = http.createServer(app);

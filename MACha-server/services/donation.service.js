@@ -1,9 +1,11 @@
 import Donation from "../models/donation.js";
 import Campaign from "../models/campaign.js";
 import Escrow from "../models/escrow.js";
+import CampaignCompanion from "../models/campaignCompanion.js";
 import { redisClient } from "../config/redis.js";
 import * as trackingService from "./tracking.service.js";
 import * as escrowService from "./escrow.service.js";
+import * as campaignCompanionService from "./campaignCompanion.service.js";
 
 const checkAndCreateMilestoneWithdrawalRequest = async (campaign, isExpired = false) => {
     const percentage = (campaign.current_amount / campaign.goal_amount) * 100;
@@ -261,11 +263,24 @@ const checkAndCreateMilestoneWithdrawalRequest = async (campaign, isExpired = fa
 };
 
 export const createDonation = async (campaignId, donorId, donationData) => {
-    const { amount, currency, donation_method, is_anonymous } = donationData;
+    const { amount, currency, donation_method, is_anonymous, companion_id } = donationData;
     
     const campaign = await Campaign.findById(campaignId);
     if (!campaign) {
         return null;
+    }
+
+    let companion = null;
+    if (companion_id) {
+        try {
+            companion = await campaignCompanionService.validateCompanionForDonation(
+                companion_id,
+                donorId,
+                campaignId
+            );
+        } catch (error) {
+            throw new Error(`Invalid companion: ${error.message}`);
+        }
     }
     
     const donation = await Donation.create({
@@ -275,6 +290,7 @@ export const createDonation = async (campaignId, donorId, donationData) => {
         currency,
         donation_method,
         is_anonymous,
+        companion: companion ? companion._id : null,
     });
     
     campaign.current_amount += amount;
@@ -336,24 +352,63 @@ export const getDonationsByCampaign = async (campaignId) => {
     
     const cached = await redisClient.get(donationKey);
     if (cached) {
-        return JSON.parse(cached);
+        const donations = JSON.parse(cached);
+        return donations.map(formatDonationWithCompanion);
     }
     
     const donations = await Donation.find({ campaign: campaignId })
         .populate("donor", "username avatar_url fullname")
+        .populate({
+            path: "companion",
+            populate: {
+                path: "user",
+                select: "username fullname avatar"
+            }
+        })
         .sort({ createdAt: -1 });
     
-    await redisClient.setEx(donationKey, 300, JSON.stringify(donations));
+    const formattedDonations = donations.map(formatDonationWithCompanion);
     
-    return donations;
+    await redisClient.setEx(donationKey, 300, JSON.stringify(formattedDonations));
+    
+    return formattedDonations;
+}
+
+const formatDonationWithCompanion = (donation) => {
+    const donationObj = donation.toObject ? donation.toObject() : donation;
+    
+    let display_name = donationObj.donor?.fullname || donationObj.donor?.username || "Anonymous";
+    
+    if (donationObj.companion?.user) {
+        const companionName = donationObj.companion.user.fullname || donationObj.companion.user.username;
+        display_name = `${display_name} (qua ${companionName})`;
+    }
+    
+    return {
+        ...donationObj,
+        display_name
+    };
 }
 
 export const createSepayDonation = async (campaignId, donorId, donationData) => {
-    const { amount, currency, paymentMethod, is_anonymous } = donationData;
+    const { amount, currency, paymentMethod, is_anonymous, companion_id } = donationData;
     
     const campaign = await Campaign.findById(campaignId);
     if (!campaign) {
         return null;
+    }
+
+    let companion = null;
+    if (companion_id) {
+        try {
+            companion = await campaignCompanionService.validateCompanionForDonation(
+                companion_id,
+                donorId,
+                campaignId
+            );
+        } catch (error) {
+            throw new Error(`Invalid companion: ${error.message}`);
+        }
     }
     
     const donation = await Donation.create({
@@ -365,6 +420,7 @@ export const createSepayDonation = async (campaignId, donorId, donationData) => 
         sepay_payment_method: paymentMethod || 'BANK_TRANSFER',
         payment_status: 'pending',
         is_anonymous: is_anonymous || false,
+        companion: companion_id || null,
     });
     
     const orderInvoiceNumber = `DONATION-${campaign._id}-${Date.now()}`;

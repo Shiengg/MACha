@@ -13,8 +13,22 @@ export const createDonation = async (req, res) => {
             return res.status(HTTP_STATUS.NOT_FOUND).json({ message: "Campaign not found" });
         }
 
-        res.status(HTTP_STATUS.CREATED).json({ donation: result.donation });
+        const populatedDonation = await result.donation.populate([
+            { path: "donor", select: "username fullname avatar" },
+            {
+                path: "companion",
+                populate: {
+                    path: "user",
+                    select: "username fullname avatar"
+                }
+            }
+        ]);
+
+        res.status(HTTP_STATUS.CREATED).json({ donation: populatedDonation });
     } catch (error) {
+        if (error.message.includes("Invalid companion")) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: error.message });
+        }
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
     }
 }

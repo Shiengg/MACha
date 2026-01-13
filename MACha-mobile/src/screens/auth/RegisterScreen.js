@@ -17,19 +17,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
 import apiClient from '../../services/apiClient';
-import { SIGNUP_ROUTE, VERIFY_SIGNUP_OTP_ROUTE } from '../../constants/api';
+import { SIGNUP_ROUTE, SIGNUP_ORGANIZATION_ROUTE, VERIFY_SIGNUP_OTP_ROUTE } from '../../constants/api';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 
 export default function RegisterScreen({ navigation }) {
   const { login } = useAuth();
+  const [isOrganization, setIsOrganization] = useState(false);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [organizationName, setOrganizationName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({
     username: '',
     email: '',
+    organizationName: '',
     password: '',
     confirmPassword: '',
   });
@@ -44,6 +47,7 @@ export default function RegisterScreen({ navigation }) {
     const newErrors = {
       username: '',
       email: '',
+      organizationName: '',
       password: '',
       confirmPassword: '',
     };
@@ -64,11 +68,27 @@ export default function RegisterScreen({ navigation }) {
       isValid = false;
     }
 
-    // Email validation
-    if (!email.trim()) {
-      newErrors.email = 'Email là bắt buộc';
-      isValid = false;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    // Organization name validation (only for organization)
+    if (isOrganization) {
+      if (!organizationName.trim()) {
+        newErrors.organizationName = 'Tên tổ chức là bắt buộc';
+        isValid = false;
+      } else if (organizationName.trim().length < 3) {
+        newErrors.organizationName = 'Tên tổ chức phải có ít nhất 3 ký tự';
+        isValid = false;
+      }
+    }
+
+    // Email validation (required for individual, optional for organization)
+    if (!isOrganization) {
+      if (!email.trim()) {
+        newErrors.email = 'Email là bắt buộc';
+        isValid = false;
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        newErrors.email = 'Email không hợp lệ';
+        isValid = false;
+      }
+    } else if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       newErrors.email = 'Email không hợp lệ';
       isValid = false;
     }
@@ -109,6 +129,7 @@ export default function RegisterScreen({ navigation }) {
     setErrors({
       username: '',
       email: '',
+      organizationName: '',
       password: '',
       confirmPassword: '',
     });
@@ -121,21 +142,51 @@ export default function RegisterScreen({ navigation }) {
     setIsSubmitting(true);
 
     try {
-      const { confirmPassword: _, ...signupData } = {
-        username: username.trim(),
-        email: email.trim(),
-        password,
-      };
+      if (isOrganization) {
+        // Organization signup - no OTP needed
+        const signupData = {
+          organization_name: organizationName.trim(),
+          username: username.trim(),
+          password,
+          confirm_password: confirmPassword,
+          email: email.trim() || undefined,
+        };
 
-      const res = await apiClient.post(SIGNUP_ROUTE, signupData);
-      const userId = res.data.user?.id;
+        const res = await apiClient.post(SIGNUP_ORGANIZATION_ROUTE, signupData);
 
-      if (!userId) {
-        throw new Error('Không lấy được thông tin tài khoản vừa đăng ký.');
+        // Auto login after organization signup
+        await login();
+
+        Alert.alert(
+          'Đăng ký tổ chức thành công!',
+          'Tài khoản tổ chức của bạn đã được tạo thành công.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.replace('MainTabs');
+              },
+            },
+          ]
+        );
+      } else {
+        // Individual signup - requires OTP
+        const { confirmPassword: _, ...signupData } = {
+          username: username.trim(),
+          email: email.trim(),
+          password,
+        };
+
+        const res = await apiClient.post(SIGNUP_ROUTE, signupData);
+        const userId = res.data.user?.id;
+
+        if (!userId) {
+          throw new Error('Không lấy được thông tin tài khoản vừa đăng ký.');
+        }
+
+        setUserId(userId);
+        setShowOtpModal(true);
       }
-
-      setUserId(userId);
-      setShowOtpModal(true);
     } catch (error) {
       console.error('❌ [Register] Signup error:', error);
 
@@ -239,6 +290,87 @@ export default function RegisterScreen({ navigation }) {
                 </Text>
               </Text>
 
+              {/* Toggle between Individual and Organization */}
+              <View style={styles.toggleContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    !isOrganization && styles.toggleButtonActive,
+                  ]}
+                  onPress={() => {
+                    setIsOrganization(false);
+                    setErrors({
+                      username: '',
+                      email: '',
+                      organizationName: '',
+                      password: '',
+                      confirmPassword: '',
+                    });
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.toggleButtonText,
+                      !isOrganization && styles.toggleButtonTextActive,
+                    ]}
+                  >
+                    Cá nhân
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    isOrganization && styles.toggleButtonActive,
+                  ]}
+                  onPress={() => {
+                    setIsOrganization(true);
+                    setErrors({
+                      username: '',
+                      email: '',
+                      organizationName: '',
+                      password: '',
+                      confirmPassword: '',
+                    });
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.toggleButtonText,
+                      isOrganization && styles.toggleButtonTextActive,
+                    ]}
+                  >
+                    Tổ chức
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Organization Name Input (only for organization) */}
+              {isOrganization && (
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Tên tổ chức</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      errors.organizationName && styles.inputError,
+                    ]}
+                    placeholder="Tên tổ chức"
+                    placeholderTextColor="#9CA3AF"
+                    value={organizationName}
+                    onChangeText={(text) => {
+                      setOrganizationName(text);
+                      if (errors.organizationName)
+                        setErrors({ ...errors, organizationName: '' });
+                    }}
+                    editable={!isSubmitting}
+                  />
+                  {errors.organizationName ? (
+                    <Text style={styles.errorText}>
+                      {errors.organizationName}
+                    </Text>
+                  ) : null}
+                </View>
+              )}
+
               {/* Username Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Username</Text>
@@ -262,10 +394,12 @@ export default function RegisterScreen({ navigation }) {
 
               {/* Email Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Email</Text>
+                <Text style={styles.label}>
+                  Email {isOrganization && '(Tùy chọn)'}
+                </Text>
                 <TextInput
                   style={[styles.input, errors.email && styles.inputError]}
-                  placeholder="Email"
+                  placeholder={isOrganization ? 'Email (Tùy chọn)' : 'Email'}
                   placeholderTextColor="#9CA3AF"
                   value={email}
                   onChangeText={(text) => {
@@ -340,7 +474,11 @@ export default function RegisterScreen({ navigation }) {
                   <ActivityIndicator color="#fff" size="small" />
                 ) : null}
                 <Text style={styles.signupButtonText}>
-                  {isSubmitting ? 'Đang tạo tài khoản...' : 'Tạo tài khoản'}
+                  {isSubmitting
+                    ? 'Đang tạo tài khoản...'
+                    : isOrganization
+                    ? 'Tạo tài khoản tổ chức'
+                    : 'Tạo tài khoản'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -592,6 +730,32 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: moderateScale(16),
     fontWeight: '600',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    gap: scale(12),
+    marginBottom: verticalScale(20),
+    backgroundColor: '#F3F4F6',
+    borderRadius: scale(12),
+    padding: scale(4),
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: verticalScale(10),
+    borderRadius: scale(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleButtonActive: {
+    backgroundColor: '#2563EB',
+  },
+  toggleButtonText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  toggleButtonTextActive: {
+    color: '#FFFFFF',
   },
 });
 

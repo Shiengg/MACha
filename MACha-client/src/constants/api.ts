@@ -1,6 +1,7 @@
 export const AUTH_ROUTE = "api/auth";
 export const LOGIN_ROUTE = `${AUTH_ROUTE}/login`;
 export const SIGNUP_ROUTE = `${AUTH_ROUTE}/signup`;
+export const SIGNUP_ORGANIZATION_ROUTE = `${AUTH_ROUTE}/signup/organization`;
 export const VERIFY_SIGNUP_OTP_ROUTE = `${AUTH_ROUTE}/verify-user-account`;
 export const GET_CURRENT_USER_ROUTE = `${AUTH_ROUTE}/me`;
 export const LOGOUT_ROUTE = `${AUTH_ROUTE}/logout`;
@@ -81,6 +82,8 @@ export const GET_KYC_HISTORY_BY_USER_ROUTE = (userId: string) => `${KYC_ROUTE}/h
 export const VNPT_VERIFY_QUALITY_ROUTE = `${KYC_ROUTE}/vnpt/verify-quality`;
 export const VNPT_OCR_ROUTE = `${KYC_ROUTE}/vnpt/ocr`;
 export const VNPT_COMPARE_FACES_ROUTE = `${KYC_ROUTE}/vnpt/compare-faces`;
+export const SUBMIT_ORGANIZATION_KYC_ROUTE = `${KYC_ROUTE}/organization/submit`;
+export const GET_ORGANIZATION_KYC_STATUS_ROUTE = `${KYC_ROUTE}/organization/status`;
 
 export const DONATION_ROUTE = "api/donations";
 export const GET_DONATIONS_BY_CAMPAIGN_ROUTE = (campaignId: string) => `${DONATION_ROUTE}/${campaignId}/donations`;
@@ -89,6 +92,13 @@ export const SEPAY_CALLBACK_ROUTE = `${DONATION_ROUTE}/sepay/callback`;
 export const SEPAY_SUCCESS_ROUTE = `${DONATION_ROUTE}/sepay/success`;
 export const SEPAY_ERROR_ROUTE = `${DONATION_ROUTE}/sepay/error`;
 export const SEPAY_CANCEL_ROUTE = `${DONATION_ROUTE}/sepay/cancel`;
+export const CREATE_DONATION_ROUTE = (campaignId: string) => `${DONATION_ROUTE}/${campaignId}/donate`;
+
+export const CAMPAIGN_COMPANION_ROUTE = "api";
+export const JOIN_CAMPAIGN_COMPANION_ROUTE = (campaignId: string) => `${CAMPAIGN_COMPANION_ROUTE}/campaigns/${campaignId}/companion/join`;
+export const LEAVE_CAMPAIGN_COMPANION_ROUTE = (campaignId: string) => `${CAMPAIGN_COMPANION_ROUTE}/campaigns/${campaignId}/companion/leave`;
+export const GET_CAMPAIGN_COMPANIONS_ROUTE = (campaignId: string) => `${CAMPAIGN_COMPANION_ROUTE}/campaigns/${campaignId}/companions`;
+export const GET_USER_COMPANION_CAMPAIGNS_ROUTE = (userId: string) => `${CAMPAIGN_COMPANION_ROUTE}/users/${userId}/companion-campaigns`;
 
 export const CONVERSATION_ROUTE = "api/conversations";
 export const CREATE_CONVERSATION_PRIVATE_ROUTE = (userId2: string) => `${CONVERSATION_ROUTE}/private/${userId2}`;

@@ -9,6 +9,13 @@ const kycSchema = new mongoose.Schema({
         index: true
     },
     
+    kyc_type: {
+        type: String,
+        enum: ["individual", "organization"],
+        default: "individual",
+        index: true
+    },
+    
     status: {
         type: String,
         enum: ["pending", "verified", "rejected"],
@@ -166,6 +173,24 @@ const kycSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "KYC",
         default: null
+    },
+    organization_data: {
+        legal_representative: {
+            fullname: String,
+            id_card_number: String,
+            id_card_last4: String,
+            position: String,
+            id_card_front_url: String,
+            id_card_back_url: String,
+            selfie_url: String
+        },
+        organization_documents: {
+            business_license_url: String,
+            establishment_decision_url: String,
+            tax_code: String,
+            organization_name: String,
+            organization_address: String
+        }
     }
 }, {
     timestamps: true
@@ -220,6 +245,7 @@ kycSchema.methods.getDecryptedData = function() {
 kycSchema.index({ user: 1, status: 1 });
 kycSchema.index({ status: 1, submitted_at: -1 });
 kycSchema.index({ user: 1, submission_number: -1 });
+kycSchema.index({ user: 1, kyc_type: 1, status: 1 });
 
 const KYC = mongoose.model("KYC", kycSchema);
 export default KYC;

@@ -1,6 +1,7 @@
 export const AUTH_ROUTE = "api/auth";
 export const LOGIN_ROUTE = `${AUTH_ROUTE}/login`;
 export const SIGNUP_ROUTE = `${AUTH_ROUTE}/signup`;
+export const SIGNUP_ORGANIZATION_ROUTE = `${AUTH_ROUTE}/signup/organization`;
 export const VERIFY_SIGNUP_OTP_ROUTE = `${AUTH_ROUTE}/verify-user-account`;
 export const GET_CURRENT_USER_ROUTE = `${AUTH_ROUTE}/me`;
 export const LOGOUT_ROUTE = `${AUTH_ROUTE}/logout`;
@@ -26,6 +27,14 @@ export const DELETE_CAMPAIGN_UPDATE_ROUTE = (updateId: string) => `${CAMPAIGN_RO
 export const DONATION_ROUTE = "api/donations";
 export const GET_DONATIONS_BY_CAMPAIGN_ROUTE = (campaignId: string) => `${DONATION_ROUTE}/${campaignId}/donations`;
 export const INIT_SEPAY_PAYMENT_ROUTE = (campaignId: string) => `${DONATION_ROUTE}/${campaignId}/sepay/init`;
+
+export const CAMPAIGN_COMPANION_ROUTE = "api";
+export const JOIN_CAMPAIGN_COMPANION_ROUTE = (campaignId: string) => `${CAMPAIGN_COMPANION_ROUTE}/campaigns/${campaignId}/companion/join`;
+export const LEAVE_CAMPAIGN_COMPANION_ROUTE = (campaignId: string) => `${CAMPAIGN_COMPANION_ROUTE}/campaigns/${campaignId}/companion/leave`;
+export const GET_CAMPAIGN_COMPANIONS_ROUTE = (campaignId: string) => `${CAMPAIGN_COMPANION_ROUTE}/campaigns/${campaignId}/companions`;
+export const GET_USER_COMPANION_CAMPAIGNS_ROUTE = (userId: string) => `${CAMPAIGN_COMPANION_ROUTE}/users/${userId}/companion-campaigns`;
+
+export const USER_ROUTE = "api/users";
 
 export const ESCROW_ROUTE = "api/escrow";
 export const CREATE_WITHDRAWAL_REQUEST_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/withdrawal-requests`;
@@ -66,6 +75,8 @@ export const SUBMIT_KYC_VNPT_ROUTE = `${KYC_ROUTE}/submit-vnpt`;
 export const VNPT_VERIFY_QUALITY_ROUTE = `${KYC_ROUTE}/vnpt/verify-quality`;
 export const VNPT_OCR_ROUTE = `${KYC_ROUTE}/vnpt/ocr`;
 export const VNPT_COMPARE_FACES_ROUTE = `${KYC_ROUTE}/vnpt/compare-faces`;
+export const SUBMIT_ORGANIZATION_KYC_ROUTE = `${KYC_ROUTE}/organization/submit`;
+export const GET_ORGANIZATION_KYC_STATUS_ROUTE = `${KYC_ROUTE}/organization/status`;
 
 export const REPORT_ROUTE = "api/reports";
 export const CREATE_REPORT_ROUTE = `${REPORT_ROUTE}`;

@@ -836,3 +836,140 @@ export const compareFaces = async (userId, cardImage, faceImage) => {
     }
 };
 
+export const submitOrganizationKYC = async (userId, kycData) => {
+    const user = await User.findById(userId);
+    
+    if (!user) {
+        return { success: false, error: 'USER_NOT_FOUND' };
+    }
+
+    if (user.role !== 'organization') {
+        return { success: false, error: 'INVALID_ROLE', message: 'Only organization users can submit organization KYC' };
+    }
+
+    if (user.kyc_status === 'verified') {
+        return { success: false, error: 'ALREADY_VERIFIED' };
+    }
+
+    if (user.kyc_status === 'pending') {
+        return { success: false, error: 'PENDING_REVIEW' };
+    }
+
+    const { legal_representative, organization_documents } = kycData;
+
+    if (!legal_representative || !organization_documents) {
+        return {
+            success: false,
+            error: 'MISSING_REQUIRED_FIELDS',
+            message: 'legal_representative and organization_documents are required'
+        };
+    }
+
+    const requiredFields = [
+        'fullname',
+        'id_card_number',
+        'position',
+        'id_card_front_url',
+        'id_card_back_url',
+        'selfie_url'
+    ];
+
+    const missingFields = requiredFields.filter(field => !legal_representative[field]);
+    if (missingFields.length > 0) {
+        return {
+            success: false,
+            error: 'MISSING_REQUIRED_FIELDS',
+            message: `Missing required fields in legal_representative: ${missingFields.join(', ')}`,
+            missingFields
+        };
+    }
+
+    const orgRequiredFields = [
+        'business_license_url',
+        'establishment_decision_url',
+        'tax_code',
+        'organization_name',
+        'organization_address'
+    ];
+
+    const missingOrgFields = orgRequiredFields.filter(field => !organization_documents[field]);
+    if (missingOrgFields.length > 0) {
+        return {
+            success: false,
+            error: 'MISSING_REQUIRED_FIELDS',
+            message: `Missing required fields in organization_documents: ${missingOrgFields.join(', ')}`,
+            missingFields: missingOrgFields
+        };
+    }
+
+    let submissionNumber = 1;
+    let previousKYCId = null;
+    
+    if (user.current_kyc_id) {
+        const previousKYC = await KYC.findById(user.current_kyc_id);
+        if (previousKYC) {
+            submissionNumber = previousKYC.submission_number + 1;
+            previousKYCId = previousKYC._id;
+        }
+    }
+
+    const idCardNumber = legal_representative.id_card_number;
+    const idCardLast4 = idCardNumber && idCardNumber.length >= 4 ? idCardNumber.slice(-4) : null;
+
+    const kyc = await KYC.create({
+        user: userId,
+        kyc_type: 'organization',
+        status: 'pending',
+        documents: {
+            identity_front_url: legal_representative.id_card_front_url,
+            identity_back_url: legal_representative.id_card_back_url,
+            selfie_url: legal_representative.selfie_url
+        },
+        extracted_data: {
+            identity_verified_name: legal_representative.fullname,
+            identity_card_number: idCardNumber,
+            identity_card_last4: idCardLast4,
+            tax_code: organization_documents.tax_code
+        },
+        organization_data: {
+            legal_representative: {
+                fullname: legal_representative.fullname,
+                id_card_number: idCardNumber,
+                id_card_last4: idCardLast4,
+                position: legal_representative.position,
+                id_card_front_url: legal_representative.id_card_front_url,
+                id_card_back_url: legal_representative.id_card_back_url,
+                selfie_url: legal_representative.selfie_url
+            },
+            organization_documents: {
+                business_license_url: organization_documents.business_license_url,
+                establishment_decision_url: organization_documents.establishment_decision_url,
+                tax_code: organization_documents.tax_code,
+                organization_name: organization_documents.organization_name,
+                organization_address: organization_documents.organization_address
+            }
+        },
+        submission_number: submissionNumber,
+        previous_kyc_id: previousKYCId,
+        submitted_at: new Date()
+    });
+
+    user.current_kyc_id = kyc._id;
+    user.kyc_status = 'pending';
+    await user.save();
+
+    if (organization_documents.organization_name && organization_documents.organization_name !== user.fullname) {
+        user.fullname = organization_documents.organization_name;
+        await user.save();
+    }
+    
+    await invalidateKYCCaches(userId);
+    
+    return {
+        success: true,
+        kyc,
+        user,
+        message: 'KYC đã được gửi để duyệt'
+    };
+};
+

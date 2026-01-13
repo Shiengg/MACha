@@ -5,7 +5,9 @@ import {
   SUBMIT_KYC_VNPT_ROUTE,
   VNPT_VERIFY_QUALITY_ROUTE,
   VNPT_OCR_ROUTE,
-  VNPT_COMPARE_FACES_ROUTE
+  VNPT_COMPARE_FACES_ROUTE,
+  SUBMIT_ORGANIZATION_KYC_ROUTE,
+  GET_ORGANIZATION_KYC_STATUS_ROUTE
 } from '@/constants/api';
 
 export interface KYCStatus {
@@ -131,6 +133,32 @@ export const kycService = {
       faceImage1, 
       faceImage2 
     });
+    return response.data;
+  },
+
+  async submitOrganizationKYC(payload: {
+    legal_representative: {
+      fullname: string;
+      id_card_number: string;
+      position: string;
+      id_card_front_url: string;
+      id_card_back_url: string;
+      selfie_url: string;
+    };
+    organization_documents: {
+      business_license_url: string;
+      establishment_decision_url: string;
+      tax_code: string;
+      organization_name: string;
+      organization_address: string;
+    };
+  }): Promise<any> {
+    const response = await apiClient.post(SUBMIT_ORGANIZATION_KYC_ROUTE, payload);
+    return response.data;
+  },
+
+  async getOrganizationKYCStatus(): Promise<KYCStatus> {
+    const response = await apiClient.get(GET_ORGANIZATION_KYC_STATUS_ROUTE);
     return response.data;
   },
 };
