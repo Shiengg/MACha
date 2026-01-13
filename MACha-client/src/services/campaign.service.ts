@@ -25,6 +25,7 @@ export interface Campaign {
     username: string;
     fullname?: string;
     avatar?: string;
+    role?: string;
   };
   contact_info: {
     fullname: string;
