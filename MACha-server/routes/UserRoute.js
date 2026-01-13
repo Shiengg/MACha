@@ -1,28 +1,35 @@
 import { Router } from "express";
-import { 
+import {
     getAllUsers,
-    getUserById, 
-    followUser, 
-    unfollowUser, 
-    getFollowers, 
-    getFollowing, 
+    getUserById,
+    followUser,
+    unfollowUser,
+    getFollowers,
+    getFollowing,
     searchUsers,
     getPublicAdmins
 } from "../controllers/UserController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { checkRole } from "../middlewares/checkRole.js";
-import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
+import { rateLimitByIP, rateLimitByUserId } from "../middlewares/rateLimitMiddleware.js";
 
 const userRoutes = Router();
 
-userRoutes.get('/public/admins', getPublicAdmins);
-userRoutes.get('/', authMiddleware, checkRole('admin'), getAllUsers);
-userRoutes.get('/search', authMiddleware, searchUsers);
-userRoutes.get('/:id', authMiddleware, getUserById);
-userRoutes.post('/:id/follow', authMiddleware, followUser);
-userRoutes.post('/:id/unfollow', authMiddleware, unfollowUser);
-userRoutes.get('/:id/follower', authMiddleware, getFollowers);
-userRoutes.get('/:id/following', authMiddleware, getFollowing);
+// Public admin listing – mild IP-based limit
+userRoutes.get('/public/admins', rateLimitByIP(300, 60), getPublicAdmins);
+
+// Admin-only user listing
+userRoutes.get('/', authMiddleware, checkRole('admin'), rateLimitByIP(150, 60), getAllUsers);
+
+// Authenticated search & profile – per user
+userRoutes.get('/search', authMiddleware, rateLimitByUserId(300, 60), searchUsers);
+userRoutes.get('/:id', authMiddleware, rateLimitByUserId(300, 60), getUserById);
+
+// Social graph operations – per user, chặt hơn
+userRoutes.post('/:id/follow', authMiddleware, rateLimitByUserId(60, 60), followUser);
+userRoutes.post('/:id/unfollow', authMiddleware, rateLimitByUserId(60, 60), unfollowUser);
+userRoutes.get('/:id/follower', authMiddleware, rateLimitByUserId(300, 60), getFollowers);
+userRoutes.get('/:id/following', authMiddleware, rateLimitByUserId(300, 60), getFollowing);
 
 /**
  * @swagger
@@ -252,6 +259,7 @@ userRoutes.get('/:id/following', authMiddleware, getFollowing);
  *         kyc_rejection_reason:
  *           type: string
  *           example: "Identity card image is not clear"
+ */
 
 /**
  * @swagger

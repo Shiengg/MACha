@@ -1,17 +1,32 @@
 import { Router } from "express";
-import { createPost, getPosts, getPostById, updatePost, deletePost, getPostsByHashtag, searchPostsByHashtag, searchPostsByTitle } from "../controllers/PostController.js";
+import {
+    createPost,
+    getPosts,
+    getPostById,
+    updatePost,
+    deletePost,
+    getPostsByHashtag,
+    searchPostsByHashtag,
+    searchPostsByTitle
+} from "../controllers/PostController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { rateLimitByIP, rateLimitByUserId } from "../middlewares/rateLimitMiddleware.js";
 
 const postRoutes = Router();
 
-postRoutes.post('/', authMiddleware, createPost);
-postRoutes.get('/', authMiddleware, getPosts);
-postRoutes.get('/search', searchPostsByHashtag);
-postRoutes.get('/search/title', searchPostsByTitle);
-postRoutes.get('/hashtag/:name', getPostsByHashtag);
-postRoutes.get('/:id', authMiddleware, getPostById);
-postRoutes.put('/:id', authMiddleware, updatePost);
-postRoutes.delete('/:id', authMiddleware, deletePost);
+// Write operations – rate limit per user
+postRoutes.post('/', authMiddleware, rateLimitByUserId(120, 60), createPost);
+postRoutes.put('/:id', authMiddleware, rateLimitByUserId(120, 60), updatePost);
+postRoutes.delete('/:id', authMiddleware, rateLimitByUserId(60, 60), deletePost);
+
+// Authenticated feed
+postRoutes.get('/', authMiddleware, rateLimitByUserId(300, 60), getPosts);
+postRoutes.get('/:id', authMiddleware, rateLimitByUserId(300, 60), getPostById);
+
+// Public / search endpoints – IP-based limit
+postRoutes.get('/search', rateLimitByIP(300, 60), searchPostsByHashtag);
+postRoutes.get('/search/title', rateLimitByIP(300, 60), searchPostsByTitle);
+postRoutes.get('/hashtag/:name', rateLimitByIP(300, 60), getPostsByHashtag);
 
 /**
  * @swagger

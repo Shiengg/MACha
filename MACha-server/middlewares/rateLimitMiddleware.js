@@ -1,16 +1,15 @@
 import { redisClient } from "../config/redis.js";
 import { HTTP_STATUS } from "../utils/status.js";
+import dotenv from 'dotenv';
+dotenv.config();
 
-/**
- * Rate Limiting Middleware
- * @param {Object} options - Cấu hình rate limit
- * @param {number} options.maxRequests - Số request tối đa (default: 5)
- * @param {number} options.windowSeconds - Thời gian window tính bằng giây (default: 60)
- * @param {string} options.keyPrefix - Prefix cho Redis key (default: 'rate_limit')
- * @param {Function} options.keyGenerator - Custom function để tạo key (default: dùng IP)
- * @param {string} options.message - Custom error message
- */
 export const rateLimit = (options = {}) => {
+    // Cho phép tắt toàn bộ rate limit khi testing (ví dụ với k6)
+    // Đặt RATE_LIMIT_ENABLED=false trong .env hoặc env runtime
+    if (process.env.RATE_LIMIT_ENABLED === 'false') {
+        return (req, res, next) => next();
+    }
+
     const {
         maxRequests = 5,
         windowSeconds = 60,

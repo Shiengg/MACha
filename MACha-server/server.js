@@ -17,6 +17,7 @@ import './jobs/processExpiredEvents.job.js';
 import { initSubscribers } from './subscribers/initSubscriber.js';
 import User from './models/user.js';
 import * as onlineService from './services/online.service.js';
+import { metricsMiddleware, register, updateWebSocketConnections } from './middlewares/metricsMiddleware.js';
 
 const app = express();
 dotenv.config();
@@ -77,6 +78,13 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
+
+// Metrics middleware - phải đặt trước routes để capture tất cả requests
+// Chỉ enable nếu METRICS_ENABLED=true trong .env
+if (process.env.METRICS_ENABLED === 'true') {
+    app.use(metricsMiddleware);
+    console.log('📊 Metrics enabled - Prometheus metrics available at /metrics');
+}
 
 app.use("/api/auth", routes.authRoutes);
 app.use("/api/users", routes.userRoutes);
@@ -160,6 +168,11 @@ io.on('connection', async (socket) => {
 
     //console.log(`✅ Socket connected: ${socket.id} (User: ${username})`);
 
+    // Update WebSocket connections metric
+    if (process.env.METRICS_ENABLED === 'true') {
+        updateWebSocketConnections(io.sockets.sockets.size);
+    }
+
     if (userId) {
         const userRoom = `user:${userId}`;
         socket.join(userRoom);
@@ -190,6 +203,11 @@ io.on('connection', async (socket) => {
     socket.on('disconnect', async () => {
         //console.log(`❌ Socket disconnected: ${socket.id} (User: ${username})`);
 
+        // Update WebSocket connections metric
+        if (process.env.METRICS_ENABLED === 'true') {
+            updateWebSocketConnections(io.sockets.sockets.size);
+        }
+
         if (userId) {
             // Set user offline khi socket disconnect
             await onlineService.setUserOffline(userId);
@@ -217,6 +235,23 @@ app.get('/health', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
+
+// Prometheus metrics endpoint
+// Chỉ expose nếu METRICS_ENABLED=true
+if (process.env.METRICS_ENABLED === 'true') {
+    const metricsPath = process.env.METRICS_PATH || '/metrics';
+    app.get(metricsPath, async (req, res) => {
+        try {
+            res.set('Content-Type', register.contentType);
+            const metrics = await register.metrics();
+            res.end(metrics);
+        } catch (error) {
+            console.error('❌ Error generating metrics:', error);
+            res.status(500).end('Error generating metrics');
+        }
+    });
+    console.log(`📊 Metrics endpoint available at ${metricsPath}`);
+}
 
 // Init subscribers (pass Socket.IO instance)
 initSubscribers(io).then(() => {

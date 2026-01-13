@@ -1,12 +1,16 @@
 import { Router } from "express";
 import { likePost, unlikePost, getPostLikes } from "../controllers/LikeController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { rateLimitByIP, rateLimitByUserId } from "../middlewares/rateLimitMiddleware.js";
 
 const likeRoutes = Router();
 
-likeRoutes.post('/:postId/like', authMiddleware, likePost);
-likeRoutes.post('/:postId/unlike', authMiddleware, unlikePost);
-likeRoutes.get('/:postId/likes', authMiddleware, getPostLikes);
+// Like/unlike: per user để tránh spam
+likeRoutes.post('/:postId/like', authMiddleware, rateLimitByUserId(200, 60), likePost);
+likeRoutes.post('/:postId/unlike', authMiddleware, rateLimitByUserId(200, 60), unlikePost);
+
+// Get likes: public-ish, limit theo IP
+likeRoutes.get('/:postId/likes', rateLimitByIP(300, 60), getPostLikes);
 
 /**
  * @swagger

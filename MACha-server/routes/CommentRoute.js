@@ -1,13 +1,15 @@
 import { Router } from "express";
 import { addComment, getComments, deleteComment } from "../controllers/CommentController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
-import * as RateLimitMiddleware from "../middlewares/rateLimitMiddleware.js";
+import { rateLimitByIP, rateLimitByUserId } from "../middlewares/rateLimitMiddleware.js";
 
 const commentRoutes = Router();
 
-commentRoutes.post('/:postId/comments', authMiddleware, RateLimitMiddleware.rateLimitByUserId(10, 60), addComment);
-commentRoutes.get('/:postId/comments', RateLimitMiddleware.rateLimitByUserId(10, 60), getComments);
-commentRoutes.delete('/comments/:commentId', authMiddleware, RateLimitMiddleware.rateLimitByUserId(10, 60), deleteComment);
+commentRoutes.post('/:postId/comments', authMiddleware, rateLimitByUserId(120, 60), addComment);
+commentRoutes.delete('/comments/:commentId', authMiddleware, rateLimitByUserId(60, 60), deleteComment);
+
+// Read: per IP, rộng để không siết người dùng thật
+commentRoutes.get('/:postId/comments', rateLimitByIP(300, 60), getComments);
 
 /**
  * @swagger
