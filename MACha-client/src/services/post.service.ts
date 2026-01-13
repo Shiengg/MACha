@@ -77,9 +77,11 @@ export interface SearchPostsResponse {
   message?: string;
 }
 
-export const getPosts = async (): Promise<Post[]> => {
+export const getPosts = async (page: number = 0, limit: number = 20): Promise<Post[]> => {
   try {
-    const response = await apiClient.get(GET_POSTS_ROUTE);
+    const response = await apiClient.get(GET_POSTS_ROUTE, {
+      params: { page, limit },
+    });
     return response.data;
   } catch (error) {
     console.error("Error fetching posts:", error);

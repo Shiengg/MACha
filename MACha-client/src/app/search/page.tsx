@@ -3,7 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { campaignService, Campaign } from '@/services/campaign.service';
-import { searchPostsByTitle, Post } from '@/services/post.service';
+import { searchPostsByTitle, getPostsByHashtag, Post } from '@/services/post.service';
 import CampaignCard from '@/components/campaign/CampaignCard';
 import PostCard from '@/components/shared/PostCard';
 
@@ -43,6 +43,20 @@ function SearchContent() {
             const decoded = decodeURIComponent(query);
             setDecodedQuery(decoded);
             setPosts([]);
+            
+            // Check if query is a hashtag (starts with #)
+            if (decoded.startsWith('#')) {
+                const hashtagName = decoded.substring(1).trim().toLowerCase();
+                if (hashtagName) {
+                    // Search campaigns by hashtag
+                    fetchCampaignsByHashtag(hashtagName);
+                    // Search posts by hashtag
+                    fetchPostsByHashtag(hashtagName);
+                    return;
+                }
+            }
+            
+            // Search by title for both campaigns and posts
             fetchCampaignsByTitle(decoded);
             fetchPostsByTitle(decoded);
         } else {
@@ -73,6 +87,21 @@ function SearchContent() {
         }
     };
 
+    const fetchCampaignsByHashtag = async (hashtagName: string) => {
+        try {
+            setLoading(true);
+            setError(null);
+            const results = await campaignService.searchCampaignsByHashtag(hashtagName);
+            setCampaigns(results);
+        } catch (err: any) {
+            console.error('Error fetching campaigns by hashtag:', err);
+            setError('Không thể tải kết quả tìm kiếm chiến dịch theo hashtag. Vui lòng thử lại sau.');
+            setCampaigns([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const fetchPostsByTitle = async (searchTerm: string) => {
         try {
             setPostsLoading(true);
@@ -84,6 +113,22 @@ function SearchContent() {
         } catch (err: any) {
             console.error('Error fetching posts by title:', err);
             setPostsError('Không thể tải kết quả tìm kiếm bài viết. Vui lòng thử lại sau.');
+            setPosts([]);
+        } finally {
+            setPostsLoading(false);
+        }
+    };
+
+    const fetchPostsByHashtag = async (hashtagName: string) => {
+        try {
+            setPostsLoading(true);
+            setPostsError(null);
+            const normalizedHashtag = hashtagName.toLowerCase().trim();
+            const result = await getPostsByHashtag(normalizedHashtag, 1, 50);
+            setPosts(result.posts || []);
+        } catch (err: any) {
+            console.error('Error fetching posts by hashtag:', err);
+            setPostsError('Không thể tải kết quả tìm kiếm bài viết theo hashtag. Vui lòng thử lại sau.');
             setPosts([]);
         } finally {
             setPostsLoading(false);

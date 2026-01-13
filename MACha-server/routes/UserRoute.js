@@ -39,7 +39,7 @@ userRoutes.get('/:id/following', authMiddleware, getFollowing);
  *           type: string
  *           description: ID of the user that was followed
  *           example: "64a7b8c9d1e2f3a4b5c6d7e8"
- *     
+ * 
  *     FollowErrorResponse:
  *       type: object
  *       properties:
@@ -47,7 +47,7 @@ userRoutes.get('/:id/following', authMiddleware, getFollowing);
  *           type: string
  *           description: Error message
  *           example: "You can't follow your own account."
- *     
+ * 
  *     UnfollowUserResponse:
  *       type: object
  *       properties:
@@ -55,7 +55,7 @@ userRoutes.get('/:id/following', authMiddleware, getFollowing);
  *           type: string
  *           description: Success message
  *           example: "Successfully unfollowed."
- *     
+ * 
  *     UnfollowErrorResponse:
  *       type: object
  *       properties:
@@ -63,7 +63,7 @@ userRoutes.get('/:id/following', authMiddleware, getFollowing);
  *           type: string
  *           description: Error message
  *           example: "We couldn't find the user you want to unfollow."
- *     
+ * 
  *     FollowerInfo:
  *       type: object
  *       properties:
@@ -83,7 +83,7 @@ userRoutes.get('/:id/following', authMiddleware, getFollowing);
  *           type: string
  *           description: Follower's avatar URL
  *           example: "https://example.com/avatar.jpg"
- *     
+ * 
  *     GetFollowersResponse:
  *       type: object
  *       properties:
@@ -96,7 +96,7 @@ userRoutes.get('/:id/following', authMiddleware, getFollowing);
  *           items:
  *             $ref: '#/components/schemas/FollowerInfo'
  *           description: List of followers with basic information
- *     
+ * 
  *     FollowingInfo:
  *       type: object
  *       properties:
@@ -129,7 +129,7 @@ userRoutes.get('/:id/following', authMiddleware, getFollowing);
  *           items:
  *             $ref: '#/components/schemas/FollowingInfo'
  *           description: List of users being followed with basic information
- *     
+ * 
  *     SearchUserResult:
  *       type: object
  *       properties:
@@ -153,7 +153,7 @@ userRoutes.get('/:id/following', authMiddleware, getFollowing);
  *           type: string
  *           description: User's biography
  *           example: "Software developer passionate about AI"
- *     
+ * 
  *     SearchUsersResponse:
  *       type: object
  *       properties:
@@ -191,7 +191,7 @@ userRoutes.get('/:id/following', authMiddleware, getFollowing);
  *           type: string
  *           description: URL to bank statement
  *           example: "https://s3.amazonaws.com/bucket/user123/bank.pdf"
- *     
+ * 
  *     SubmitKYCRequest:
  *       type: object
  *       required:
@@ -233,7 +233,7 @@ userRoutes.get('/:id/following', authMiddleware, getFollowing);
  *               example: "NGUYEN VAN A"
  *         kyc_documents:
  *           $ref: '#/components/schemas/KYCDocuments'
- *     
+ * 
  *     KYCStatusResponse:
  *       type: object
  *       properties:

@@ -364,12 +364,14 @@ async function handleSendOtp(job) {
 
 async function handleSendForgotPassword(job) {
     try {
-        await mailerService.sendForgotPasswordEmail(job.email, {
+        console.log(`📧 [Worker] Processing SEND_FORGOT_PASSWORD job for email: ${job.email}`);
+        const result = await mailerService.sendForgotPasswordEmail(job.email, {
             username: job.username,
             newPassword: job.newPassword
         });
+        console.log(`✅ [Worker] Successfully sent forgot password email to ${job.email}`);
     } catch (error) {
-        console.error('Error processing SEND_FORGOT_PASSWORD job:', error);
+        console.error(`❌ [Worker] Error processing SEND_FORGOT_PASSWORD job for ${job.email}:`, error.message || error);
     }
 }
 

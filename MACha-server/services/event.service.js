@@ -25,6 +25,22 @@ const invalidateEventCaches = async (eventId, category = null, status = null) =>
         keys.push(`events:status:${status}`);
     }
     
+    // Delete all dynamic cache keys with pattern events:all:*
+    try {
+        const dynamicKeys = [];
+        for await (const key of redisClient.scanIterator({
+            MATCH: 'events:all:*',
+            COUNT: 100
+        })) {
+            dynamicKeys.push(String(key));
+        }
+        if (dynamicKeys.length > 0) {
+            keys.push(...dynamicKeys);
+        }
+    } catch (error) {
+        console.error('Error scanning dynamic event cache keys:', error);
+    }
+    
     await Promise.all(keys.map(key => redisClient.del(key)));
 };
 
