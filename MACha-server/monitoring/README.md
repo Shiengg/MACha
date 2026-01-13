@@ -142,11 +142,9 @@ cd monitoring
 5. **Chạy load test với K6:**
    ```bash
    # K6 script đã được config để test production
-   export BASE_URL=https://macha-production-4144.up.railway.app
-   export TEST_USER_EMAIL=your-email@example.com
-   export TEST_USER_PASSWORD=your-password
-   
-   k6 run ../k6-load-test.js
+   cd k6
+
+   ./run-production.sh
    ```
 
 6. **Stop monitoring:**
