@@ -627,8 +627,7 @@ export const sepayWithdrawalCallback = async (req, res) => {
 export const sepayWithdrawalSuccess = async (req, res) => {
     try {
         const { order_invoice_number } = req.query;
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         if (order_invoice_number) {
             const result = await escrowService.updateSepayWithdrawalStatus(order_invoice_number, 'completed', {});
             if (result && result.escrow) {
@@ -639,7 +638,7 @@ export const sepayWithdrawalSuccess = async (req, res) => {
         return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=success`);
     } catch (error) {
         console.error('[SePay][WITHDRAWAL][SUCCESS][ERROR]', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=error`);
     }
 };
@@ -647,7 +646,7 @@ export const sepayWithdrawalSuccess = async (req, res) => {
 export const sepayWithdrawalError = async (req, res) => {
     try {
         const { order_invoice_number } = req.query;
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
 
         if (order_invoice_number) {
             const result = await escrowService.updateSepayWithdrawalStatus(order_invoice_number, 'failed', {});
@@ -659,7 +658,7 @@ export const sepayWithdrawalError = async (req, res) => {
         return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=error`);
     } catch (error) {
         console.error('[SePay][WITHDRAWAL][ERROR][EXCEPTION]', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=error`);
     }
 };
@@ -667,7 +666,7 @@ export const sepayWithdrawalError = async (req, res) => {
 export const sepayWithdrawalCancel = async (req, res) => {
     try {
         const { order_invoice_number } = req.query;
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
 
         if (order_invoice_number) {
             const escrow = await escrowService.getEscrowByOrderInvoice(order_invoice_number);
@@ -711,7 +710,7 @@ export const sepayWithdrawalCancel = async (req, res) => {
         return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=cancelled`);
     } catch (error) {
         console.error('[SePay][WITHDRAWAL][CANCEL][EXCEPTION]', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=cancelled`);
     }
 };
@@ -860,7 +859,7 @@ export const sepayRefundCallback = async (req, res) => {
 export const sepayRefundSuccess = async (req, res) => {
     try {
         const { order_invoice_number } = req.query;
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
 
         if (order_invoice_number) {
             const refund = await refundService.getRefundByOrderInvoice(order_invoice_number);
@@ -880,7 +879,7 @@ export const sepayRefundSuccess = async (req, res) => {
         return res.redirect(`${frontendUrl}/owner/refunds?payment=success`);
     } catch (error) {
         console.error('[SePay][REFUND][SUCCESS][ERROR]', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}/owner/refunds?payment=error`);
     }
 };
@@ -888,7 +887,7 @@ export const sepayRefundSuccess = async (req, res) => {
 export const sepayRefundError = async (req, res) => {
     try {
         const { order_invoice_number } = req.query;
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
 
         if (order_invoice_number) {
             const refund = await refundService.getRefundByOrderInvoice(order_invoice_number);
@@ -907,7 +906,7 @@ export const sepayRefundError = async (req, res) => {
         return res.redirect(`${frontendUrl}/owner/refunds?payment=error`);
     } catch (error) {
         console.error('[SePay][REFUND][ERROR][EXCEPTION]', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}/owner/refunds?payment=error`);
     }
 };
@@ -915,12 +914,12 @@ export const sepayRefundError = async (req, res) => {
 export const sepayRefundCancel = async (req, res) => {
     try {
         const { order_invoice_number } = req.query;
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
 
         return res.redirect(`${frontendUrl}/owner/refunds?payment=cancelled`);
     } catch (error) {
         console.error('[SePay][REFUND][CANCEL][EXCEPTION]', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}/owner/refunds?payment=cancelled`);
     }
 };
