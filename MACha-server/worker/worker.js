@@ -29,7 +29,7 @@ const notificationPublisher = createClient({
     url: process.env.REDIS_URL
 });
 
-xl.on("error", (err) => console.error("Notification Publisher Error:", err));
+notificationPublisher.on("error", (err) => console.error("Notification Publisher Error:", err));
 
 async function processQueue() {
 
