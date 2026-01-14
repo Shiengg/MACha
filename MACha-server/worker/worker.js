@@ -35,11 +35,6 @@ async function processQueue() {
 
     while (true) {
         try {
-            if (process.env.RUN_WORKER !== 'true') {
-                console.log('⛔ Worker disabled in this service');
-                process.exit(0);
-            }
-
             const jobQueue = await workerRedisClient.brPop("job_queue", 5);
 
             if (!jobQueue) {
