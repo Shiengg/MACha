@@ -1,0 +1,20 @@
+{
+  "name": "macha_worker",
+  "version": "1.0.0",
+  "description": "Background worker for processing email jobs with RabbitMQ and Resend",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["worker", "rabbitmq", "resend", "email"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "amqplib": "^0.10.9",
+    "dotenv": "^17.2.3",
+    "resend": "^4.0.0"
+  }
+}
