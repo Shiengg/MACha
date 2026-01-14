@@ -836,6 +836,8 @@ async function startWorker() {
         await workerRedisClient.connect();
         await notificationPublisher.connect();
 
+        console.log('Worker is running');
+
         await mailerService.verifyConnection();
 
         await processQueue();
