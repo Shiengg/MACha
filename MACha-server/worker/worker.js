@@ -19,17 +19,17 @@ connectDB();
 
 // Tạo Redis client riêng cho worker (không dùng chung với server)
 const workerRedisClient = createClient({
-    url: process.env.REDIS_URL || "redis://localhost:6379"
+    url: process.env.REDIS_URL
 });
 
 workerRedisClient.on("error", (err) => console.error("Worker Redis Error:", err));
 
 // Tạo Redis Publisher để gửi notification events
 const notificationPublisher = createClient({
-    url: process.env.REDIS_URL || "redis://localhost:6379"
+    url: process.env.REDIS_URL
 });
 
-notificationPublisher.on("error", (err) => console.error("Notification Publisher Error:", err));
+xl.on("error", (err) => console.error("Notification Publisher Error:", err));
 
 async function processQueue() {
 
@@ -365,7 +365,7 @@ async function handleSendOtp(job) {
 async function handleSendForgotPassword(job) {
     try {
         console.log(`📧 [Worker] Processing SEND_FORGOT_PASSWORD job for email: ${job.email}`);
-        const result = await mailerService.sendForgotPasswordEmail(job.email, {
+        await mailerService.sendForgotPasswordEmail(job.email, {
             username: job.username,
             newPassword: job.newPassword
         });
