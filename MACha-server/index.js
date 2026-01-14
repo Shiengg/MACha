@@ -8,13 +8,10 @@ const ROLE = process.env.ROLE?.toLowerCase();
 console.log(`🚀 Starting application with ROLE=${ROLE || 'server (default)'}`);
 
 try {
-    if (ROLE === 'worker') {
-        console.log('📦 Starting worker process...');
-        await import('./worker/worker.js');
-    } else {
-        console.log('🌐 Starting server process...');
-        await import('./server.js');
-    }
+    await import('./worker/worker.js');
+    console.log('📦 Starting worker process...');
+    await import('./server.js');
+    console.log('🌐 Starting server process...');
 } catch (error) {
     console.error('❌ Failed to start application:', error);
     process.exit(1);
