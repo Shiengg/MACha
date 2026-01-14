@@ -118,7 +118,7 @@ export const sepaySuccess = async (req, res) => {
         return res.redirect(`${frontendUrl}?donation=success`);
     } catch (error) {
         console.error('[SePay][SUCCESS][ERROR]', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}?donation=error`);
     }
 }
@@ -138,7 +138,7 @@ export const sepayError = async (req, res) => {
         return res.redirect(`${frontendUrl}?donation=error`);
     } catch (error) {
         console.error('[SePay][ERROR][EXCEPTION]', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}?donation=error`);
     }
 }
@@ -205,7 +205,7 @@ export const sepayCancel = async (req, res) => {
         return res.redirect(`${frontendUrl}?donation=cancelled`);
     } catch (error) {
         console.error('[SePay][CANCEL][EXCEPTION]', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}?donation=cancelled`);
     }
 }

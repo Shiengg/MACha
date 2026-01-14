@@ -218,7 +218,7 @@ export const sepayRecoveryCallback = async (req, res) => {
 export const sepayRecoverySuccess = async (req, res) => {
     try {
         const { order_invoice_number } = req.query;
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
 
         if (order_invoice_number && order_invoice_number.startsWith('RECOVERY-')) {
             const recoveryCaseId = order_invoice_number.split('-')[1];
@@ -265,7 +265,7 @@ export const sepayRecoverySuccess = async (req, res) => {
         return res.redirect(`${frontendUrl}/creator/recovery-cases?payment=success`);
     } catch (error) {
         console.error('[SePay][RECOVERY][SUCCESS][ERROR]', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}/creator/recovery-cases?payment=error`);
     }
 };
@@ -273,23 +273,23 @@ export const sepayRecoverySuccess = async (req, res) => {
 export const sepayRecoveryError = async (req, res) => {
     try {
         const { order_invoice_number } = req.query;
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
 
         return res.redirect(`${frontendUrl}/creator/recovery-cases?payment=error`);
     } catch (error) {
         console.error('[SePay][RECOVERY][ERROR][EXCEPTION]', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}/creator/recovery-cases?payment=error`);
     }
 };
 
 export const sepayRecoveryCancel = async (req, res) => {
     try {
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}/creator/recovery-cases?payment=cancelled`);
     } catch (error) {
         console.error('[SePay][RECOVERY][CANCEL][EXCEPTION]', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ORIGIN_PROD;
         return res.redirect(`${frontendUrl}/creator/recovery-cases?payment=cancelled`);
     }
 };
