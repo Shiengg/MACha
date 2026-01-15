@@ -95,7 +95,7 @@ function OwnerAdminActivitiesContent() {
           <div className="flex items-center justify-center h-screen">
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading...</p>
+              <p className="text-gray-500">Đang tải...</p>
             </div>
           </div>
         </OwnerContentWrapper>
@@ -104,15 +104,15 @@ function OwnerAdminActivitiesContent() {
   }
 
   const stats = [
-    { label: 'Campaign Approvals', value: data.statistics.campaign_approvals || 0, icon: CheckCircle, color: 'bg-green-500' },
-    { label: 'Campaign Rejections', value: data.statistics.campaign_rejections || 0, icon: XCircle, color: 'bg-red-500' },
-    { label: 'Event Approvals', value: data.statistics.event_approvals || 0, icon: CheckCircle, color: 'bg-blue-500' },
-    { label: 'Event Rejections', value: data.statistics.event_rejections || 0, icon: XCircle, color: 'bg-orange-500' },
-    { label: 'KYC Approvals', value: data.statistics.kyc_approvals || 0, icon: CheckCircle, color: 'bg-purple-500' },
-    { label: 'KYC Rejections', value: data.statistics.kyc_rejections || 0, icon: XCircle, color: 'bg-pink-500' },
-    { label: 'Report Resolutions', value: data.statistics.report_resolutions || 0, icon: FileText, color: 'bg-yellow-500' },
-    { label: 'Withdrawal Approvals', value: data.statistics.withdrawal_approvals || 0, icon: DollarSign, color: 'bg-green-600' },
-    { label: 'Withdrawal Rejections', value: data.statistics.withdrawal_rejections || 0, icon: DollarSign, color: 'bg-red-600' },
+    { label: 'Duyệt chiến dịch', value: data.statistics.campaign_approvals || 0, icon: CheckCircle, color: 'bg-green-500' },
+    { label: 'Từ chối chiến dịch', value: data.statistics.campaign_rejections || 0, icon: XCircle, color: 'bg-red-500' },
+    { label: 'Duyệt sự kiện', value: data.statistics.event_approvals || 0, icon: CheckCircle, color: 'bg-blue-500' },
+    { label: 'Từ chối sự kiện', value: data.statistics.event_rejections || 0, icon: XCircle, color: 'bg-orange-500' },
+    { label: 'Duyệt KYC', value: data.statistics.kyc_approvals || 0, icon: CheckCircle, color: 'bg-purple-500' },
+    { label: 'Từ chối KYC', value: data.statistics.kyc_rejections || 0, icon: XCircle, color: 'bg-pink-500' },
+    { label: 'Xử lý báo cáo', value: data.statistics.report_resolutions || 0, icon: FileText, color: 'bg-yellow-500' },
+    { label: 'Duyệt rút tiền', value: data.statistics.withdrawal_approvals || 0, icon: DollarSign, color: 'bg-green-600' },
+    { label: 'Từ chối rút tiền', value: data.statistics.withdrawal_rejections || 0, icon: DollarSign, color: 'bg-red-600' },
   ];
 
   return (
@@ -248,7 +248,7 @@ export default function OwnerAdminActivities() {
           <div className="flex items-center justify-center h-screen">
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading...</p>
+              <p className="text-gray-500">Đang tải...</p>
             </div>
           </div>
         </OwnerContentWrapper>

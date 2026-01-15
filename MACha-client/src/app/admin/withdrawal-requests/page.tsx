@@ -444,7 +444,7 @@ export default function AdminWithdrawalRequests() {
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search"
+                  placeholder="Tìm kiếm"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
@@ -458,7 +458,7 @@ export default function AdminWithdrawalRequests() {
                   className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors text-sm sm:text-base"
                 >
                   <SlidersHorizontal className="w-4 h-4 text-gray-600" />
-                  <span className="text-xs sm:text-sm font-bold">Filters</span>
+                  <span className="text-xs sm:text-sm font-bold">Bộ lọc</span>
                 </button>
                 
                 {/* Filters Dropdown */}
@@ -526,7 +526,7 @@ export default function AdminWithdrawalRequests() {
                           onChange={(e) => handleSelectAll(e.target.checked)}
                         />
                       </th>
-                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900">Campaign</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900">Chiến dịch</th>
                       <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900 hidden md:table-cell">Người yêu cầu</th>
                       <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900">Số tiền</th>
                       <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs sm:text-sm font-medium text-gray-900 hidden lg:table-cell">Kết quả vote</th>
@@ -634,11 +634,11 @@ export default function AdminWithdrawalRequests() {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5" />
-                  Thông tin Campaign
+                  Thông tin chiến dịch
                 </h3>
                 <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <div>
-                    <p className="text-gray-600 text-sm mb-1">Tên Campaign</p>
+                    <p className="text-gray-600 text-sm mb-1">Tên chiến dịch</p>
                     <p className="text-gray-900 font-medium">
                       {selectedRequest.campaign && typeof selectedRequest.campaign === 'object'
                         ? selectedRequest.campaign.title || 'N/A'
@@ -672,7 +672,7 @@ export default function AdminWithdrawalRequests() {
                     <p className="text-gray-900 font-medium">{getCreatorInfo(selectedRequest.requested_by)}</p>
                   </div>
                   <div>
-                    <p className="text-gray-600 text-sm mb-1">Username</p>
+                    <p className="text-gray-600 text-sm mb-1">Tên đăng nhập</p>
                     <p className="text-gray-900 font-medium">
                       {typeof selectedRequest.requested_by === 'object'
                         ? selectedRequest.requested_by.username

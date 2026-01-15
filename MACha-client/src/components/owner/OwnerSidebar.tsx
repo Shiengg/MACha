@@ -52,7 +52,7 @@ export default function OwnerSidebar() {
     {
       title: 'TỔNG QUAN',
       items: [
-        { icon: BarChart3, label: 'Dashboard', href: '/owner/dashboard' },
+        { icon: BarChart3, label: 'Trang tổng quan', href: '/owner/dashboard' },
       ],
     },
     {
@@ -60,7 +60,7 @@ export default function OwnerSidebar() {
       items: [
         { icon: ShieldCheck, label: 'Quản lý Admin', href: '/owner/admins', badge: undefined },
         { icon: Flag, label: 'Báo cáo về Admin', href: '/owner/admin-reports', badge: undefined },
-        { icon: Users, label: 'Quản lý Users', href: '/owner/users', badge: undefined },
+        { icon: Users, label: 'Quản lý người dùng', href: '/owner/users', badge: undefined },
         { icon: Wallet, label: 'Tài chính tổng quan', href: '/owner/financial' },
         { icon: ChartLine, label: 'Tài chính Campaign', href: '/owner/financial/campaigns' },
         { icon: Activity, label: 'Hoạt động Admin', href: '/owner/admin-activities' },
@@ -92,14 +92,14 @@ export default function OwnerSidebar() {
                 <Crown className="w-7 h-7" />
               </div>
               <div>
-                <span className="text-gray-900 font-bold text-lg block">Owner Panel</span>
-                <span className="text-xs text-purple-600 font-medium">System Management</span>
+                <span className="text-gray-900 font-bold text-lg block">Bảng điều khiển Owner</span>
+                <span className="text-xs text-purple-600 font-medium">Quản lý hệ thống</span>
               </div>
             </div>
             <button
               onClick={closeSidebar}
               className="lg:hidden p-1 hover:bg-gray-100 rounded transition-colors"
-              aria-label="Close sidebar"
+              aria-label="Đóng sidebar"
             >
               <X className="w-5 h-5 text-gray-600" />
             </button>

@@ -46,9 +46,9 @@ export default function ForgotPasswordPage() {
                 {/* Left Side - Forgot Password Form */}
                 <div className="lg:w-1/2 bg-white p-12 flex flex-col justify-center">
                     <div className="max-w-md w-full mx-auto">
-                        <h2 className="text-4xl font-bold text-gray-900 mb-4">Forgot Password</h2>
+                        <h2 className="text-4xl font-bold text-gray-900 mb-4">Quên mật khẩu</h2>
                         <p className="text-gray-600 mb-8">
-                            Enter your email address and we'll send you instructions to reset your password.
+                            Nhập địa chỉ email của bạn và chúng tôi sẽ gửi hướng dẫn để đặt lại mật khẩu.
                         </p>
                         
                         {/* Email Input */}
@@ -96,7 +96,7 @@ export default function ForgotPasswordPage() {
                                     ></path>
                                 </svg>
                             )}
-                            <span>{loading ? 'Đang gửi yêu cầu...' : 'Send Reset Link'}</span>
+                            <span>{loading ? 'Đang gửi yêu cầu...' : 'Gửi liên kết đặt lại'}</span>
                         </button>
 
                         {/* Back to Login Link */}
@@ -117,7 +117,7 @@ export default function ForgotPasswordPage() {
                                         clipRule="evenodd" 
                                     />
                                 </svg>
-                                Back to Login
+                                Quay lại đăng nhập
                             </Link>
                         </div>
                     </div>
@@ -126,10 +126,10 @@ export default function ForgotPasswordPage() {
                 {/* Right Side - Illustration */}
                 <div className="lg:w-1/2 bg-white p-12 flex flex-col justify-center items-center">
                     <h1 className="text-5xl font-bold text-gray-900 mb-8 leading-tight text-center">
-                        Reset your password
+                        Đặt lại mật khẩu của bạn
                     </h1>
                     <p className="text-gray-600 text-lg mb-8 text-center max-w-md">
-                        Don't worry! It happens. We'll help you get back to your account.
+                        Đừng lo lắng! Chúng tôi sẽ giúp bạn lấy lại quyền truy cập vào tài khoản.
                     </p>
                     <div className="w-full max-w-md">
                         <Image

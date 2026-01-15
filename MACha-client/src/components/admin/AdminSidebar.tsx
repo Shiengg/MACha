@@ -44,9 +44,9 @@ export default function AdminSidebar() {
 
   const menuSections: MenuSection[] = [
     {
-      title: 'GENERAL',
+      title: 'TỔNG QUAN',
       items: [
-        { icon: BarChart3, label: 'Dashboard', href: '/admin/dashboard' },
+        { icon: BarChart3, label: 'Bảng điều khiển', href: '/admin/dashboard' },
       ],
     },
     {
@@ -82,12 +82,12 @@ export default function AdminSidebar() {
               <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
                 A
               </div>
-              <span className="text-gray-900 font-bold text-lg">Admin Panel</span>
+              <span className="text-gray-900 font-bold text-lg">Bảng quản trị</span>
             </div>
             <button
               onClick={closeSidebar}
               className="lg:hidden p-1 hover:bg-gray-100 rounded transition-colors"
-              aria-label="Close sidebar"
+              aria-label="Đóng sidebar"
             >
               <X className="w-5 h-5 text-gray-600" />
             </button>

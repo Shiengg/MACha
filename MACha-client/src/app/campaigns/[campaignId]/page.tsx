@@ -834,7 +834,7 @@ function CampaignDetails() {
                                     <div className="relative">
                                         <img
                                             src={imagePreview}
-                                            alt="Preview"
+                                            alt="Xem trước"
                                             className="max-w-full h-auto rounded-lg max-h-64 object-contain"
                                         />
                                         <button
@@ -1527,7 +1527,7 @@ function CampaignDetails() {
                                                         <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
                                                         </svg>
-                                                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Hashtag</h3>
+                                                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Thẻ bắt đầu bằng #</h3>
                                                     </div>
                                                         <span className="text-blue-600 dark:text-blue-400 font-semibold group-hover:text-blue-700 dark:group-hover:text-blue-300">
                                                             #{campaign.hashtag.name}
@@ -1542,7 +1542,7 @@ function CampaignDetails() {
                                                         <div key={index} className="relative aspect-video rounded-xl overflow-hidden">
                                                             <img 
                                                                 src={img} 
-                                                                alt={`Gallery ${index + 1}`}
+                                                                alt={`Ảnh ${index + 1}`}
                                                                 className="w-full h-full object-cover hover:scale-105 transition duration-300"
                                                             />
                                                         </div>
@@ -1555,7 +1555,7 @@ function CampaignDetails() {
                                                 <div className="relative aspect-video rounded-xl overflow-hidden">
                                                     <img 
                                                         src={campaign.banner_image} 
-                                                        alt="Campaign banner"
+                                                        alt="Ảnh bìa chiến dịch"
                                                         className="w-full h-full object-cover"
                                                     />
                                                 </div>
@@ -1618,10 +1618,10 @@ function CampaignDetails() {
                                                                 </div>
                                                                 <div className="flex-1">
                                                                     <h3 className="text-lg font-bold text-orange-900 dark:text-orange-300 mb-2">
-                                                                        Campaign đã đạt milestone! 🎉
+                                                                        Chiến dịch đã đạt mốc quan trọng! 🎉
                                                                     </h3>
                                                                     <p className="text-orange-700 dark:text-orange-400 mb-4">
-                                                                        Withdrawal request đã được tạo tự động khi campaign đạt các mốc mục tiêu:
+                                                                        Yêu cầu rút tiền đã được tạo tự động khi chiến dịch đạt các mốc mục tiêu:
                                                                     </p>
                                                                     <div className="space-y-2 mb-4">
                                                                         {autoCreatedRequests.map((request) => (

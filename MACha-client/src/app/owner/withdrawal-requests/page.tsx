@@ -315,11 +315,11 @@ export default function OwnerWithdrawalRequests() {
                               <p className="text-xs text-gray-500 mb-2">Kết quả voting</p>
                               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm">
                                 <span className="text-green-600">
-                                  ✓ Approve: {request.votingResults.approveCount} ({request.votingResults.approvePercentage}
+                                  ✓ Phê duyệt: {request.votingResults.approveCount} ({request.votingResults.approvePercentage}
                                   %)
                                 </span>
                                 <span className="text-red-600">
-                                  ✗ Reject: {request.votingResults.rejectCount} ({request.votingResults.rejectPercentage}
+                                  ✗ Từ chối: {request.votingResults.rejectCount} ({request.votingResults.rejectPercentage}
                                   %)
                                 </span>
                               </div>
@@ -374,7 +374,7 @@ export default function OwnerWithdrawalRequests() {
 
             <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               <div>
-                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Campaign</h3>
+                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Chiến dịch</h3>
                 <p className="text-base sm:text-lg font-semibold text-gray-900">{getCampaignTitle(selectedRequest.campaign)}</p>
               </div>
 
@@ -416,14 +416,14 @@ export default function OwnerWithdrawalRequests() {
                       <span className="font-semibold">{selectedRequest.votingResults.totalVotes}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-green-600">Approve:</span>
+                      <span className="text-green-600">Phê duyệt:</span>
                       <span className="font-semibold text-green-600">
                         {selectedRequest.votingResults.approveCount} ({selectedRequest.votingResults.approvePercentage}
                         %)
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-red-600">Reject:</span>
+                      <span className="text-red-600">Từ chối:</span>
                       <span className="font-semibold text-red-600">
                         {selectedRequest.votingResults.rejectCount} ({selectedRequest.votingResults.rejectPercentage}
                         %)

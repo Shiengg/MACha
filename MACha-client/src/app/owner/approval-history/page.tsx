@@ -80,11 +80,11 @@ export default function OwnerApprovalHistory() {
 
   const getTypeLabel = (type: string) => {
     const labels: { [key: string]: string } = {
-      campaign: 'Campaign',
-      event: 'Event',
+      campaign: 'Chiến dịch',
+      event: 'Sự kiện',
       kyc: 'KYC',
-      report: 'Report',
-      escrow: 'Escrow',
+      report: 'Báo cáo',
+      escrow: 'Rút tiền',
     };
     return labels[type] || type;
   };
@@ -146,10 +146,10 @@ export default function OwnerApprovalHistory() {
 
   const handleExport = () => {
     const csvContent = [
-      ['Type', 'Action', 'Item', 'Admin', 'Reason', 'Date'].join(','),
+      ['Loại', 'Hành động', 'Nội dung', 'Admin', 'Lý do', 'Ngày'].join(','),
       ...sortedHistory.map(item => {
-        const reason = item.action === 'rejected' 
-          ? (item.item?.rejection_reason || item.item?.rejected_reason || item.item?.admin_rejection_reason || 'No reason provided')
+        const reason =           item.action === 'rejected' 
+          ? (item.item?.rejection_reason || item.item?.rejected_reason || item.item?.admin_rejection_reason || 'Không có lý do')
           : (item.item?.approval_reason || 'N/A');
         const itemName = item.type === 'campaign' ? (item.item?.title || 'N/A') :
           item.type === 'event' ? (item.item?.title || 'N/A') :
@@ -555,7 +555,7 @@ export default function OwnerApprovalHistory() {
             {type === 'escrow' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Campaign</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Chiến dịch</label>
                   <p className="text-sm font-semibold text-gray-900">{item?.campaign?.title || 'N/A'}</p>
                 </div>
                 <div>
@@ -663,30 +663,30 @@ export default function OwnerApprovalHistory() {
               className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all text-sm sm:text-base w-full sm:w-auto justify-center"
             >
               <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline">Export CSV</span>
-              <span className="sm:hidden">Export</span>
+              <span className="hidden sm:inline">Xuất CSV</span>
+              <span className="sm:hidden">Xuất</span>
             </button>
           </div>
 
           <div className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200 shadow-sm mb-4 sm:mb-6">
             <div className="flex items-center gap-2 mb-3 sm:mb-4">
               <Filter className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-              <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Filters</h3>
+              <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Bộ lọc</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Loại</label>
                 <select
                   value={filters.type}
                   onChange={(e) => setFilters({ ...filters, type: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 >
-                  <option value="">All Types</option>
-                  <option value="campaign">Campaign</option>
-                  <option value="event">Event</option>
+                  <option value="">Tất cả loại</option>
+                  <option value="campaign">Chiến dịch</option>
+                  <option value="event">Sự kiện</option>
                   <option value="kyc">KYC</option>
-                  <option value="report">Report</option>
-                  <option value="escrow">Escrow</option>
+                  <option value="report">Báo cáo</option>
+                  <option value="escrow">Rút tiền</option>
                 </select>
               </div>
               <div>
@@ -696,7 +696,7 @@ export default function OwnerApprovalHistory() {
                   onChange={(e) => setFilters({ ...filters, adminId: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 >
-                  <option value="">All Admins</option>
+                  <option value="">Tất cả Admin</option>
                   {admins.map((admin) => (
                     <option key={admin._id} value={admin._id}>
                       {admin.username}
@@ -705,7 +705,7 @@ export default function OwnerApprovalHistory() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ngày bắt đầu</label>
                 <input
                   type="date"
                   value={filters.startDate}
@@ -714,7 +714,7 @@ export default function OwnerApprovalHistory() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ngày kết thúc</label>
                 <input
                   type="date"
                   value={filters.endDate}
@@ -728,7 +728,7 @@ export default function OwnerApprovalHistory() {
           {loading ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading...</p>
+              <p className="text-gray-500">Đang tải...</p>
             </div>
           ) : (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
@@ -741,7 +741,7 @@ export default function OwnerApprovalHistory() {
                         onClick={() => handleSort('type')}
                       >
                         <div className="flex items-center gap-2">
-                          Type
+                          Loại
                           {getSortIcon('type')}
                         </div>
                       </th>
@@ -750,11 +750,11 @@ export default function OwnerApprovalHistory() {
                         onClick={() => handleSort('action')}
                       >
                         <div className="flex items-center gap-2">
-                          Action
+                          Hành động
                           {getSortIcon('action')}
                         </div>
                       </th>
-                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nội dung</th>
                       <th 
                         className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                         onClick={() => handleSort('admin')}
@@ -764,13 +764,13 @@ export default function OwnerApprovalHistory() {
                           {getSortIcon('admin')}
                         </div>
                       </th>
-                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Reason</th>
+                      <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Lý do</th>
                       <th 
                         className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                         onClick={() => handleSort('timestamp')}
                       >
                         <div className="flex items-center gap-2">
-                          Date
+                          Ngày
                           {getSortIcon('timestamp')}
                         </div>
                       </th>
@@ -790,7 +790,7 @@ export default function OwnerApprovalHistory() {
 
                       const getReason = () => {
                         if (item.action === 'rejected' || item.action === 'rejected') {
-                          return item.item?.rejection_reason || item.item?.rejected_reason || item.item?.admin_rejection_reason || 'No reason provided';
+                          return item.item?.rejection_reason || item.item?.rejected_reason || item.item?.admin_rejection_reason || 'Không có lý do';
                         }
                         return item.item?.approval_reason || 'N/A';
                       };
@@ -805,7 +805,7 @@ export default function OwnerApprovalHistory() {
                           </td>
                           <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
                             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getActionColor(item.action)}`}>
-                              {item.action}
+                              {item.action === 'approved' ? 'Đã duyệt' : item.action === 'rejected' ? 'Đã từ chối' : item.action === 'verified' ? 'Đã xác minh' : item.action}
                             </span>
                           </td>
                           <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
@@ -852,7 +852,7 @@ export default function OwnerApprovalHistory() {
                   disabled={currentPage === 1}
                   className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm"
                 >
-                  Previous
+                  Trước
                 </button>
                 <span className="text-gray-600 text-sm">
                   Trang {currentPage} / {totalPages}
@@ -862,7 +862,7 @@ export default function OwnerApprovalHistory() {
                   disabled={currentPage === totalPages}
                   className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm"
                 >
-                  Next
+                  Sau
                 </button>
               </div>
             </div>

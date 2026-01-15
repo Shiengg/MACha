@@ -21,7 +21,7 @@ export default function OwnerDashboard() {
         const data = await ownerService.getOwnerDashboard();
         setDashboardData(data);
       } catch (err: any) {
-        setError(err.response?.data?.message || 'Failed to load dashboard');
+        setError(err.response?.data?.message || 'Không thể tải trang tổng quan');
         console.error('Error fetching dashboard:', err);
       } finally {
         setLoading(false);
@@ -40,7 +40,7 @@ export default function OwnerDashboard() {
           <div className="flex items-center justify-center h-screen">
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading dashboard...</p>
+              <p className="text-gray-500">Đang tải trang tổng quan...</p>
             </div>
           </div>
         </OwnerContentWrapper>
@@ -56,7 +56,7 @@ export default function OwnerDashboard() {
         <OwnerContentWrapper>
           <div className="flex items-center justify-center h-screen">
             <div className="text-center">
-              <p className="text-red-500">{error || 'Failed to load dashboard'}</p>
+              <p className="text-red-500">{error || 'Không thể tải trang tổng quan'}</p>
             </div>
           </div>
         </OwnerContentWrapper>
@@ -66,21 +66,21 @@ export default function OwnerDashboard() {
 
   const financialStats = [
     {
-      label: 'Total Donated',
+      label: 'Tổng quyên góp',
       value: dashboardData.financial.total_donated,
       icon: TrendingUp,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
     },
     {
-      label: 'Total Released',
+      label: 'Tổng đã giải ngân',
       value: dashboardData.financial.total_released,
       icon: TrendingDown,
       color: 'text-red-600',
       bgColor: 'bg-red-50',
     },
     {
-      label: 'Total Pending',
+      label: 'Tổng đang chờ',
       value: dashboardData.financial.total_pending || 0,
       icon: DollarSign,
       color: 'text-yellow-600',
@@ -104,7 +104,7 @@ export default function OwnerDashboard() {
         <div className="p-4 sm:p-6 lg:p-8">
           <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Dashboard</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Trang tổng quan</h1>
               <p className="text-sm sm:text-base text-gray-600">Tổng quan hệ thống MACha</p>
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
@@ -118,7 +118,7 @@ export default function OwnerDashboard() {
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                   }`}
                 >
-                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                  {filter === 'today' ? 'Hôm nay' : filter === 'week' ? 'Tuần này' : 'Tháng này'}
                 </button>
               ))}
             </div>
@@ -131,7 +131,7 @@ export default function OwnerDashboard() {
                 <Shield className="w-6 h-6 text-purple-600 group-hover:scale-110 transition-transform" />
                 <div>
                   <div className="text-sm font-semibold text-gray-900">Quản lý Admin</div>
-                  <div className="text-xs text-gray-500">Manage admins</div>
+                  <div className="text-xs text-gray-500">Quản lý quản trị viên</div>
                 </div>
               </div>
             </Link>
@@ -140,7 +140,7 @@ export default function OwnerDashboard() {
                 <DollarSign className="w-6 h-6 text-green-600 group-hover:scale-110 transition-transform" />
                 <div>
                   <div className="text-sm font-semibold text-gray-900">Tài chính</div>
-                  <div className="text-xs text-gray-500">Financial overview</div>
+                  <div className="text-xs text-gray-500">Tổng quan tài chính</div>
                 </div>
               </div>
             </Link>
@@ -148,8 +148,8 @@ export default function OwnerDashboard() {
               <div className="flex items-center gap-3">
                 <TrendingUp className="w-6 h-6 text-blue-600 group-hover:scale-110 transition-transform" />
                 <div>
-                  <div className="text-sm font-semibold text-gray-900">Campaigns</div>
-                  <div className="text-xs text-gray-500">Campaign finances</div>
+                  <div className="text-sm font-semibold text-gray-900">Chiến dịch</div>
+                  <div className="text-xs text-gray-500">Tài chính chiến dịch</div>
                 </div>
               </div>
             </Link>
@@ -158,7 +158,7 @@ export default function OwnerDashboard() {
                 <Activity className="w-6 h-6 text-orange-600 group-hover:scale-110 transition-transform" />
                 <div>
                   <div className="text-sm font-semibold text-gray-900">Hoạt động</div>
-                  <div className="text-xs text-gray-500">Admin activities</div>
+                  <div className="text-xs text-gray-500">Hoạt động quản trị</div>
                 </div>
               </div>
             </Link>
@@ -167,7 +167,7 @@ export default function OwnerDashboard() {
                 <History className="w-6 h-6 text-purple-600 group-hover:scale-110 transition-transform" />
                 <div>
                   <div className="text-sm font-semibold text-gray-900">Lịch sử</div>
-                  <div className="text-xs text-gray-500">Approval history</div>
+                  <div className="text-xs text-gray-500">Lịch sử phê duyệt</div>
                 </div>
               </div>
             </Link>
@@ -178,7 +178,7 @@ export default function OwnerDashboard() {
               <div className="flex items-center justify-between mb-4">
                 <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
                 <div className="text-right">
-                  <div className="text-gray-500 text-xs sm:text-sm mb-1">Total Admins</div>
+                  <div className="text-gray-500 text-xs sm:text-sm mb-1">Tổng Admin</div>
                   <div className="text-xl sm:text-2xl font-bold text-gray-900">{dashboardData.overview.admins}</div>
                 </div>
               </div>
@@ -205,24 +205,24 @@ export default function OwnerDashboard() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
             <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Approvals/Rejections ({timeFilter})</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Phê duyệt/Từ chối ({timeFilter === 'today' ? 'Hôm nay' : timeFilter === 'week' ? 'Tuần này' : 'Tháng này'})</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <CheckCircle className="w-6 h-6 text-green-600" />
-                    <span className="text-gray-700 font-medium">Approvals</span>
+                    <span className="text-gray-700 font-medium">Phê duyệt</span>
                   </div>
                   <span className="text-2xl font-bold text-green-600">{approvalStats.approvals}</span>
                 </div>
                 <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <XCircle className="w-6 h-6 text-red-600" />
-                    <span className="text-gray-700 font-medium">Rejections</span>
+                    <span className="text-gray-700 font-medium">Từ chối</span>
                   </div>
                   <span className="text-2xl font-bold text-red-600">{approvalStats.rejections}</span>
                 </div>
                 <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                  <span className="text-gray-700 font-medium">Total Actions</span>
+                  <span className="text-gray-700 font-medium">Tổng hành động</span>
                   <span className="text-2xl font-bold text-blue-600">
                     {approvalStats.approvals + approvalStats.rejections}
                   </span>
@@ -231,7 +231,7 @@ export default function OwnerDashboard() {
             </div>
 
             <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Financial Flow (Last 12 Months)</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Dòng tiền tài chính (12 tháng qua)</h3>
               <div className="h-48 sm:h-64 relative overflow-x-auto">
                 <svg viewBox="0 0 400 200" className="w-full h-full">
                   <defs>
@@ -288,17 +288,17 @@ export default function OwnerDashboard() {
                   })}
                 </svg>
                 <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-500 px-2">
-                  <span>12 months ago</span>
-                  <span>Now</span>
+                  <span>12 tháng trước</span>
+                  <span>Hiện tại</span>
                 </div>
                 <div className="absolute top-2 right-2 flex gap-4 text-xs">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span className="text-gray-600">Donated</span>
+                    <span className="text-gray-600">Đã quyên góp</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <span className="text-gray-600">Released</span>
+                    <span className="text-gray-600">Đã giải ngân</span>
                   </div>
                 </div>
               </div>
@@ -308,9 +308,9 @@ export default function OwnerDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Top 5 Campaigns</h3>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Top 5 Chiến dịch</h3>
                 <Link href="/owner/financial/campaigns" className="text-purple-600 hover:text-purple-700 text-xs sm:text-sm flex items-center gap-1">
-                  View All <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4" />
+                  Xem tất cả <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4" />
                 </Link>
               </div>
               <div className="space-y-3">
@@ -331,16 +331,16 @@ export default function OwnerDashboard() {
                   </div>
                 ))}
                 {(!dashboardData.top_campaigns || dashboardData.top_campaigns.length === 0) && (
-                  <div className="text-center text-gray-500 py-4">No campaigns data</div>
+                  <div className="text-center text-gray-500 py-4">Không có dữ liệu chiến dịch</div>
                 )}
               </div>
             </div>
 
             <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Top 5 Admins</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Top 5 Admin</h3>
                 <Link href="/owner/admin-activities" className="text-purple-600 hover:text-purple-700 text-sm flex items-center gap-1">
-                  View All <ArrowUpRight className="w-4 h-4" />
+                  Xem tất cả <ArrowUpRight className="w-4 h-4" />
                 </Link>
               </div>
               <div className="space-y-3">
@@ -356,12 +356,12 @@ export default function OwnerDashboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold text-gray-900">{admin.total} actions</div>
+                      <div className="font-bold text-gray-900">{admin.total} hành động</div>
                     </div>
                   </div>
                 ))}
                 {(!dashboardData.top_admins || dashboardData.top_admins.length === 0) && (
-                  <div className="text-center text-gray-500 py-4">No admins data</div>
+                  <div className="text-center text-gray-500 py-4">Không có dữ liệu admin</div>
                 )}
               </div>
             </div>

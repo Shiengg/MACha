@@ -134,9 +134,9 @@ function LoginPageContent() {
         {/* Left Side - Illustration */}
         <div className="lg:w-1/2 bg-white p-12 flex flex-col justify-center items-center">
           <h1 className="text-5xl font-bold text-gray-900 mb-8 leading-tight">
-            Join our charity<br />
-            fundraiser social<br />
-            network
+            Tham gia mạng xã hội<br />
+            gây quỹ từ thiện<br />
+            của chúng tôi
           </h1>
           <div className="w-full max-w-md">
             <Image
@@ -180,13 +180,13 @@ function LoginPageContent() {
               {/* Password Input */}
               <div className="mb-4">
                 <label htmlFor="password" className="block text-gray-900 font-medium mb-2">
-                  Password
+                  Mật khẩu
                 </label>
                 <input
                   id="password"
                   type="password"
                   {...register('password')}
-                  placeholder="Password"
+                  placeholder="Mật khẩu"
                   className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${errors.password
                     ? 'border-red-500 focus:border-red-500'
                     : 'border-gray-300 focus:border-blue-500'

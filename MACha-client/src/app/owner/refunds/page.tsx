@@ -78,7 +78,7 @@ export default function OwnerRefunds() {
       Swal.fire({
         icon: 'success',
         title: 'Hoàn tiền thành công!',
-        text: 'Refund đã được chuyển thành công đến người quyên góp.',
+        text: 'Hoàn tiền đã được chuyển thành công đến người quyên góp.',
         timer: 3000,
         timerProgressBar: true,
         showConfirmButton: false,
@@ -365,7 +365,7 @@ export default function OwnerRefunds() {
           <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="p-4 sm:p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg sm:text-2xl font-bold text-gray-900">Chi tiết refund</h2>
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-900">Chi tiết hoàn tiền</h2>
                 <button
                   onClick={() => {
                     setShowDetailsModal(false);
@@ -380,7 +380,7 @@ export default function OwnerRefunds() {
 
             <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               <div>
-                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Campaign</h3>
+                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2">Chiến dịch</h3>
                 <p className="text-base sm:text-lg font-semibold text-gray-900">{selectedRefund.campaign?.title || 'N/A'}</p>
               </div>
 
