@@ -13,6 +13,115 @@ import { invalidateCampaignCache } from "./campaign.service.js";
 
 const VOTING_DURATION_DAYS = 3;
 
+/**
+ * Helper function: Set post-release update tracking fields cho escrow
+ * CHỈ gọi khi escrow vừa được release (request_status = "released")
+ * 
+ * Logic:
+ * 1. Nếu escrow có milestone_percentage → tìm milestone tương ứng trong Campaign.milestones
+ * 2. Lấy commitment_days từ milestone
+ * 3. Set update_required_by = released_at + commitment_days (cuối ngày)
+ * 4. Set update_fulfilled_at = null
+ * 5. Set update_warning_email_sent_at = null
+ * 
+ * @param {Object} escrow - Escrow document (đã populate campaign)
+ * @param {Date} releasedAt - Thời điểm released (nếu null thì dùng escrow.released_at)
+ * @returns {Promise<Object>} { success: boolean, error?: string, update_required_by?: Date }
+ */
+const setPostReleaseUpdateTracking = async (escrow, releasedAt = null) => {
+    try {
+        // Chỉ set tracking fields khi request_status = "released"
+        if (escrow.request_status !== "released") {
+            return {
+                success: false,
+                error: "INVALID_STATUS",
+                message: "Chỉ set tracking fields khi escrow đã released"
+            };
+        }
+
+        const releaseTime = releasedAt || escrow.released_at;
+        if (!releaseTime) {
+            return {
+                success: false,
+                error: "MISSING_RELEASED_AT",
+                message: "released_at phải được set trước khi set tracking fields"
+            };
+        }
+
+        // Nếu escrow không có milestone_percentage → không cần track (manual withdrawal request)
+        if (!escrow.milestone_percentage) {
+            console.log(`[Post-Release Tracking] Escrow ${escrow._id} không có milestone_percentage, bỏ qua tracking`);
+            return {
+                success: true,
+                skipped: true,
+                reason: "No milestone_percentage"
+            };
+        }
+
+        // Tìm milestone tương ứng trong Campaign.milestones
+        const campaign = escrow.campaign;
+        if (!campaign || !campaign.milestones || campaign.milestones.length === 0) {
+            console.warn(`[Post-Release Tracking] Campaign ${campaign?._id} không có milestones, không thể set tracking`);
+            return {
+                success: false,
+                error: "CAMPAIGN_NO_MILESTONES",
+                message: "Campaign không có milestones"
+            };
+        }
+
+        const milestone = campaign.milestones.find(
+            m => m.percentage === escrow.milestone_percentage
+        );
+
+        if (!milestone) {
+            console.error(`[Post-Release Tracking] Không tìm thấy milestone với percentage ${escrow.milestone_percentage} trong campaign ${campaign._id}`);
+            return {
+                success: false,
+                error: "MILESTONE_NOT_FOUND",
+                message: `Không tìm thấy milestone với percentage ${escrow.milestone_percentage}`
+            };
+        }
+
+        // Validate commitment_days
+        if (!milestone.commitment_days || milestone.commitment_days < 1) {
+            console.error(`[Post-Release Tracking] Milestone ${escrow.milestone_percentage}% không có commitment_days hợp lệ: ${milestone.commitment_days}`);
+            return {
+                success: false,
+                error: "INVALID_COMMITMENT_DAYS",
+                message: `commitment_days không hợp lệ: ${milestone.commitment_days}`
+            };
+        }
+
+        // Set update_required_by = released_at + commitment_days (cuối ngày 23:59:59)
+        const updateRequiredBy = new Date(releaseTime);
+        updateRequiredBy.setDate(updateRequiredBy.getDate() + milestone.commitment_days);
+        updateRequiredBy.setHours(23, 59, 59, 999); // Cuối ngày
+
+        // Set tracking fields
+        escrow.update_required_by = updateRequiredBy;
+        escrow.update_fulfilled_at = null;
+        escrow.update_warning_email_sent_at = null;
+
+        await escrow.save();
+
+        console.log(`[Post-Release Tracking] Set tracking fields cho escrow ${escrow._id}: update_required_by = ${updateRequiredBy.toISOString()}, commitment_days = ${milestone.commitment_days}`);
+
+        return {
+            success: true,
+            update_required_by: updateRequiredBy,
+            commitment_days: milestone.commitment_days,
+            milestone_percentage: escrow.milestone_percentage
+        };
+    } catch (error) {
+        console.error(`[Post-Release Tracking] Error setting tracking fields cho escrow ${escrow._id}:`, error);
+        return {
+            success: false,
+            error: "TRACKING_SET_ERROR",
+            message: error.message
+        };
+    }
+};
+
 
 export const getTotalReleasedAmount = async (campaignId) => {
     const result = await Escrow.aggregate([
@@ -1324,13 +1433,27 @@ export const updateSepayWithdrawalStatus = async (orderInvoiceNumber, status, se
         updateData.sepay_transaction_id = sepayData.transaction_id;
     }
     
+    const now = new Date();
     if (newStatus === 'released') {
-        updateData.released_at = new Date();
+        updateData.released_at = now;
         escrow.request_status = 'released';
     }
 
     Object.assign(escrow, updateData);
     await escrow.save();
+    
+    // Set post-release update tracking fields (nếu có milestone)
+    // Reload escrow với populated campaign để ensure có latest data
+    if (newStatus === 'released') {
+        const escrowWithCampaign = await Escrow.findById(escrow._id).populate("campaign");
+        if (escrowWithCampaign) {
+            const trackingResult = await setPostReleaseUpdateTracking(escrowWithCampaign, now);
+            if (!trackingResult.success && !trackingResult.skipped) {
+                // Log warning nhưng không fail release
+                console.warn(`[Update Sepay Status] Warning: Could not set post-release tracking fields for escrow ${escrow._id}:`, trackingResult.error || trackingResult.message);
+            }
+        }
+    }
     
     const campaign = escrow.campaign;
     if (campaign && newStatus === 'released') {
@@ -1528,6 +1651,17 @@ export const releaseEscrow = async (escrowId, ownerId, releaseData) => {
     escrow.released_at = now;
     
     await escrow.save();
+    
+    // Set post-release update tracking fields (nếu có milestone)
+    // Reload escrow với populated campaign để ensure có latest data
+    const escrowWithCampaign = await Escrow.findById(escrowId).populate("campaign");
+    if (escrowWithCampaign) {
+        const trackingResult = await setPostReleaseUpdateTracking(escrowWithCampaign, now);
+        if (!trackingResult.success && !trackingResult.skipped) {
+            // Log warning nhưng không fail release
+            console.warn(`[Release Escrow] Warning: Could not set post-release tracking fields for escrow ${escrowId}:`, trackingResult.error || trackingResult.message);
+        }
+    }
     
     // Invalidate cache liên quan
     await redisClient.del(`campaign:${campaign._id}`);

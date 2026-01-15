@@ -4,7 +4,7 @@
  * Consumes messages from notification.create queue and processes them
  */
 
-import { consumeMessages, ackMessage, nackMessage } from "../config/rabbitmq.js";
+import { consumeMessages, ackMessage, nackMessage, republishMessage } from "../config/rabbitmq.js";
 import { handleNotificationJob } from "../handlers/notification.handler.js";
 import { assertJob } from "../schemas/job.schema.js";
 import { QUEUE_NAMES, RETRY_CONFIG } from "../constants/index.js";
@@ -66,28 +66,50 @@ const processNotificationMessage = async (content, msg, channel) => {
         const canRetry = shouldRetry(msg, error);
 
         if (canRetry) {
+            // Increment retry count
+            const newRetryCount = getRetryCount(msg) + 1;
+            
             console.warn(`[Notification Consumer] Retrying message:`, {
                 requestId,
                 userId,
-                retryCount: getRetryCount(msg) + 1,
+                retryCount: newRetryCount,
                 maxRetries: RETRY_CONFIG.MAX_RETRIES,
                 error: error.message,
+                isPermanent: error.isPermanent || false
             });
             
-            await nackMessage(msg, true);
+            // CRITICAL FIX: Republish message with updated headers instead of nack with requeue
+            // This ensures headers (retry count) are preserved correctly
+            try {
+                await republishMessage(msg, QUEUE_NAMES.NOTIFICATION_CREATE, {
+                    "x-retry-count": newRetryCount
+                });
+            } catch (republishError) {
+                // If republish fails, discard message to prevent infinite loop
+                console.error(`[Notification Consumer] Failed to republish message, discarding:`, {
+                    requestId,
+                    userId,
+                    error: republishError.message
+                });
+                await nackMessage(msg, false);
+            }
         } else {
-            const reason = getRetryCount(msg) >= RETRY_CONFIG.MAX_RETRIES 
-                ? "Max retries exceeded" 
+            const retryCount = getRetryCount(msg);
+            const reason = retryCount >= RETRY_CONFIG.MAX_RETRIES 
+                ? `Max retries exceeded (${retryCount}/${RETRY_CONFIG.MAX_RETRIES})` 
                 : "Permanent error";
 
             console.error(`[Notification Consumer] Message failed permanently:`, {
                 requestId,
                 userId,
-                retryCount: getRetryCount(msg),
+                retryCount,
                 reason,
                 error: error.message,
+                errorName: error.name,
+                isPermanent: error.isPermanent || false
             });
 
+            // Discard message permanently (don't requeue)
             await nackMessage(msg, false);
         }
     }

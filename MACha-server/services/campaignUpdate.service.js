@@ -1,5 +1,6 @@
 import CampaignUpdate from "../models/campaignUpdate.js";
 import Campaign from "../models/campaign.js";
+import Escrow from "../models/escrow.js";
 import { redisClient } from "../config/redis.js";
 import * as trackingService from "./tracking.service.js";
 
@@ -30,6 +31,49 @@ export const createCampaignUpdate = async (campaignId, userId, updateData) => {
 
     // Populate creator info
     await update.populate("creator", "username avatar_url fullname");
+
+    // Check if this update fulfills any escrow post-release requirement
+    // Logic: Một CampaignUpdate được coi là HOÀN THÀNH NGHĨA VỤ nếu:
+    // - campaignUpdate.campaign == escrow.campaign
+    // - campaignUpdate.creator == campaign.creator
+    // - campaignUpdate.createdAt ∈ [released_at, update_required_by]
+    try {
+        const updateCreatedAt = update.createdAt;
+        
+        // Query escrows với điều kiện:
+        // - request_status = "released"
+        // - campaign = campaignId
+        // - update_fulfilled_at == null (chưa được fulfill)
+        // - update_required_by != null (có deadline)
+        // - released_at != null (đã được release)
+        const pendingEscrows = await Escrow.find({
+            campaign: campaignId,
+            request_status: "released",
+            update_fulfilled_at: null,
+            update_required_by: { $ne: null },
+            released_at: { $ne: null }
+        });
+
+        for (const escrow of pendingEscrows) {
+            // Check nếu update nằm trong khoảng [released_at, update_required_by]
+            if (
+                updateCreatedAt >= escrow.released_at &&
+                updateCreatedAt <= escrow.update_required_by
+            ) {
+                // Update fulfills requirement → set update_fulfilled_at
+                // Không rollback nếu đã set (idempotency)
+                if (!escrow.update_fulfilled_at) {
+                    escrow.update_fulfilled_at = updateCreatedAt;
+                    await escrow.save();
+                    
+                    console.log(`[Campaign Update] Update ${update._id} fulfills escrow ${escrow._id} requirement (milestone ${escrow.milestone_percentage}%, deadline: ${escrow.update_required_by.toISOString()})`);
+                }
+            }
+        }
+    } catch (error) {
+        // Log error nhưng không fail createCampaignUpdate
+        console.error(`[Campaign Update] Error checking escrow fulfillment for update ${update._id}:`, error);
+    }
 
     // Invalidate cache
     await redisClient.del(`campaign:${campaignId}:updates`);

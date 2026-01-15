@@ -298,20 +298,53 @@ export const consumeMessages = async (queueName, handler, options = {}) => {
             try {
                 content = JSON.parse(content);
             } catch (parseError) {
-                throw new Error(`Invalid JSON in message: ${parseError.message}`);
+                // JSON parse error - permanent error, don't requeue
+                logEvent("error", { 
+                    error: parseError, 
+                    message: `Invalid JSON in message from queue '${queueName}' - discarding message` 
+                });
+                channel.nack(msg, false, false); // Don't requeue - permanent error
+                return;
             }
 
-            // Call handler
+            // Call handler (handler is responsible for ack/nack with retry logic)
             await handler(content, msg, channel);
         } catch (error) {
+            // Error at consumeMessages level (should not happen if handler handles errors correctly)
+            // Check retry count from headers to prevent infinite retry
+            const headers = msg.properties.headers || {};
+            const retryCount = Number(headers["x-retry-count"]) || 0;
+            const MAX_CONSUME_ERROR_RETRIES = 5; // Hard limit for errors at consumeMessages level
+            
             logEvent("error", { 
                 error, 
-                message: `Error processing message from queue '${queueName}'` 
+                message: `Error at consumeMessages level for queue '${queueName}' (retry count: ${retryCount})`,
+                retryCount
             });
             
-            // Nack message (requeue based on error type)
-            const requeue = options.requeueOnError !== false && !error.isPermanent;
-            channel.nack(msg, false, requeue);
+            // Don't requeue if:
+            // 1. Error is permanent
+            // 2. Retry count exceeded MAX_CONSUME_ERROR_RETRIES (hard limit)
+            // 3. requeueOnError is explicitly false
+            const shouldRequeue = options.requeueOnError !== false && 
+                                 !error.isPermanent && 
+                                 retryCount < MAX_CONSUME_ERROR_RETRIES;
+            
+            if (!shouldRequeue) {
+                const reason = error.isPermanent 
+                    ? "Permanent error" 
+                    : retryCount >= MAX_CONSUME_ERROR_RETRIES 
+                        ? `Max consume error retries (${MAX_CONSUME_ERROR_RETRIES}) exceeded`
+                        : "requeueOnError is false";
+                
+                logEvent("error", {
+                    message: `Message discarded from queue '${queueName}': ${reason}`,
+                    reason,
+                    retryCount
+                });
+            }
+            
+            channel.nack(msg, false, shouldRequeue);
         }
     }, defaultOptions);
 
@@ -335,6 +368,59 @@ export const nackMessage = async (msg, requeue = false) => {
     if (!msg) return;
     const channel = await getConsumerChannel();
     channel.nack(msg, false, requeue);
+};
+
+/**
+ * Republish message to queue with updated headers (for retry)
+ * This ensures headers are preserved when retrying
+ * 
+ * @param {Object} msg - Original message
+ * @param {string} queueName - Queue name to republish to
+ * @param {Object} updatedHeaders - Updated headers (e.g. retry count)
+ * @returns {Promise<boolean>} True if republished successfully
+ */
+export const republishMessage = async (msg, queueName, updatedHeaders = {}) => {
+    if (!msg) return false;
+    
+    try {
+        const channel = await getConsumerChannel();
+        
+        // Get original content
+        const content = msg.content.toString();
+        
+        // Merge headers
+        const originalHeaders = msg.properties?.headers || {};
+        const mergedHeaders = {
+            ...originalHeaders,
+            ...updatedHeaders
+        };
+        
+        // Create new message properties with updated headers
+        const properties = {
+            ...msg.properties,
+            headers: mergedHeaders,
+            timestamp: Date.now() // Update timestamp
+        };
+        
+        // Republish message with updated headers
+        const sent = channel.sendToQueue(queueName, Buffer.from(content), {
+            persistent: true,
+            ...properties
+        });
+        
+        // ACK original message (we've republished it)
+        channel.ack(msg, false);
+        
+        return sent;
+    } catch (error) {
+        logEvent("error", { 
+            error, 
+            message: `Failed to republish message to queue '${queueName}'` 
+        });
+        // If republish fails, nack without requeue to prevent infinite loop
+        await nackMessage(msg, false);
+        throw error;
+    }
 };
 
 /**

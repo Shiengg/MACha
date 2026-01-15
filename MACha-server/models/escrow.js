@@ -184,6 +184,27 @@ const escrowSchema = new mongoose.Schema({
     disbursement_verified_at: {
         type: Date,
         default: null
+    },
+    // ==================== POST-RELEASE UPDATE TRACKING FIELDS ====================
+    // Các fields này CHỈ áp dụng khi request_status = "released"
+    // Track nghĩa vụ creator phải cập nhật tiến độ sau khi được giải ngân
+    // Deadline phải update (dựa trên milestone.commitment_days)
+    update_required_by: {
+        type: Date,
+        default: null,
+        index: true
+    },
+    // Thời điểm creator đã update hợp lệ (fulfilled requirement)
+    update_fulfilled_at: {
+        type: Date,
+        default: null,
+        index: true
+    },
+    // Thời điểm đã gửi email cảnh báo (idempotency - tránh gửi mail trùng)
+    update_warning_email_sent_at: {
+        type: Date,
+        default: null,
+        index: true
     }
 },
     {
@@ -212,6 +233,24 @@ escrowSchema.index(
             }
         },
         name: 'unique_milestone_withdrawal_request'
+    }
+);
+
+// Index for checking overdue updates (used in background job)
+escrowSchema.index(
+    { 
+        request_status: 1, 
+        update_fulfilled_at: 1, 
+        update_required_by: 1, 
+        update_warning_email_sent_at: 1 
+    },
+    { 
+        name: 'overdue_update_check_index',
+        // Partial index: chỉ index các escrow released và chưa fulfilled
+        partialFilterExpression: {
+            request_status: 'released',
+            update_fulfilled_at: null
+        }
     }
 );
 
