@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, CheckCircle2, XCircle, AlertCircle, DollarSign, Calendar, Users, TrendingUp, TrendingDown } from 'lucide-react';
 import { Escrow, Vote, WithdrawalRequestStatus } from '@/services/escrow.service';
+import EscrowProgressBar from './EscrowProgressBar';
 
 interface WithdrawalRequestCardProps {
   escrow: Escrow;
@@ -168,6 +169,16 @@ export default function WithdrawalRequestCard({
 
       {/* Content */}
       <div className="p-4 space-y-4">
+        {/* Progress Bar */}
+        {escrow.escrow_progress && (
+          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              Tiến trình giải ngân
+            </h4>
+            <EscrowProgressBar progress={escrow.escrow_progress} compact={false} />
+          </div>
+        )}
+
         {/* Request Reason */}
         {escrow.request_reason && (
           <div>

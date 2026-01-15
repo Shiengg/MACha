@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Escrow, Vote } from '@/services/escrow.service';
 import { escrowService } from '@/services/escrow.service';
+import EscrowProgressBar from '@/components/escrow/EscrowProgressBar';
 import {
   DollarSign,
   CheckCircle2,
@@ -252,8 +253,19 @@ export default function WithdrawalRequestDetail({
         </div>
       </div>
 
-      {/* Status Timeline */}
-      {getStatusTimeline().length > 0 && (
+      {/* Progress Bar */}
+      {escrow.escrow_progress && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            Tiến trình giải ngân
+          </h3>
+          <EscrowProgressBar progress={escrow.escrow_progress} showLabels={true} compact={false} />
+        </div>
+      )}
+
+      {/* Status Timeline (Fallback nếu không có progress) */}
+      {!escrow.escrow_progress && getStatusTimeline().length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
             <Clock className="w-5 h-5" />

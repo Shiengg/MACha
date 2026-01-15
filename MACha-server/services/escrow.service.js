@@ -439,6 +439,9 @@ export const getWithdrawalRequestsForReview = async (status = "voting_completed"
             const approvePercentage = totalWeight > 0 ? (totalApproveWeight / totalWeight) * 100 : 0;
             const rejectPercentage = totalWeight > 0 ? (totalRejectWeight / totalWeight) * 100 : 0;
             
+            // Tính progress cho mỗi escrow
+            const progress = calculateEscrowProgress(escrow);
+            
             return {
                 ...escrow.toObject(),
                 votingResults: {
@@ -449,7 +452,8 @@ export const getWithdrawalRequestsForReview = async (status = "voting_completed"
                     totalRejectWeight,
                     approvePercentage: approvePercentage.toFixed(2),
                     rejectPercentage: rejectPercentage.toFixed(2)
-                }
+                },
+                escrow_progress: progress
             };
         })
     );
@@ -639,6 +643,9 @@ export const getWithdrawalRequestsByCampaign = async (campaignId, status = null)
             const approvePercentage = totalWeight > 0 ? (totalApproveWeight / totalWeight) * 100 : 0;
             const rejectPercentage = totalWeight > 0 ? (totalRejectWeight / totalWeight) * 100 : 0;
             
+            // Tính progress cho mỗi escrow
+            const progress = calculateEscrowProgress(escrow);
+            
             return {
                 ...escrow.toObject(),
                 votingResults: {
@@ -649,7 +656,8 @@ export const getWithdrawalRequestsByCampaign = async (campaignId, status = null)
                     totalRejectWeight,
                     approvePercentage: approvePercentage.toFixed(2),
                     rejectPercentage: rejectPercentage.toFixed(2)
-                }
+                },
+                escrow_progress: progress
             };
         })
     );
@@ -694,6 +702,9 @@ export const getWithdrawalRequestById = async (escrowId) => {
     const approvePercentage = totalWeight > 0 ? (totalApproveWeight / totalWeight) * 100 : 0;
     const rejectPercentage = totalWeight > 0 ? (totalRejectWeight / totalWeight) * 100 : 0;
     
+    // Tính progress
+    const progress = calculateEscrowProgress(escrow);
+    
     return {
         ...escrow.toObject(),
         votingResults: {
@@ -704,7 +715,8 @@ export const getWithdrawalRequestById = async (escrowId) => {
             totalRejectWeight,
             approvePercentage: approvePercentage.toFixed(2),
             rejectPercentage: rejectPercentage.toFixed(2)
-        }
+        },
+        escrow_progress: progress
     };
 };
 
@@ -938,4 +950,135 @@ export const updateSepayWithdrawalStatus = async (orderInvoiceNumber, status, se
     }
     
     return { escrow, campaign };
+};
+
+/**
+ * Tính toán progress steps cho escrow
+ * @param {Object} escrow - Escrow object với request_status
+ * @returns {Object} Progress object với current_status và steps[]
+ */
+export const calculateEscrowProgress = (escrow) => {
+    if (!escrow || !escrow.request_status) {
+        return null;
+    }
+
+    const status = escrow.request_status;
+    
+    // Định nghĩa các steps
+    const allSteps = [
+        { key: 'milestone_reached', label: 'Đạt mốc giải ngân', order: 1 },
+        { key: 'community_voting', label: 'Cộng đồng bỏ phiếu', order: 2 },
+        { key: 'admin_review', label: 'Admin duyệt', order: 3 },
+        { key: 'owner_disbursement', label: 'Owner giải ngân', order: 4 },
+        { key: 'completed', label: 'Hoàn tất', order: 5 }
+    ];
+
+    // Map status sang progress steps
+    let steps = [];
+    
+    switch (status) {
+        case 'pending_voting':
+            // Escrow vừa được tạo, chưa bắt đầu vote
+            steps = allSteps.map(step => {
+                if (step.order === 1) {
+                    return { ...step, state: 'DONE' };
+                } else if (step.order === 2) {
+                    return { ...step, state: 'WAITING' };
+                } else {
+                    return { ...step, state: 'WAITING' };
+                }
+            });
+            break;
+            
+        case 'voting_in_progress':
+            // Đang trong quá trình vote
+            steps = allSteps.map(step => {
+                if (step.order === 1) {
+                    return { ...step, state: 'DONE' };
+                } else if (step.order === 2) {
+                    return { ...step, state: 'ACTIVE' };
+                } else {
+                    return { ...step, state: 'WAITING' };
+                }
+            });
+            break;
+            
+        case 'voting_completed':
+            // Vote xong, chờ admin duyệt
+            steps = allSteps.map(step => {
+                if (step.order <= 2) {
+                    return { ...step, state: 'DONE' };
+                } else if (step.order === 3) {
+                    return { ...step, state: 'ACTIVE' };
+                } else {
+                    return { ...step, state: 'WAITING' };
+                }
+            });
+            break;
+            
+        case 'admin_approved':
+            // Admin đã duyệt, chờ owner giải ngân
+            steps = allSteps.map(step => {
+                if (step.order <= 3) {
+                    return { ...step, state: 'DONE' };
+                } else if (step.order === 4) {
+                    return { ...step, state: 'ACTIVE' };
+                } else {
+                    return { ...step, state: 'WAITING' };
+                }
+            });
+            break;
+            
+        case 'released':
+            // Đã giải ngân hoàn tất
+            steps = allSteps.map(step => ({
+                ...step,
+                state: 'DONE'
+            }));
+            break;
+            
+        case 'admin_rejected':
+            // Admin từ chối
+            steps = allSteps.map(step => {
+                if (step.order <= 2) {
+                    return { ...step, state: 'DONE' };
+                } else if (step.order === 3) {
+                    return { ...step, state: 'REJECTED' };
+                } else {
+                    return { ...step, state: 'CANCELLED' };
+                }
+            });
+            break;
+            
+        case 'cancelled':
+            // Đã hủy
+            steps = allSteps.map(step => {
+                if (step.order === 1) {
+                    return { ...step, state: 'DONE' };
+                } else {
+                    return { ...step, state: 'CANCELLED' };
+                }
+            });
+            break;
+            
+        default:
+            // Unknown status
+            steps = allSteps.map(step => ({
+                ...step,
+                state: 'WAITING'
+            }));
+    }
+
+    return {
+        current_status: status,
+        steps: steps,
+        // Thêm metadata hữu ích
+        metadata: {
+            voting_start_date: escrow.voting_start_date || null,
+            voting_end_date: escrow.voting_end_date || null,
+            admin_reviewed_at: escrow.admin_reviewed_at || null,
+            released_at: escrow.released_at || null,
+            milestone_percentage: escrow.milestone_percentage || null
+        }
+    };
 };

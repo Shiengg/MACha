@@ -42,6 +42,27 @@ export interface VotingResults {
   rejectPercentage: string;
 }
 
+export type ProgressStepState = 'DONE' | 'ACTIVE' | 'WAITING' | 'REJECTED' | 'CANCELLED';
+
+export interface ProgressStep {
+  key: string;
+  label: string;
+  order: number;
+  state: ProgressStepState;
+}
+
+export interface EscrowProgress {
+  current_status: WithdrawalRequestStatus;
+  steps: ProgressStep[];
+  metadata?: {
+    voting_start_date: string | null;
+    voting_end_date: string | null;
+    admin_reviewed_at: string | null;
+    released_at: string | null;
+    milestone_percentage: number | null;
+  };
+}
+
 export interface Escrow {
   _id: string;
   campaign: string | Campaign;
@@ -63,6 +84,7 @@ export interface Escrow {
   createdAt: string;
   updatedAt: string;
   votingResults?: VotingResults;
+  escrow_progress?: EscrowProgress;
 }
 
 export interface CreateWithdrawalRequestPayload {
