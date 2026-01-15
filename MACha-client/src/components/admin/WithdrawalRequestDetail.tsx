@@ -25,12 +25,16 @@ interface WithdrawalRequestDetailProps {
   escrow: Escrow;
   onApprove: (escrowId: string) => void;
   onReject: (escrowId: string, reason: string) => void;
+  onExtend?: (escrowId: string, days: 3 | 5) => void;
+  onCancel?: (escrowId: string) => void;
 }
 
 export default function WithdrawalRequestDetail({
   escrow,
   onApprove,
   onReject,
+  onExtend,
+  onCancel,
 }: WithdrawalRequestDetailProps) {
   const [votes, setVotes] = useState<Vote[]>([]);
   const [loadingVotes, setLoadingVotes] = useState(false);
@@ -470,38 +474,104 @@ export default function WithdrawalRequestDetail({
       )}
 
       {/* Action Section */}
-      {escrow.request_status === 'voting_completed' && (
+      {escrow.adminActions && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Hành động</h3>
           <div className="space-y-4">
-            <button
-              onClick={() => onApprove(escrow._id)}
-              className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              Duyệt yêu cầu
-            </button>
+            {/* CASE 1: Gia hạn vote (vote < 50%) */}
+            {escrow.adminActions.canExtend && onExtend && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3 mb-4">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-1">
+                      Vote quá ít
+                    </h4>
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      Chỉ có {escrow.votingResults?.votePercentage || '0'}% donor đã vote (yêu cầu tối thiểu 50%).
+                      Bạn có thể gia hạn thời gian vote để tạo cơ hội cho cộng đồng tham gia.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => onExtend(escrow._id, 3)}
+                    className="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Gia hạn 3 ngày
+                  </button>
+                  <button
+                    onClick={() => onExtend(escrow._id, 5)}
+                    className="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Gia hạn 5 ngày
+                  </button>
+                </div>
+              </div>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Lý do từ chối (tối thiểu 10 ký tự)
-              </label>
-              <textarea
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Nhập lý do từ chối..."
-                rows={4}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white"
-              />
-              <button
-                onClick={handleRejectClick}
-                disabled={!rejectionReason.trim() || rejectionReason.trim().length < 10}
-                className="w-full mt-3 px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
-              >
-                <XCircle className="w-5 h-5" />
-                Từ chối yêu cầu
-              </button>
-            </div>
+            {/* CASE 2: Huỷ campaign (reject > 50%) */}
+            {escrow.adminActions.canCancel && onCancel && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3 mb-4">
+                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-red-900 dark:text-red-100 mb-1">
+                      Campaign bị từ chối bởi cộng đồng
+                    </h4>
+                    <p className="text-sm text-red-800 dark:text-red-200">
+                      {escrow.votingResults?.rejectDonorPercentage || '0'}% donors đã reject withdrawal request này.
+                      Bạn có thể huỷ campaign và khởi tạo hoàn tiền cho tất cả donors.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onCancel(escrow._id)}
+                  className="w-full px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                >
+                  <XCircle className="w-5 h-5" />
+                  Huỷ campaign & hoàn tiền
+                </button>
+              </div>
+            )}
+
+            {/* CASE 3: Approve/Reject (voting_completed) */}
+            {escrow.adminActions.canApprove && escrow.request_status === 'voting_completed' && (
+              <>
+                <button
+                  onClick={() => onApprove(escrow._id)}
+                  className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 className="w-5 h-5" />
+                  Duyệt yêu cầu
+                </button>
+
+                {escrow.adminActions.canReject && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Lý do từ chối (tối thiểu 10 ký tự)
+                    </label>
+                    <textarea
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Nhập lý do từ chối..."
+                      rows={4}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white"
+                    />
+                    <button
+                      onClick={handleRejectClick}
+                      disabled={!rejectionReason.trim() || rejectionReason.trim().length < 10}
+                      className="w-full mt-3 px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                    >
+                      <XCircle className="w-5 h-5" />
+                      Từ chối yêu cầu
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

@@ -14,6 +14,8 @@ escrowRoutes.get('/:escrowId', RateLimitMiddleware.rateLimitByIP(100, 60), Escro
 adminEscrowRoutes.get('/withdrawal-requests', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), EscrowController.getWithdrawalRequestsForReview);
 adminEscrowRoutes.post('/withdrawal-requests/:escrowId/approve', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), EscrowController.approveWithdrawalRequest);
 adminEscrowRoutes.post('/withdrawal-requests/:escrowId/reject', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(100, 60), EscrowController.rejectWithdrawalRequest);
+adminEscrowRoutes.post('/withdrawal-requests/:escrowId/extend-vote', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(50, 60), EscrowController.extendVotingPeriod);
+adminEscrowRoutes.post('/withdrawal-requests/:escrowId/cancel-campaign', authMiddleware, checkRole('admin'), RateLimitMiddleware.rateLimitByIP(20, 60), EscrowController.cancelCampaignByCommunityRejection);
 
 export { escrowRoutes, adminEscrowRoutes };
 export default escrowRoutes;

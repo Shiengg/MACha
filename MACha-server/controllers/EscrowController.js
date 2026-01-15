@@ -200,3 +200,89 @@ export const getVotesByEscrow = async (req, res) => {
     }
 };
 
+/**
+ * Admin gia hạn thời gian vote cho escrow
+ * POST /api/escrow/:escrowId/extend-vote
+ */
+export const extendVotingPeriod = async (req, res) => {
+    try {
+        const { escrowId } = req.params;
+        const adminId = req.user._id;
+        const { extension_days } = req.body;
+        
+        if (!extension_days) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "extension_days (3 hoặc 5) là bắt buộc"
+            });
+        }
+        
+        const result = await escrowService.extendVotingPeriod(escrowId, adminId, extension_days);
+        
+        if (!result.success) {
+            const errorStatusMap = {
+                "ESCROW_NOT_FOUND": HTTP_STATUS.NOT_FOUND,
+                "INVALID_STATUS": HTTP_STATUS.BAD_REQUEST,
+                "INVALID_EXTENSION_DAYS": HTTP_STATUS.BAD_REQUEST
+            };
+            
+            const statusCode = errorStatusMap[result.error] || HTTP_STATUS.BAD_REQUEST;
+            
+            return res.status(statusCode).json({
+                message: result.message,
+                error: result.error
+            });
+        }
+        
+        return res.status(HTTP_STATUS.OK).json({
+            message: `Thời gian vote đã được gia hạn thêm ${extension_days} ngày`,
+            escrow: result.escrow,
+            newEndDate: result.newEndDate,
+            extensionDays: result.extensionDays,
+            extendedCount: result.extendedCount
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message || "Internal server error"
+        });
+    }
+};
+
+/**
+ * Admin huỷ campaign do bị từ chối bởi cộng đồng và khởi tạo refund
+ * POST /api/escrow/:escrowId/cancel-campaign
+ */
+export const cancelCampaignByCommunityRejection = async (req, res) => {
+    try {
+        const { escrowId } = req.params;
+        const adminId = req.user._id;
+        
+        const result = await escrowService.cancelCampaignByCommunityRejection(escrowId, adminId);
+        
+        if (!result.success) {
+            const errorStatusMap = {
+                "ESCROW_NOT_FOUND": HTTP_STATUS.NOT_FOUND,
+                "INVALID_STATUS": HTTP_STATUS.BAD_REQUEST
+            };
+            
+            const statusCode = errorStatusMap[result.error] || HTTP_STATUS.BAD_REQUEST;
+            
+            return res.status(statusCode).json({
+                message: result.message,
+                error: result.error
+            });
+        }
+        
+        return res.status(HTTP_STATUS.OK).json({
+            message: "Campaign đã bị huỷ và refund đã được khởi tạo",
+            campaign: result.campaign,
+            refund: result.refund,
+            wasAlreadyCancelled: result.wasAlreadyCancelled || false,
+            warning: result.warning || null
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            message: error.message || "Internal server error"
+        });
+    }
+};
+

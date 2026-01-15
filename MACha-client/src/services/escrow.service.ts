@@ -10,7 +10,9 @@ import {
 export type WithdrawalRequestStatus =
   | 'pending_voting'
   | 'voting_in_progress'
+  | 'voting_extended'
   | 'voting_completed'
+  | 'rejected_by_community'
   | 'admin_approved'
   | 'admin_rejected'
   | 'released'
@@ -33,6 +35,7 @@ export interface Campaign {
 }
 
 export interface VotingResults {
+  totalDonors?: number;
   totalVotes: number;
   approveCount: number;
   rejectCount: number;
@@ -40,6 +43,8 @@ export interface VotingResults {
   totalRejectWeight: number;
   approvePercentage: string;
   rejectPercentage: string;
+  votePercentage?: string;
+  rejectDonorPercentage?: string;
 }
 
 export type ProgressStepState = 'DONE' | 'ACTIVE' | 'WAITING' | 'REJECTED' | 'CANCELLED';
@@ -63,6 +68,13 @@ export interface EscrowProgress {
   };
 }
 
+export interface AdminActions {
+  canExtend: boolean;
+  canCancel: boolean;
+  canApprove: boolean;
+  canReject: boolean;
+}
+
 export interface Escrow {
   _id: string;
   campaign: string | Campaign;
@@ -81,10 +93,15 @@ export interface Escrow {
   milestone_percentage: number | null;
   approved_at: string | null;
   released_at: string | null;
+  community_rejected_at?: string | null;
+  voting_extended_count?: number;
+  last_extended_at?: string | null;
+  voting_extended_by?: string | User | null;
   createdAt: string;
   updatedAt: string;
   votingResults?: VotingResults;
   escrow_progress?: EscrowProgress;
+  adminActions?: AdminActions;
 }
 
 export interface CreateWithdrawalRequestPayload {

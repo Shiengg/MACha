@@ -121,6 +121,8 @@ export const ADMIN_ESCROW_ROUTE = "api/admin";
 export const ADMIN_GET_WITHDRAWAL_REQUESTS_ROUTE = `${ADMIN_ESCROW_ROUTE}/withdrawal-requests`;
 export const ADMIN_APPROVE_WITHDRAWAL_REQUEST_ROUTE = (escrowId: string) => `${ADMIN_ESCROW_ROUTE}/withdrawal-requests/${escrowId}/approve`;
 export const ADMIN_REJECT_WITHDRAWAL_REQUEST_ROUTE = (escrowId: string) => `${ADMIN_ESCROW_ROUTE}/withdrawal-requests/${escrowId}/reject`;
+export const ADMIN_EXTEND_VOTING_PERIOD_ROUTE = (escrowId: string) => `${ADMIN_ESCROW_ROUTE}/withdrawal-requests/${escrowId}/extend-vote`;
+export const ADMIN_CANCEL_CAMPAIGN_BY_REJECTION_ROUTE = (escrowId: string) => `${ADMIN_ESCROW_ROUTE}/withdrawal-requests/${escrowId}/cancel-campaign`;
 
 export const REPORT_ROUTE = "api/reports";
 export const CREATE_REPORT_ROUTE = `${REPORT_ROUTE}`;

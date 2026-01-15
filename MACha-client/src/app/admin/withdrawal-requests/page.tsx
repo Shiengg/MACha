@@ -9,6 +9,8 @@ import {
   getWithdrawalRequestsForReview,
   approveWithdrawalRequest,
   rejectWithdrawalRequest,
+  extendVotingPeriod,
+  cancelCampaignByCommunityRejection,
 } from '@/services/admin/escrow.service';
 import { Escrow, WithdrawalRequestStatus, Campaign, User } from '@/services/escrow.service';
 import { formatEscrowError, formatWithdrawalStatus, formatCurrencyVND, formatDateTime, formatDateOnly } from '@/utils/escrow.utils';
@@ -369,6 +371,187 @@ export default function AdminWithdrawalRequests() {
     }
   };
 
+  const handleExtendVote = async (escrowId: string, days: 3 | 5) => {
+    const result = await Swal.fire({
+      title: `Gia hạn thời gian vote ${days} ngày?`,
+      html: `
+        <p style="margin-bottom: 20px;">Thời gian vote sẽ được gia hạn thêm ${days} ngày. Tất cả donors sẽ nhận được thông báo.</p>
+        <div style="text-align: left; margin-bottom: 15px;">
+          <label style="display: flex; align-items: center; cursor: pointer; color: #374151;">
+            <input type="checkbox" id="terms-checkbox-extend" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+            <span>Tôi cam kết chịu trách nhiệm với quyết định của mình</span>
+          </label>
+        </div>
+      `,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#f59e0b',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: `Gia hạn ${days} ngày`,
+      cancelButtonText: 'Hủy',
+      didOpen: () => {
+        const checkbox = document.getElementById('terms-checkbox-extend') as HTMLInputElement;
+        const confirmButton = Swal.getConfirmButton();
+        
+        if (confirmButton) {
+          confirmButton.disabled = true;
+          confirmButton.style.opacity = '0.5';
+          confirmButton.style.cursor = 'not-allowed';
+        }
+        
+        if (checkbox) {
+          checkbox.addEventListener('change', () => {
+            const confirmButton = Swal.getConfirmButton();
+            if (confirmButton) {
+              if (checkbox.checked) {
+                confirmButton.disabled = false;
+                confirmButton.style.opacity = '1';
+                confirmButton.style.cursor = 'pointer';
+              } else {
+                confirmButton.disabled = true;
+                confirmButton.style.opacity = '0.5';
+                confirmButton.style.cursor = 'not-allowed';
+              }
+            }
+          });
+        }
+      },
+      preConfirm: () => {
+        const checkbox = document.getElementById('terms-checkbox-extend') as HTMLInputElement;
+        if (!checkbox || !checkbox.checked) {
+          return false;
+        }
+        return true;
+      },
+      allowOutsideClick: () => !Swal.isLoading(),
+    });
+
+    if (result.isConfirmed) {
+      try {
+        setIsProcessing(true);
+        await extendVotingPeriod(escrowId, days);
+        
+        await Swal.fire({
+          icon: 'success',
+          title: 'Đã gia hạn!',
+          text: `Thời gian vote đã được gia hạn thêm ${days} ngày`,
+          timer: 3000,
+          timerProgressBar: true,
+          showConfirmButton: false,
+          toast: true,
+          position: 'top-end',
+        });
+        
+        fetchWithdrawalRequests();
+        setShowDetailsModal(false);
+        setSelectedRequest(null);
+      } catch (error: any) {
+        const errorMessage = formatEscrowError(error);
+        await Swal.fire({
+          icon: 'error',
+          title: 'Lỗi',
+          text: errorMessage,
+          confirmButtonText: 'Đóng',
+          confirmButtonColor: '#dc2626',
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
+
+  const handleCancelCampaign = async (escrowId: string) => {
+    const result = await Swal.fire({
+      title: 'Huỷ campaign & hoàn tiền?',
+      html: `
+        <p style="margin-bottom: 20px; color: #dc2626; font-weight: 600;">⚠️ Hành động này không thể hoàn tác!</p>
+        <p style="margin-bottom: 20px;">Campaign sẽ bị huỷ và tất cả donors sẽ được hoàn tiền theo tỷ lệ. Bạn có chắc chắn muốn tiếp tục?</p>
+        <div style="text-align: left; margin-bottom: 15px;">
+          <label style="display: flex; align-items: center; cursor: pointer; color: #374151;">
+            <input type="checkbox" id="terms-checkbox-cancel" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+            <span>Tôi hiểu rõ hậu quả và cam kết chịu trách nhiệm</span>
+          </label>
+        </div>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Huỷ campaign',
+      cancelButtonText: 'Hủy',
+      didOpen: () => {
+        const checkbox = document.getElementById('terms-checkbox-cancel') as HTMLInputElement;
+        const confirmButton = Swal.getConfirmButton();
+        
+        if (confirmButton) {
+          confirmButton.disabled = true;
+          confirmButton.style.opacity = '0.5';
+          confirmButton.style.cursor = 'not-allowed';
+        }
+        
+        if (checkbox) {
+          checkbox.addEventListener('change', () => {
+            const confirmButton = Swal.getConfirmButton();
+            if (confirmButton) {
+              if (checkbox.checked) {
+                confirmButton.disabled = false;
+                confirmButton.style.opacity = '1';
+                confirmButton.style.cursor = 'pointer';
+              } else {
+                confirmButton.disabled = true;
+                confirmButton.style.opacity = '0.5';
+                confirmButton.style.cursor = 'not-allowed';
+              }
+            }
+          });
+        }
+      },
+      preConfirm: () => {
+        const checkbox = document.getElementById('terms-checkbox-cancel') as HTMLInputElement;
+        if (!checkbox || !checkbox.checked) {
+          return false;
+        }
+        return true;
+      },
+      allowOutsideClick: () => !Swal.isLoading(),
+    });
+
+    if (result.isConfirmed) {
+      try {
+        setIsProcessing(true);
+        const response = await cancelCampaignByCommunityRejection(escrowId);
+        
+        await Swal.fire({
+          icon: response.wasAlreadyCancelled ? 'info' : 'success',
+          title: response.wasAlreadyCancelled ? 'Đã huỷ trước đó' : 'Đã huỷ campaign!',
+          text: response.wasAlreadyCancelled 
+            ? 'Campaign đã bị huỷ trước đó'
+            : response.warning 
+              ? `Campaign đã bị huỷ. ${response.warning}`
+              : 'Campaign đã bị huỷ và refund đã được khởi tạo',
+          timer: 5000,
+          timerProgressBar: true,
+          showConfirmButton: true,
+        });
+        
+        fetchWithdrawalRequests();
+        setShowDetailsModal(false);
+        setSelectedRequest(null);
+      } catch (error: any) {
+        const errorMessage = formatEscrowError(error);
+        await Swal.fire({
+          icon: 'error',
+          title: 'Lỗi',
+          text: errorMessage,
+          confirmButtonText: 'Đóng',
+          confirmButtonColor: '#dc2626',
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
+
   const handleRefresh = () => {
     fetchWithdrawalRequests();
   };
@@ -378,6 +561,10 @@ export default function AdminWithdrawalRequests() {
     switch (status) {
       case 'voting_completed':
         return { label, bgColor: 'bg-blue-50', textColor: 'text-blue-700' };
+      case 'voting_extended':
+        return { label, bgColor: 'bg-yellow-50', textColor: 'text-yellow-700' };
+      case 'rejected_by_community':
+        return { label, bgColor: 'bg-red-50', textColor: 'text-red-700' };
       case 'admin_approved':
         return { label, bgColor: 'bg-emerald-50', textColor: 'text-emerald-700' };
       case 'admin_rejected':
@@ -475,7 +662,9 @@ export default function AdminWithdrawalRequests() {
                           onChange={(e) => setStatusFilter(e.target.value as WithdrawalRequestStatus)}
                           className="w-full px-3 py-2 bg-white text-gray-900 rounded-lg border border-gray-200 appearance-none pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
+                          <option value="">Tất cả (cần review)</option>
                           <option value="voting_completed">Đã hoàn thành vote</option>
+                          <option value="rejected_by_community">Bị từ chối bởi cộng đồng</option>
                           <option value="admin_approved">Admin đã duyệt</option>
                           <option value="admin_rejected">Admin từ chối</option>
                           <option value="released">Đã giải ngân</option>
@@ -828,24 +1017,93 @@ export default function AdminWithdrawalRequests() {
               )}
 
               {/* Actions */}
-              {selectedRequest.request_status === 'voting_completed' && (
-                <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={() => handleApprove(selectedRequest._id)}
-                    disabled={isProcessing}
-                    className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle2 className="w-5 h-5" />
-                    Duyệt yêu cầu
-                  </button>
-                  <button
-                    onClick={() => handleReject(selectedRequest._id)}
-                    disabled={isProcessing}
-                    className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <XCircle className="w-5 h-5" />
-                    Từ chối
-                  </button>
+              {selectedRequest.adminActions && (
+                <div className="pt-4 border-t border-gray-200 space-y-4">
+                  {/* CASE 1: Gia hạn vote (vote < 50%) */}
+                  {selectedRequest.adminActions.canExtend && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                      <div className="flex items-start gap-3 mb-4">
+                        <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-1">
+                            Vote quá ít
+                          </h4>
+                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                            Chỉ có {selectedRequest.votingResults?.votePercentage || '0'}% donor đã vote (yêu cầu tối thiểu 50%).
+                            Bạn có thể gia hạn thời gian vote để tạo cơ hội cho cộng đồng tham gia.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => handleExtendVote(selectedRequest._id, 3)}
+                          disabled={isProcessing}
+                          className="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          <Calendar className="w-4 h-4" />
+                          Gia hạn 3 ngày
+                        </button>
+                        <button
+                          onClick={() => handleExtendVote(selectedRequest._id, 5)}
+                          disabled={isProcessing}
+                          className="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          <Calendar className="w-4 h-4" />
+                          Gia hạn 5 ngày
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CASE 2: Huỷ campaign (reject > 50%) */}
+                  {selectedRequest.adminActions.canCancel && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                      <div className="flex items-start gap-3 mb-4">
+                        <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-red-900 dark:text-red-100 mb-1">
+                            Campaign bị từ chối bởi cộng đồng
+                          </h4>
+                          <p className="text-sm text-red-800 dark:text-red-200">
+                            {selectedRequest.votingResults?.rejectDonorPercentage || '0'}% donors đã reject withdrawal request này.
+                            Bạn có thể huỷ campaign và khởi tạo hoàn tiền cho tất cả donors.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleCancelCampaign(selectedRequest._id)}
+                        disabled={isProcessing}
+                        className="w-full px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        <XCircle className="w-5 h-5" />
+                        Huỷ campaign & hoàn tiền
+                      </button>
+                    </div>
+                  )}
+
+                  {/* CASE 3: Approve/Reject (voting_completed) */}
+                  {selectedRequest.adminActions.canApprove && selectedRequest.request_status === 'voting_completed' && (
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => handleApprove(selectedRequest._id)}
+                        disabled={isProcessing}
+                        className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle2 className="w-5 h-5" />
+                        Duyệt yêu cầu
+                      </button>
+                      {selectedRequest.adminActions.canReject && (
+                        <button
+                          onClick={() => handleReject(selectedRequest._id)}
+                          disabled={isProcessing}
+                          className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          <XCircle className="w-5 h-5" />
+                          Từ chối
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
