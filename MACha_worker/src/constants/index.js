@@ -15,6 +15,8 @@ export const EMAIL_CONFIG = {
     FROM_EMAIL: process.env.FROM_EMAIL || process.env.EMAIL_USER,
     FROM_NAME: process.env.FROM_NAME || "MACha",
     TIMEOUT: Number(process.env.EMAIL_TIMEOUT) || 10000,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    USE_RESEND: !!process.env.RESEND_API_KEY, // Use Resend if API key is provided
 };
 
 export const ERROR_TYPES = {
