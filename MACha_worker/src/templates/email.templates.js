@@ -784,3 +784,115 @@ Trân trọng,
     return { subject, text, html };
 };
 
+export const generateEscrowThresholdReachedEmail = (data) => {
+    const { donorName, campaignTitle, campaignId, escrowId, milestonePercentage } = data;
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    const campaignUrl = `${clientUrl}/campaigns/${campaignId}`;
+
+    const displayName = donorName || 'Bạn';
+    const formattedPercentage = milestonePercentage ? `${milestonePercentage}%` : 'mốc giải ngân';
+
+    const subject = `"${campaignTitle}" đã đạt mốc giải ngân – Hãy vào vote`;
+
+    const text = `
+Xin chào ${displayName},
+
+Cảm ơn bạn đã ủng hộ và đóng góp cho chiến dịch "${campaignTitle}"!
+
+Tin vui! Chiến dịch "${campaignTitle}" mà bạn đã donate đã đạt ${formattedPercentage} mục tiêu và đã đến mốc giải ngân.
+
+Bây giờ, chúng tôi cần ý kiến của bạn để quyết định việc giải ngân. Hãy vào vote để thể hiện quyết định của bạn!
+
+Vào vote cho yêu cầu giải ngân: ${campaignUrl}
+
+Mỗi vote của bạn đều quan trọng và góp phần quyết định việc giải ngân có được thực hiện hay không.
+
+Trân trọng,
+Đội ngũ MACha
+    `.trim();
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f6f8; padding: 32px 16px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: bold;">🎯 Đã đạt mốc giải ngân!</h1>
+                            <p style="color: #ffffff; margin: 12px 0 0 0; font-size: 18px; opacity: 0.95;">Chiến dịch cần ý kiến vote của bạn</p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                                Xin chào <strong>${displayName}</strong>,
+                            </p>
+                            
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
+                                Cảm ơn bạn đã ủng hộ và đóng góp cho chiến dịch <strong>"${campaignTitle}"</strong>!
+                            </p>
+                            
+                            <!-- Milestone Info -->
+                            <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 24px; margin: 24px 0; border-radius: 8px;">
+                                <h2 style="color: #065f46; margin: 0 0 12px 0; font-size: 20px; font-weight: 600;">🎉 Tin vui!</h2>
+                                <p style="color: #047857; margin: 0; font-size: 16px; line-height: 1.6;">
+                                    Chiến dịch <strong>"${campaignTitle}"</strong> mà bạn đã donate đã đạt <strong>${formattedPercentage}</strong> mục tiêu và đã đến <strong>mốc giải ngân</strong>.
+                                </p>
+                            </div>
+                            
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 24px 0;">
+                                Bây giờ, chúng tôi cần ý kiến của bạn để quyết định việc giải ngân. 
+                                <strong>Hãy vào vote để thể hiện quyết định của bạn!</strong>
+                            </p>
+                            
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+                                💡 Mỗi vote của bạn đều quan trọng và góp phần quyết định việc giải ngân có được thực hiện hay không.
+                            </p>
+                            
+                            <!-- CTA Button -->
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="${campaignUrl}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: bold; font-size: 18px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);">
+                                    Vào vote cho yêu cầu giải ngân
+                                </a>
+                            </div>
+                            
+                            <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin-top: 30px; text-align: center;">
+                                Hoặc truy cập: <a href="${campaignUrl}" style="color: #10b981; text-decoration: underline;">${campaignUrl}</a>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                            <p style="color: #6b7280; font-size: 14px; margin: 0 0 12px 0;">
+                                Trân trọng,
+                            </p>
+                            <p style="color: #111827; font-size: 16px; font-weight: bold; margin: 0 0 16px 0;">
+                                Đội ngũ MACha
+                            </p>
+                            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                                © ${new Date().getFullYear()} MACha. Tất cả quyền được bảo lưu.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+    `.trim();
+    
+    return { subject, text, html };
+};

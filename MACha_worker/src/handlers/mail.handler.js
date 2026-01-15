@@ -121,6 +121,19 @@ export const handleMailJob = async (job) => {
             });
             break;
 
+        case JOB_TYPES.ESCROW_THRESHOLD_EMAIL:
+            if (!payload.email || !payload.campaignTitle || !payload.campaignId) {
+                throw new Error("Missing required fields for ESCROW_THRESHOLD_EMAIL: email, campaignTitle, campaignId");
+            }
+            emailData = emailTemplates.generateEscrowThresholdReachedEmail({
+                donorName: payload.donorName || null,
+                campaignTitle: payload.campaignTitle,
+                campaignId: payload.campaignId,
+                escrowId: payload.escrowId || null,
+                milestonePercentage: payload.milestonePercentage || null
+            });
+            break;
+
         default:
             throw new Error(`Unknown email job type: ${type}`);
     }

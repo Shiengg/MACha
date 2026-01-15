@@ -1,5 +1,7 @@
 import Notification from "../models/notification.js";
 import { redisClient } from "../config/redis.js";
+import mongoose from "mongoose";
+
 export const createNotification = async (payload) => {
     const notification = new Notification(payload);
     await notification.save();
@@ -7,13 +9,20 @@ export const createNotification = async (payload) => {
 }
 
 export const getNotifications = async (userId) => {
-    const notificationKey = `notifications:${userId}`;
+    // Convert userId to ObjectId to ensure consistent query
+    const userIdStr = userId?.toString();
+    const notificationKey = `notifications:${userIdStr}`;
     const cached = await redisClient.get(notificationKey);
     if (cached) {
         return JSON.parse(cached);
     }
 
-    const notifications = await Notification.find({ receiver: userId })
+    // Ensure userId is converted to ObjectId for proper matching
+    const receiverId = mongoose.Types.ObjectId.isValid(userId) 
+        ? new mongoose.Types.ObjectId(userId) 
+        : userId;
+
+    const notifications = await Notification.find({ receiver: receiverId })
         .populate("sender", "username avatar")
         .populate("post", "content_text")
         .populate("campaign", "title")
@@ -26,9 +35,16 @@ export const getNotifications = async (userId) => {
 }
 
 export const markAsRead = async (notificationId, userId) => {
-    const notificationKey = `notifications:${userId}`;
+    const userIdStr = userId?.toString();
+    const notificationKey = `notifications:${userIdStr}`;
+    
+    // Ensure userId is converted to ObjectId for proper matching
+    const receiverId = mongoose.Types.ObjectId.isValid(userId) 
+        ? new mongoose.Types.ObjectId(userId) 
+        : userId;
+    
     const notification = await Notification.findOneAndUpdate(
-        { _id: notificationId, receiver: userId },
+        { _id: notificationId, receiver: receiverId },
         { is_read: true },
         { new: true }
     );
@@ -38,9 +54,16 @@ export const markAsRead = async (notificationId, userId) => {
 }
 
 export const markAllAsRead = async (userId) => {
-    const notificationKey = `notifications:${userId}`;
+    const userIdStr = userId?.toString();
+    const notificationKey = `notifications:${userIdStr}`;
+    
+    // Ensure userId is converted to ObjectId for proper matching
+    const receiverId = mongoose.Types.ObjectId.isValid(userId) 
+        ? new mongoose.Types.ObjectId(userId) 
+        : userId;
+    
     const result = await Notification.updateMany(
-        { receiver: userId, is_read: false },
+        { receiver: receiverId, is_read: false },
         { $set: { is_read: true } }
     );
     await redisClient.del(notificationKey);
@@ -48,10 +71,17 @@ export const markAllAsRead = async (userId) => {
 }
 
 export const deleteNotification = async (notificationId, userId) => {
-    const notificationKey = `notifications:${userId}`;
+    const userIdStr = userId?.toString();
+    const notificationKey = `notifications:${userIdStr}`;
+    
+    // Ensure userId is converted to ObjectId for proper matching
+    const receiverId = mongoose.Types.ObjectId.isValid(userId) 
+        ? new mongoose.Types.ObjectId(userId) 
+        : userId;
+    
     const notification = await Notification.findOne({
         _id: notificationId,
-        receiver: userId
+        receiver: receiverId
     });
 
     if (!notification) {

@@ -99,6 +99,12 @@ const emitEscrowThresholdReachedNotification = async (withdrawalRequest, campaig
     }
     
     try {
+        // Kiểm tra escrow status phải là voting_in_progress (WAITING_FOR_VOTE)
+        if (withdrawalRequest.request_status !== 'voting_in_progress') {
+            console.log(`[Milestone] ⚠️ Escrow ${withdrawalRequest._id} status is ${withdrawalRequest.request_status}, not voting_in_progress. Skipping notification.`);
+            return;
+        }
+        
         // Lấy danh sách unique donors (chỉ những người đã donate thành công)
         const uniqueDonors = await Donation.aggregate([
             {
@@ -125,7 +131,8 @@ const emitEscrowThresholdReachedNotification = async (withdrawalRequest, campaig
         if (donorIds.length > 0) {
             console.log(`[Milestone] Emitting ESCROW_THRESHOLD_REACHED event for escrow ${withdrawalRequest._id}, campaign ${campaign._id}, ${donorIds.length} donors`);
             
-            const job = createJob(
+            // A. Queue notification job (in-app notifications)
+            const notificationJob = createJob(
                 JOB_TYPES.ESCROW_THRESHOLD_REACHED,
                 {
                     escrowId: withdrawalRequest._id.toString(),
@@ -141,7 +148,61 @@ const emitEscrowThresholdReachedNotification = async (withdrawalRequest, campaig
                 }
             );
             
-            await queueService.pushJob(job);
+            await queueService.pushJob(notificationJob);
+            
+            // B. Queue email jobs (chỉ nếu chưa gửi email - idempotency)
+            if (!withdrawalRequest.vote_email_sent_at) {
+                console.log(`[Milestone] Queueing email jobs for escrow ${withdrawalRequest._id}, ${donorIds.length} donors`);
+                
+                // Lấy thông tin users (email, username) cho tất cả donors
+                const users = await User.find({
+                    _id: { $in: donorIds.map(id => new mongoose.Types.ObjectId(id)) }
+                }).select('email username').lean();
+                
+                // Tạo map userId -> user info
+                const userMap = new Map();
+                users.forEach(user => {
+                    userMap.set(user._id.toString(), user);
+                });
+                
+                // Queue email job cho mỗi donor có email
+                let emailJobsQueued = 0;
+                const emailPromises = donorIds.map(async (donorId) => {
+                    const user = userMap.get(donorId);
+                    if (!user || !user.email) {
+                        console.log(`[Milestone] ⚠️ Donor ${donorId} has no email, skipping email`);
+                        return;
+                    }
+                    
+                    const emailJob = createJob(
+                        JOB_TYPES.ESCROW_THRESHOLD_EMAIL,
+                        {
+                            email: user.email,
+                            donorName: user.username || null,
+                            campaignTitle: campaign.title,
+                            campaignId: campaign._id.toString(),
+                            escrowId: withdrawalRequest._id.toString(),
+                            milestonePercentage: milestonePercentage
+                        },
+                        {
+                            userId: donorId,
+                            source: JOB_SOURCE.SYSTEM,
+                            requestId: `escrow-threshold-email-${withdrawalRequest._id}-${donorId}-${Date.now()}`
+                        }
+                    );
+                    
+                    await queueService.pushJob(emailJob);
+                    emailJobsQueued++;
+                });
+                
+                await Promise.all(emailPromises);
+                
+                // Đánh dấu đã gửi email (idempotency)
+                withdrawalRequest.vote_email_sent_at = new Date();
+                console.log(`[Milestone] ✅ Queued ${emailJobsQueued} email jobs for escrow ${withdrawalRequest._id}`);
+            } else {
+                console.log(`[Milestone] ⚠️ Escrow ${withdrawalRequest._id} already sent emails (vote_email_sent_at: ${withdrawalRequest.vote_email_sent_at}), skipping email queue`);
+            }
             
             // Đánh dấu đã notify (idempotency)
             withdrawalRequest.threshold_notified_at = new Date();

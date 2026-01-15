@@ -50,6 +50,7 @@ export const pushJob = async (job) => {
         case JOB_TYPES.CAMPAIGN_REJECTED:
         case JOB_TYPES.CAMPAIGN_REMOVED:
         case JOB_TYPES.DONATION_THANK_YOU:
+        case JOB_TYPES.ESCROW_THRESHOLD_EMAIL:
             targetQueue = QUEUE_NAMES.MAIL_SEND;
             break;
 

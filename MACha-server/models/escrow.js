@@ -118,6 +118,12 @@ const escrowSchema = new mongoose.Schema({
         type: Date,
         default: null,
         index: true
+    },
+    // Idempotency field để tránh gửi email trùng khi escrow đạt threshold
+    vote_email_sent_at: {
+        type: Date,
+        default: null,
+        index: true
     }
 },
     {
