@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import ProtectedRoute from '@/components/guards/ProtectedRoute';
+import UserRoute from '@/components/guards/UserRoute';
 import apiClient from '@/lib/api-client';
 import { INIT_SEPAY_PAYMENT_ROUTE } from '@/constants/api';
 import { campaignCompanionService } from '@/services/campaignCompanion.service';
@@ -104,7 +104,7 @@ export default function DonatePage() {
   };
 
   return (
-    <ProtectedRoute>
+    <UserRoute>
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-3 sm:px-4 py-4 sm:py-8">
         <div className="w-full max-w-md bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 space-y-4 sm:space-y-6">
           <button
@@ -165,6 +165,6 @@ export default function DonatePage() {
           </form>
         </div>
       </div>
-    </ProtectedRoute>
+    </UserRoute>
   );
 }

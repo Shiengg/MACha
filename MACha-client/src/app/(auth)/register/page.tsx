@@ -449,6 +449,14 @@ function SignupPageContent() {
                                 </button>
                             </form>
                         )}
+
+                        {/* Contact Section */}
+                        <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+                            <p className="text-sm text-gray-600 mb-2">Cần hỗ trợ?</p>
+                            <p className="text-sm text-gray-700">
+                                Liên hệ: <a href="mailto:owner@gmail.com" className="text-blue-600 hover:text-blue-700 hover:underline">owner@gmail.com</a>
+                            </p>
+                        </div>
                     </div>
                 </div>
 

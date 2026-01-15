@@ -1,12 +1,14 @@
 import { Router } from "express";
 import { addComment, getComments, deleteComment } from "../controllers/CommentController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { checkRole } from "../middlewares/checkRole.js";
 import { rateLimitByIP, rateLimitByUserId } from "../middlewares/rateLimitMiddleware.js";
 
 const commentRoutes = Router();
 
-commentRoutes.post('/:postId/comments', authMiddleware, rateLimitByUserId(120, 60), addComment);
-commentRoutes.delete('/comments/:commentId', authMiddleware, rateLimitByUserId(60, 60), deleteComment);
+// SECURITY FIX: Chỉ cho phép USER và ORGANIZATION comment, không cho OWNER và ADMIN
+commentRoutes.post('/:postId/comments', authMiddleware, checkRole('user', 'organization'), rateLimitByUserId(120, 60), addComment);
+commentRoutes.delete('/comments/:commentId', authMiddleware, checkRole('user', 'organization'), rateLimitByUserId(60, 60), deleteComment);
 
 // Read: per IP, rộng để không siết người dùng thật
 commentRoutes.get('/:postId/comments', rateLimitByIP(300, 60), getComments);

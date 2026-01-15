@@ -100,7 +100,7 @@ export default function ForgotPasswordPage() {
                         </button>
 
                         {/* Back to Login Link */}
-                        <div className="text-center">
+                        <div className="text-center mb-6">
                             <Link 
                                 href="/login" 
                                 className="text-blue-600 hover:text-blue-700 transition-colors inline-flex items-center gap-2"
@@ -119,6 +119,14 @@ export default function ForgotPasswordPage() {
                                 </svg>
                                 Quay lại đăng nhập
                             </Link>
+                        </div>
+
+                        {/* Contact Section */}
+                        <div className="pt-6 border-t border-gray-200 text-center">
+                            <p className="text-sm text-gray-600 mb-2">Cần hỗ trợ?</p>
+                            <p className="text-sm text-gray-700">
+                                Liên hệ: <a href="mailto:owner@gmail.com" className="text-blue-600 hover:text-blue-700 hover:underline">owner@gmail.com</a>
+                            </p>
                         </div>
                     </div>
                 </div>

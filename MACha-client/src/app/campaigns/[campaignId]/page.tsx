@@ -2062,11 +2062,14 @@ function CampaignDetails() {
                                         const isCreatorOrganization = campaign.creator && typeof campaign.creator === 'object' && campaign.creator.role === 'organization';
                                         const canJoinCompanion = user && user.role === 'user' && isCreatorOrganization && !isCompanion;
                                         
+                                        // SECURITY FIX: Ẩn nút donate nếu user là admin, owner, hoặc creator
+                                        const canDonate = user && (user.role === 'user' || user.role === 'organization') && !isCreator;
+                                        
                                         if (allowedStatuses.includes(campaign.status)) {
                                             return (
                                                 <>
-                                                    {/* Only show donate button if user is not the creator */}
-                                                    {!isCreator && (
+                                                    {/* Only show donate button if user is not the creator and is USER or ORGANIZATION (not ADMIN or OWNER) */}
+                                                    {canDonate && (
                                                         <button 
                                                             onClick={handleDonate} 
                                                             className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2"

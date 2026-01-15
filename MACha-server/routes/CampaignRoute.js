@@ -45,7 +45,8 @@ campaignRoutes.get('/creator/paginated', optionalAuthMiddleware, rateLimitByIP(3
 campaignRoutes.get('/:id', optionalAuthMiddleware, rateLimitByIP(300, 60), getCampaignById);
 
 // Write endpoints – per userId, chặt hơn
-campaignRoutes.post('/', authMiddleware, rateLimitByUserId(60, 60), createCampaign);
+// SECURITY FIX: Chỉ cho phép USER và ORGANIZATION tạo campaign, không cho OWNER và ADMIN
+campaignRoutes.post('/', authMiddleware, checkRole('user', 'organization'), rateLimitByUserId(60, 60), createCampaign);
 campaignRoutes.patch('/:id', authMiddleware, rateLimitByUserId(60, 60), updateCampaign);
 campaignRoutes.delete('/:id', authMiddleware, rateLimitByUserId(30, 60), deleteCampaign);
 campaignRoutes.post('/:id/cancel', authMiddleware, rateLimitByUserId(30, 60), cancelCampaign);
