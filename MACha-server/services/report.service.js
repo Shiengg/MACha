@@ -4,6 +4,7 @@ import Campaign from "../models/campaign.js";
 import User from "../models/user.js";
 import Comment from "../models/comment.js";
 import Event from "../models/event.js";
+import EventRSVP from "../models/eventRSVP.js";
 import { redisClient } from "../config/redis.js";
 import * as queueService from "./queue.service.js";
 import * as postService from "./post.service.js";
@@ -88,6 +89,7 @@ const removeReportedItem = async (reportedType, reportedId, resolutionDetails, a
                     JOB_TYPES.POST_REMOVED,
                     {
                         postId: reportedId.toString(),
+                        userId: creatorId.toString(), // Include post owner ID to avoid DB query in worker
                         adminId: adminId ? adminId.toString() : null,
                         resolutionDetails: resolutionDetails
                     },
@@ -212,12 +214,22 @@ const removeReportedItem = async (reportedType, reportedId, resolutionDetails, a
             }
             
             try {
+                // Fetch RSVP user IDs to avoid DB query in worker
+                const rsvps = await EventRSVP.find({
+                    event: reportedId,
+                    status: { $in: ['going', 'interested'] }
+                }).select('user').lean();
+                const rsvpUserIds = rsvps.map(rsvp => rsvp.user.toString());
+                
                 const job = createJob(
                     JOB_TYPES.EVENT_REMOVED,
                     {
                         eventId: reportedId.toString(),
+                        creatorId: creatorId.toString(), // Include creator ID to avoid DB query in worker
+                        rsvpUserIds: rsvpUserIds, // Include RSVP user IDs to avoid DB query in worker
                         adminId: adminId ? adminId.toString() : null,
-                        resolutionDetails: resolutionDetails
+                        resolutionDetails: resolutionDetails,
+                        eventTitle: reportedItem.title
                     },
                     {
                         userId: adminId ? adminId.toString() : null,

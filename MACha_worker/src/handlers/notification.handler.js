@@ -86,7 +86,9 @@ const handlePostLiked = async (payload) => {
     // Fallback: Query DB if postOwnerId not provided
     const Post = getModel("Post");
     if (!Post) {
-        throw new Error("Post model not available. Please provide postOwnerId in job payload.");
+        const error = new Error("Post model not available. Please provide postOwnerId in job payload.");
+        error.isPermanent = true; // Mark as permanent to prevent infinite retries
+        throw error;
     }
     
     const post = await Post.findById(postId)
@@ -143,7 +145,9 @@ const handleCommentAdded = async (payload) => {
     // Fallback: Query DB
     const Post = getModel("Post");
     if (!Post) {
-        throw new Error("Post model not available. Please provide postOwnerId in job payload.");
+        const error = new Error("Post model not available. Please provide postOwnerId in job payload.");
+        error.isPermanent = true; // Mark as permanent to prevent infinite retries
+        throw error;
     }
     
     const post = await Post.findById(postId)
@@ -306,7 +310,9 @@ const handleEventUpdateCreated = async (payload) => {
     // Fallback: Query DB
     const EventRSVP = getModel("EventRSVP");
     if (!EventRSVP) {
-        throw new Error("EventRSVP model not available. Please provide rsvpUserIds in job payload.");
+        const error = new Error("EventRSVP model not available. Please provide rsvpUserIds in job payload.");
+        error.isPermanent = true; // Mark as permanent to prevent infinite retries
+        throw error;
     }
     
     const eventObjectId = mongoose.Types.ObjectId.isValid(eventId) 
@@ -386,7 +392,9 @@ const handleEventRemoved = async (payload) => {
     // Fallback: Query DB
     const Event = getModel("Event");
     if (!Event) {
-        throw new Error("Event model not available. Please provide creatorId and rsvpUserIds in job payload.");
+        const error = new Error("Event model not available. Please provide creatorId and rsvpUserIds in job payload.");
+        error.isPermanent = true; // Mark as permanent to prevent infinite retries
+        throw error;
     }
     
     const event = await Event.findById(eventId)

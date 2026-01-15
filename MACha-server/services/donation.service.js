@@ -11,6 +11,80 @@ import * as campaignCompanionService from "./campaignCompanion.service.js";
 import * as queueService from "./queue.service.js";
 import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
 
+// Cache để tránh check nhiều lần
+let transactionSupportChecked = false;
+let transactionSupported = false;
+
+/**
+ * Kiểm tra xem MongoDB có hỗ trợ transactions không
+ * Transactions chỉ hoạt động trên replica set hoặc sharded cluster
+ */
+const checkTransactionSupport = async () => {
+    if (transactionSupportChecked) {
+        return transactionSupported;
+    }
+    
+    // Nếu có env variable force enable, sử dụng nó
+    if (process.env.MONGODB_TRANSACTION_SUPPORT === 'true') {
+        transactionSupported = true;
+        transactionSupportChecked = true;
+        console.log('✅ MongoDB transactions enabled via MONGODB_TRANSACTION_SUPPORT env variable');
+        return true;
+    }
+    
+    // Nếu có env variable force disable, sử dụng nó
+    if (process.env.MONGODB_TRANSACTION_SUPPORT === 'false') {
+        transactionSupported = false;
+        transactionSupportChecked = true;
+        console.log('⚠️  MongoDB transactions disabled via MONGODB_TRANSACTION_SUPPORT env variable');
+        return false;
+    }
+    
+    try {
+        const admin = mongoose.connection.db.admin();
+        const serverStatus = await admin.serverStatus();
+        
+        // Kiểm tra replica set: serverStatus.repl sẽ có setName nếu là replica set
+        const isReplicaSet = serverStatus.repl && 
+                            (serverStatus.repl.setName || serverStatus.repl.replSetName);
+        
+        // Kiểm tra mongos: serverStatus.process sẽ là 'mongos' nếu là mongos
+        const isMongos = serverStatus.process === 'mongos';
+        
+        // Kiểm tra connection string có chứa replica set name không
+        const connectionString = process.env.DATABASE_URL || '';
+        const hasReplicaSetInUrl = connectionString.includes('replicaSet=') || 
+                                   connectionString.includes('replicaSet:');
+        
+        // Transactions được hỗ trợ nếu:
+        // 1. Là replica set (có setName trong serverStatus)
+        // 2. Là mongos (sharded cluster)
+        // 3. Connection string có chỉ định replicaSet
+        transactionSupported = isReplicaSet || isMongos || hasReplicaSetInUrl;
+        
+        transactionSupportChecked = true;
+        
+        if (transactionSupported) {
+            const type = isMongos ? 'mongos (sharded cluster)' : 
+                        isReplicaSet ? `replica set (${serverStatus.repl.setName || serverStatus.repl.replSetName || 'unknown'})` :
+                        'replica set (detected from connection string)';
+            console.log(`✅ MongoDB transactions supported (${type})`);
+        } else {
+            console.log('⚠️  MongoDB transactions not supported (standalone instance). Using fallback operations.');
+        }
+        
+        return transactionSupported;
+    } catch (error) {
+        // Nếu không thể check, giả định không hỗ trợ (an toàn hơn)
+        // Trong production, nên set MONGODB_TRANSACTION_SUPPORT=true nếu chắc chắn có replica set
+        console.warn('⚠️  Could not check MongoDB transaction support, assuming not supported:', error.message);
+        console.warn('💡 Tip: Set MONGODB_TRANSACTION_SUPPORT=true in .env if you have replica set');
+        transactionSupported = false;
+        transactionSupportChecked = true;
+        return false;
+    }
+};
+
 const checkAndCreateMilestoneWithdrawalRequest = async (campaign, isExpired = false) => {
     const percentage = (campaign.current_amount / campaign.goal_amount) * 100;
     
@@ -577,60 +651,114 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
     
     // ✅ FIX: Sử dụng MongoDB Transaction cho complex operations khi status === 'completed'
     // Đảm bảo atomic: update donation + campaign + milestone
+    // Fallback về non-transactional operations nếu MongoDB không hỗ trợ transactions (standalone)
     if (status === 'completed' && oldPaymentStatus !== 'completed') {
-        const session = await mongoose.startSession();
-        session.startTransaction();
+        const supportsTransactions = await checkTransactionSupport();
         
-        try {
-            // ✅ FIX: Sử dụng $inc operator để đảm bảo atomic update, tránh race condition
-            await Campaign.findByIdAndUpdate(
-                campaign._id,
-                { 
-                    $inc: { 
-                        current_amount: donation.amount,
-                        completed_donations_count: 1
-                    } 
-                },
-                { session }
-            );
+        if (supportsTransactions) {
+            // Sử dụng transactions khi có hỗ trợ (replica set hoặc sharded cluster)
+            const session = await mongoose.startSession();
+            session.startTransaction();
             
-            // Reload campaign để có giá trị mới nhất
-            const campaignWithLatestData = await Campaign.findById(campaign._id).session(session);
-            
-            // Check và tạo milestone withdrawal request trong transaction
             try {
-                await checkAndCreateMilestoneWithdrawalRequest(campaignWithLatestData);
-            } catch (milestoneError) {      
-                console.error('Error checking milestone withdrawal request:', milestoneError);
-                // Không throw error, chỉ log - milestone có thể retry sau
+                // ✅ FIX: Sử dụng $inc operator để đảm bảo atomic update, tránh race condition
+                await Campaign.findByIdAndUpdate(
+                    campaign._id,
+                    { 
+                        $inc: { 
+                            current_amount: donation.amount,
+                            completed_donations_count: 1
+                        } 
+                    },
+                    { session }
+                );
+                
+                // Reload campaign để có giá trị mới nhất
+                const campaignWithLatestData = await Campaign.findById(campaign._id).session(session);
+                
+                // Check và tạo milestone withdrawal request trong transaction
+                try {
+                    await checkAndCreateMilestoneWithdrawalRequest(campaignWithLatestData);
+                } catch (milestoneError) {      
+                    console.error('Error checking milestone withdrawal request:', milestoneError);
+                    // Không throw error, chỉ log - milestone có thể retry sau
+                }
+                
+                await session.commitTransaction();
+                
+                // Publish events sau khi transaction commit thành công
+                try {
+                    await trackingService.publishEvent("tracking:campaign:updated", {
+                        campaignId: campaignWithLatestData._id.toString(),
+                        userId: donation.donor.toString(),
+                        title: campaignWithLatestData.title,
+                        goal_amount: campaignWithLatestData.goal_amount,
+                        current_amount: campaignWithLatestData.current_amount,
+                        completed_donations_count: campaignWithLatestData.completed_donations_count,
+                        status: campaignWithLatestData.status,
+                        category: campaignWithLatestData.category,
+                    });
+                } catch (campaignEventError) {
+                    console.error('Error publishing campaign updated event:', campaignEventError);
+                }
+                
+                // Update campaign reference để return đúng giá trị
+                Object.assign(campaign, campaignWithLatestData);
+            } catch (error) {
+                await session.abortTransaction();
+                console.error('Transaction failed in updateSepayDonationStatus:', error);
+                throw error;
+            } finally {
+                session.endSession();
             }
-            
-            await session.commitTransaction();
-            
-            // Publish events sau khi transaction commit thành công
+        } else {
+            // Fallback: Sử dụng atomic operations không cần transactions (cho standalone MongoDB)
+            // $inc operator đảm bảo atomicity ngay cả khi không có transactions
             try {
-                await trackingService.publishEvent("tracking:campaign:updated", {
-                    campaignId: campaignWithLatestData._id.toString(),
-                    userId: donation.donor.toString(),
-                    title: campaignWithLatestData.title,
-                    goal_amount: campaignWithLatestData.goal_amount,
-                    current_amount: campaignWithLatestData.current_amount,
-                    completed_donations_count: campaignWithLatestData.completed_donations_count,
-                    status: campaignWithLatestData.status,
-                    category: campaignWithLatestData.category,
-                });
-            } catch (campaignEventError) {
-                console.error('Error publishing campaign updated event:', campaignEventError);
+                // ✅ FIX: Sử dụng $inc operator để đảm bảo atomic update, tránh race condition
+                await Campaign.findByIdAndUpdate(
+                    campaign._id,
+                    { 
+                        $inc: { 
+                            current_amount: donation.amount,
+                            completed_donations_count: 1
+                        } 
+                    }
+                );
+                
+                // Reload campaign để có giá trị mới nhất
+                const campaignWithLatestData = await Campaign.findById(campaign._id);
+                
+                // Check và tạo milestone withdrawal request
+                try {
+                    await checkAndCreateMilestoneWithdrawalRequest(campaignWithLatestData);
+                } catch (milestoneError) {      
+                    console.error('Error checking milestone withdrawal request:', milestoneError);
+                    // Không throw error, chỉ log - milestone có thể retry sau
+                }
+                
+                // Publish events sau khi update thành công
+                try {
+                    await trackingService.publishEvent("tracking:campaign:updated", {
+                        campaignId: campaignWithLatestData._id.toString(),
+                        userId: donation.donor.toString(),
+                        title: campaignWithLatestData.title,
+                        goal_amount: campaignWithLatestData.goal_amount,
+                        current_amount: campaignWithLatestData.current_amount,
+                        completed_donations_count: campaignWithLatestData.completed_donations_count,
+                        status: campaignWithLatestData.status,
+                        category: campaignWithLatestData.category,
+                    });
+                } catch (campaignEventError) {
+                    console.error('Error publishing campaign updated event:', campaignEventError);
+                }
+                
+                // Update campaign reference để return đúng giá trị
+                Object.assign(campaign, campaignWithLatestData);
+            } catch (error) {
+                console.error('Failed to update campaign in updateSepayDonationStatus (fallback):', error);
+                throw error;
             }
-            
-            // Update campaign reference để return đúng giá trị
-            Object.assign(campaign, campaignWithLatestData);
-        } catch (error) {
-            await session.abortTransaction();
-            console.error('Transaction failed in updateSepayDonationStatus:', error);
-            throw error;
-        } finally {
-            session.endSession();
         }
     }
     

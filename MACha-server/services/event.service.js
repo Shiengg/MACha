@@ -594,13 +594,21 @@ export const createEventUpdate = async (eventId, userId, payload) => {
     await redisClient.del(`events:updates:${eventId}`);
     
     try {
+        // Fetch RSVP user IDs to avoid DB query in worker
+        const rsvps = await EventRSVP.find({
+            event: eventId,
+            status: { $in: ['going', 'interested'] }
+        }).select('user').lean();
+        const rsvpUserIds = rsvps.map(rsvp => rsvp.user.toString());
+        
         const job = createJob(
             JOB_TYPES.EVENT_UPDATE_CREATED,
             {
                 eventId: eventId.toString(),
                 userId: userId.toString(),
                 updateContent: payload.content || 'Có cập nhật mới về sự kiện',
-                eventTitle: event.title
+                eventTitle: event.title,
+                rsvpUserIds: rsvpUserIds // Include RSVP user IDs to avoid DB query in worker
             },
             {
                 userId: userId.toString(),
