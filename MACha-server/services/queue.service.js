@@ -63,6 +63,8 @@ export const pushJob = async (job) => {
         case JOB_TYPES.EVENT_REMOVED:
         case JOB_TYPES.EVENT_STARTED:
         case JOB_TYPES.CAMPAIGN_CREATED:
+        case JOB_TYPES.ESCROW_THRESHOLD_REACHED:
+        case JOB_TYPES.ESCROW_APPROVED_BY_ADMIN:
             targetQueue = QUEUE_NAMES.NOTIFICATION_CREATE;
             break;
 

@@ -7,6 +7,8 @@ import User from "../models/user.js";
 import Notification from "../models/notification.js";
 import { redisClient } from "../config/redis.js";
 import * as mailerService from "../utils/mailer.js";
+import * as queueService from "./queue.service.js";
+import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
 
 const VOTING_DURATION_DAYS = 3;
 
@@ -482,6 +484,75 @@ export const approveWithdrawalRequest = async (escrowId, adminId) => {
     escrow.admin_reviewed_at = now;
     escrow.approved_at = now;
     await escrow.save();
+    
+    // Invalidate cache
+    await redisClient.del(`campaign:${escrow.campaign._id}`);
+    await redisClient.del('campaigns');
+    await redisClient.del(`escrow:${escrowId}`);
+    
+    // Emit event ESCROW_APPROVED_BY_ADMIN để gửi notification cho tất cả donors
+    // Chỉ emit nếu chưa được notify (idempotency)
+    if (!escrow.admin_approved_notified_at) {
+        try {
+            // Lấy danh sách unique donors (chỉ những người đã donate thành công)
+            const uniqueDonors = await Donation.aggregate([
+                {
+                    $match: {
+                        campaign: escrow.campaign._id,
+                        payment_status: "completed"
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$donor"
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        donorId: "$_id"
+                    }
+                }
+            ]);
+            
+            const donorIds = uniqueDonors.map(d => d.donorId.toString());
+            
+            if (donorIds.length > 0) {
+                console.log(`[Escrow Approval] Emitting ESCROW_APPROVED_BY_ADMIN event for escrow ${escrow._id}, campaign ${escrow.campaign._id}, ${donorIds.length} donors`);
+                
+                const job = createJob(
+                    JOB_TYPES.ESCROW_APPROVED_BY_ADMIN,
+                    {
+                        escrowId: escrow._id.toString(),
+                        campaignId: escrow.campaign._id.toString(),
+                        campaignTitle: escrow.campaign.title,
+                        withdrawalAmount: escrow.withdrawal_request_amount,
+                        donorIds: donorIds // Pass donor IDs để worker không cần query DB
+                    },
+                    {
+                        userId: adminId.toString(),
+                        source: JOB_SOURCE.ADMIN,
+                        requestId: `escrow-approved-${escrow._id}-${Date.now()}`
+                    }
+                );
+                
+                await queueService.pushJob(job);
+                
+                // Đánh dấu đã notify (idempotency)
+                escrow.admin_approved_notified_at = new Date();
+                await escrow.save();
+                
+                console.log(`[Escrow Approval] ✅ ESCROW_APPROVED_BY_ADMIN job queued successfully for escrow ${escrow._id}`);
+            } else {
+                console.log(`[Escrow Approval] ⚠️ No donors found for campaign ${escrow.campaign._id}, skipping notification`);
+            }
+        } catch (error) {
+            // Log error nhưng không fail toàn bộ flow
+            console.error(`[Escrow Approval] ❌ Error emitting ESCROW_APPROVED_BY_ADMIN event for escrow ${escrow._id}:`, error);
+        }
+    } else {
+        console.log(`[Escrow Approval] ⚠️ Escrow ${escrow._id} already notified (admin_approved_notified_at: ${escrow.admin_approved_notified_at}), skipping`);
+    }
     
     return {
         success: true,

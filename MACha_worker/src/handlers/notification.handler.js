@@ -47,6 +47,12 @@ export const handleNotificationJob = async (job) => {
             // Empty handler - skip
             return { success: true, skipped: true };
             
+        case JOB_TYPES.ESCROW_THRESHOLD_REACHED:
+            return await handleEscrowThresholdReached(payload);
+            
+        case JOB_TYPES.ESCROW_APPROVED_BY_ADMIN:
+            return await handleEscrowApprovedByAdmin(payload);
+            
         default:
             throw new Error(`Unknown notification job type: ${type}`);
     }
@@ -493,5 +499,195 @@ const handleEventStarted = async (payload) => {
     });
     
     return { success: true, count: 1 };
+};
+
+// ESCROW_THRESHOLD_REACHED handler
+const handleEscrowThresholdReached = async (payload) => {
+    const { escrowId, campaignId, campaignTitle, milestonePercentage, donorIds } = payload;
+    
+    if (!escrowId || !campaignId) {
+        throw new Error("escrowId and campaignId are required");
+    }
+    
+    console.log(`[Notification Handler] Processing ESCROW_THRESHOLD_REACHED for escrow ${escrowId}, campaign ${campaignId}`);
+    
+    // If server passes donorIds directly, use it (recommended)
+    if (donorIds && Array.isArray(donorIds)) {
+        if (donorIds.length === 0) {
+            return { success: true, skipped: true };
+        }
+        
+        const notifications = donorIds.map(receiverId => ({
+            receiver: receiverId,
+            sender: null, // System notification
+            type: 'escrow_threshold_reached',
+            campaign: campaignId,
+            message: `Campaign đã đạt mốc giải ngân 🎯`,
+            content: `Campaign "${campaignTitle || 'có tên'}" bạn đã donate đã đạt ${milestonePercentage}% mục tiêu. Hãy vào vote để quyết định giải ngân.`,
+            is_read: false
+        }));
+        
+        // Create notifications in database
+        await Promise.all(
+            notifications.map(notif => notificationService.createNotification(notif))
+        );
+        
+        console.log(`[Notification Handler] ✅ ESCROW_THRESHOLD_REACHED notifications created successfully:`, {
+            escrowId,
+            campaignId,
+            count: notifications.length
+        });
+        
+        return { success: true, count: notifications.length };
+    }
+    
+    // Fallback: Query DB
+    const Donation = getModel("Donation");
+    if (!Donation) {
+        const error = new Error("Donation model not available. Please provide donorIds in job payload.");
+        error.isPermanent = true; // Mark as permanent to prevent infinite retries
+        throw error;
+    }
+    
+    const campaignObjectId = mongoose.Types.ObjectId.isValid(campaignId) 
+        ? new mongoose.Types.ObjectId(campaignId) 
+        : campaignId;
+    
+    const donations = await Donation.find({
+        campaign: campaignObjectId,
+        payment_status: "completed"
+    }).select('donor').lean();
+    
+    const uniqueDonorIds = [...new Set(donations.map(d => d.donor.toString()))];
+    
+    if (uniqueDonorIds.length === 0) {
+        return { success: true, skipped: true };
+    }
+    
+    const Campaign = getModel("Campaign");
+    const campaign = await Campaign?.findById(campaignId).select('title').lean();
+    const campaignTitleFinal = campaignTitle || campaign?.title || 'có tên';
+    
+    const notifications = uniqueDonorIds.map(receiverId => ({
+        receiver: receiverId,
+        sender: null, // System notification
+        type: 'escrow_threshold_reached',
+        campaign: campaignId,
+        message: `Campaign đã đạt mốc giải ngân 🎯`,
+        content: `Campaign "${campaignTitleFinal}" bạn đã donate đã đạt ${milestonePercentage || 'một'}% mục tiêu. Hãy vào vote để quyết định giải ngân.`,
+        is_read: false
+    }));
+    
+    // Create notifications in database
+    await Promise.all(
+        notifications.map(notif => notificationService.createNotification(notif))
+    );
+    
+    console.log(`[Notification Handler] ✅ ESCROW_THRESHOLD_REACHED notifications created successfully:`, {
+        escrowId,
+        campaignId,
+        count: notifications.length
+    });
+    
+    return { success: true, count: notifications.length };
+};
+
+// ESCROW_APPROVED_BY_ADMIN handler
+const handleEscrowApprovedByAdmin = async (payload) => {
+    const { escrowId, campaignId, campaignTitle, withdrawalAmount, donorIds } = payload;
+    
+    if (!escrowId || !campaignId) {
+        throw new Error("escrowId and campaignId are required");
+    }
+    
+    console.log(`[Notification Handler] Processing ESCROW_APPROVED_BY_ADMIN for escrow ${escrowId}, campaign ${campaignId}`);
+    
+    // If server passes donorIds directly, use it (recommended)
+    if (donorIds && Array.isArray(donorIds)) {
+        if (donorIds.length === 0) {
+            return { success: true, skipped: true };
+        }
+        
+        const formattedAmount = withdrawalAmount 
+            ? withdrawalAmount.toLocaleString('vi-VN') + ' VND'
+            : 'số tiền yêu cầu';
+        
+        const notifications = donorIds.map(receiverId => ({
+            receiver: receiverId,
+            sender: null, // System notification
+            type: 'escrow_approved',
+            campaign: campaignId,
+            message: `Escrow đã được duyệt ✅`,
+            content: `Admin đã duyệt yêu cầu giải ngân ${formattedAmount} cho campaign "${campaignTitle || 'có tên'}". Hệ thống sẽ tiến hành giải ngân sớm.`,
+            is_read: false
+        }));
+        
+        // Create notifications in database
+        await Promise.all(
+            notifications.map(notif => notificationService.createNotification(notif))
+        );
+        
+        console.log(`[Notification Handler] ✅ ESCROW_APPROVED_BY_ADMIN notifications created successfully:`, {
+            escrowId,
+            campaignId,
+            count: notifications.length
+        });
+        
+        return { success: true, count: notifications.length };
+    }
+    
+    // Fallback: Query DB
+    const Donation = getModel("Donation");
+    if (!Donation) {
+        const error = new Error("Donation model not available. Please provide donorIds in job payload.");
+        error.isPermanent = true; // Mark as permanent to prevent infinite retries
+        throw error;
+    }
+    
+    const campaignObjectId = mongoose.Types.ObjectId.isValid(campaignId) 
+        ? new mongoose.Types.ObjectId(campaignId) 
+        : campaignId;
+    
+    const donations = await Donation.find({
+        campaign: campaignObjectId,
+        payment_status: "completed"
+    }).select('donor').lean();
+    
+    const uniqueDonorIds = [...new Set(donations.map(d => d.donor.toString()))];
+    
+    if (uniqueDonorIds.length === 0) {
+        return { success: true, skipped: true };
+    }
+    
+    const Campaign = getModel("Campaign");
+    const campaign = await Campaign?.findById(campaignId).select('title').lean();
+    const campaignTitleFinal = campaignTitle || campaign?.title || 'có tên';
+    
+    const formattedAmount = withdrawalAmount 
+        ? withdrawalAmount.toLocaleString('vi-VN') + ' VND'
+        : 'số tiền yêu cầu';
+    
+    const notifications = uniqueDonorIds.map(receiverId => ({
+        receiver: receiverId,
+        sender: null, // System notification
+        type: 'escrow_approved',
+        campaign: campaignId,
+        message: `Escrow đã được duyệt ✅`,
+        content: `Admin đã duyệt yêu cầu giải ngân ${formattedAmount} cho campaign "${campaignTitleFinal}". Hệ thống sẽ tiến hành giải ngân sớm.`,
+        is_read: false
+    }));
+    
+    // Create notifications in database
+    await Promise.all(
+        notifications.map(notif => notificationService.createNotification(notif))
+    );
+    
+    console.log(`[Notification Handler] ✅ ESCROW_APPROVED_BY_ADMIN notifications created successfully:`, {
+        escrowId,
+        campaignId,
+        count: notifications.length
+    });
+    
+    return { success: true, count: notifications.length };
 };
 

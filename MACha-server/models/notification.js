@@ -35,7 +35,9 @@ const notificationSchema = new mongoose.Schema({
             "admin_reported",
             "system",
             "withdrawal_released",
-            "refund_processed"
+            "refund_processed",
+            "escrow_threshold_reached",
+            "escrow_approved"
         ],
         required: true,
         index: true

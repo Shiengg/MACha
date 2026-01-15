@@ -85,6 +85,78 @@ const checkTransactionSupport = async () => {
     }
 };
 
+/**
+ * Helper function để emit ESCROW_THRESHOLD_REACHED notification
+ * @param {Object} withdrawalRequest - Escrow object
+ * @param {Object} campaign - Campaign object
+ * @param {Number} milestonePercentage - Milestone percentage đạt được
+ */
+const emitEscrowThresholdReachedNotification = async (withdrawalRequest, campaign, milestonePercentage) => {
+    // Chỉ emit nếu chưa được notify (idempotency)
+    if (withdrawalRequest.threshold_notified_at) {
+        console.log(`[Milestone] ⚠️ Escrow ${withdrawalRequest._id} already notified (threshold_notified_at: ${withdrawalRequest.threshold_notified_at}), skipping`);
+        return;
+    }
+    
+    try {
+        // Lấy danh sách unique donors (chỉ những người đã donate thành công)
+        const uniqueDonors = await Donation.aggregate([
+            {
+                $match: {
+                    campaign: campaign._id,
+                    payment_status: "completed"
+                }
+            },
+            {
+                $group: {
+                    _id: "$donor"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    donorId: "$_id"
+                }
+            }
+        ]);
+        
+        const donorIds = uniqueDonors.map(d => d.donorId.toString());
+        
+        if (donorIds.length > 0) {
+            console.log(`[Milestone] Emitting ESCROW_THRESHOLD_REACHED event for escrow ${withdrawalRequest._id}, campaign ${campaign._id}, ${donorIds.length} donors`);
+            
+            const job = createJob(
+                JOB_TYPES.ESCROW_THRESHOLD_REACHED,
+                {
+                    escrowId: withdrawalRequest._id.toString(),
+                    campaignId: campaign._id.toString(),
+                    campaignTitle: campaign.title,
+                    milestonePercentage: milestonePercentage,
+                    donorIds: donorIds // Pass donor IDs để worker không cần query DB
+                },
+                {
+                    userId: campaign.creator.toString(),
+                    source: JOB_SOURCE.SYSTEM,
+                    requestId: `escrow-threshold-${withdrawalRequest._id}-${Date.now()}`
+                }
+            );
+            
+            await queueService.pushJob(job);
+            
+            // Đánh dấu đã notify (idempotency)
+            withdrawalRequest.threshold_notified_at = new Date();
+            await withdrawalRequest.save();
+            
+            console.log(`[Milestone] ✅ ESCROW_THRESHOLD_REACHED job queued successfully for escrow ${withdrawalRequest._id}`);
+        } else {
+            console.log(`[Milestone] ⚠️ No donors found for campaign ${campaign._id}, skipping notification`);
+        }
+    } catch (error) {
+        // Log error nhưng không fail toàn bộ flow
+        console.error(`[Milestone] ❌ Error emitting ESCROW_THRESHOLD_REACHED event for escrow ${withdrawalRequest._id}:`, error);
+    }
+};
+
 const checkAndCreateMilestoneWithdrawalRequest = async (campaign, isExpired = false) => {
     const percentage = (campaign.current_amount / campaign.goal_amount) * 100;
     
@@ -336,6 +408,9 @@ const checkAndCreateMilestoneWithdrawalRequest = async (campaign, isExpired = fa
     await withdrawalRequest.save();
     
     console.log(`[Milestone] Tạo withdrawal request tự động cho campaign ${campaign._id} khi đạt ${achievedMilestonePercentage}% mục tiêu`);
+    
+    // Emit event ESCROW_THRESHOLD_REACHED để gửi notification cho tất cả donors
+    await emitEscrowThresholdReachedNotification(withdrawalRequest, campaign, achievedMilestonePercentage);
     
     return withdrawalRequest;
 };

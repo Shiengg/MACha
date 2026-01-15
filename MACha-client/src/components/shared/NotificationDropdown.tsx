@@ -252,7 +252,7 @@ export default function NotificationDropdown() {
                             </span>
                           ) : (
                             <>
-                              <span className="font-semibold">{notification.sender?.username || 'Unknown User'}</span>
+                              <span className="font-semibold">{notification.sender?.username || 'System'}</span>
                               {' '}
                               <span className="text-gray-700 dark:text-gray-300">
                                 {notification.message}

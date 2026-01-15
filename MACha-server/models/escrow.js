@@ -107,6 +107,17 @@ const escrowSchema = new mongoose.Schema({
     sepay_response_data: {
         type: mongoose.Schema.Types.Mixed,
         default: null
+    },
+    // Idempotency fields để tránh gửi notification trùng
+    threshold_notified_at: {
+        type: Date,
+        default: null,
+        index: true
+    },
+    admin_approved_notified_at: {
+        type: Date,
+        default: null,
+        index: true
     }
 },
     {
