@@ -5,6 +5,7 @@ import {
   GET_WITHDRAWAL_REQUEST_BY_ID_ROUTE,
   SUBMIT_VOTE_ROUTE,
   GET_VOTES_BY_ESCROW_ROUTE,
+  RELEASE_ESCROW_ROUTE,
 } from '@/constants/api';
 
 export type WithdrawalRequestStatus =
@@ -97,6 +98,11 @@ export interface Escrow {
   voting_extended_count?: number;
   last_extended_at?: string | null;
   voting_extended_by?: string | User | null;
+  // Disbursement proof fields
+  disbursement_proof_images?: string[];
+  disbursement_note?: string | null;
+  disbursed_by?: string | User | null;
+  disbursement_verified_at?: string | null;
   createdAt: string;
   updatedAt: string;
   votingResults?: VotingResults;
@@ -146,6 +152,16 @@ export interface SubmitVoteResponse {
 export interface GetVotesResponse {
   votes: Vote[];
   count: number;
+}
+
+export interface ReleaseEscrowPayload {
+  disbursement_proof_images: string[];
+  disbursement_note?: string;
+}
+
+export interface ReleaseEscrowResponse {
+  message: string;
+  escrow: Escrow;
 }
 
 export const escrowService = {
@@ -234,6 +250,26 @@ export const escrowService = {
       return response.data.votes;
     } catch (error: any) {
       console.error('Error fetching votes:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Owner release escrow với bill giải ngân bắt buộc
+   * Bill giải ngân sẽ được hiển thị CÔNG KHAI trong campaign để đảm bảo minh bạch
+   */
+  async releaseEscrow(
+    escrowId: string,
+    payload: ReleaseEscrowPayload
+  ): Promise<Escrow> {
+    try {
+      const response = await apiClient.post<ReleaseEscrowResponse>(
+        RELEASE_ESCROW_ROUTE(escrowId),
+        payload
+      );
+      return response.data.escrow;
+    } catch (error: any) {
+      console.error('Error releasing escrow:', error);
       throw error;
     }
   },

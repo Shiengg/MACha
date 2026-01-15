@@ -1408,6 +1408,142 @@ export const updateSepayWithdrawalStatus = async (orderInvoiceNumber, status, se
 };
 
 /**
+ * Owner release escrow với bill giải ngân bắt buộc
+ * 
+ * Mục tiêu:
+ * - Minh bạch tài chính: Bill giải ngân được hiển thị CÔNG KHAI trong campaign
+ * - Tăng uy tín campaign & owner
+ * - Không phá vỡ flow escrow hiện tại
+ * 
+ * @param {string} escrowId - ID của escrow
+ * @param {string} ownerId - ID của owner (phải là creator của campaign)
+ * @param {Object} releaseData - Dữ liệu release
+ * @param {string[]} releaseData.disbursement_proof_images - Mảng URL ảnh bill (REQUIRED)
+ * @param {string} releaseData.disbursement_note - Ghi chú giải ngân (optional)
+ * @returns {Promise<Object>} Result object
+ */
+export const releaseEscrow = async (escrowId, ownerId, releaseData) => {
+    const { disbursement_proof_images, disbursement_note } = releaseData;
+    
+    // Validate: disbursement_proof_images là bắt buộc
+    if (!disbursement_proof_images || !Array.isArray(disbursement_proof_images) || disbursement_proof_images.length === 0) {
+        return {
+            success: false,
+            error: "MISSING_PROOF_IMAGES",
+            message: "Bill giải ngân là bắt buộc. Vui lòng upload ít nhất 1 ảnh bill."
+        };
+    }
+    
+    // Validate: mỗi ảnh phải là URL hợp lệ
+    const urlPattern = /^https?:\/\/.+/;
+    for (const imageUrl of disbursement_proof_images) {
+        if (typeof imageUrl !== 'string' || !urlPattern.test(imageUrl)) {
+            return {
+                success: false,
+                error: "INVALID_IMAGE_URL",
+                message: "Mỗi ảnh bill phải là URL hợp lệ"
+            };
+        }
+    }
+    
+    // Validate: tối đa 10 ảnh
+    if (disbursement_proof_images.length > 10) {
+        return {
+            success: false,
+            error: "TOO_MANY_IMAGES",
+            message: "Tối đa 10 ảnh bill giải ngân"
+        };
+    }
+    
+    // Validate: disbursement_note không quá 1000 ký tự
+    if (disbursement_note && disbursement_note.length > 1000) {
+        return {
+            success: false,
+            error: "NOTE_TOO_LONG",
+            message: "Ghi chú giải ngân không được vượt quá 1000 ký tự"
+        };
+    }
+    
+    // Tìm escrow và populate campaign
+    const escrow = await Escrow.findById(escrowId).populate("campaign");
+    if (!escrow) {
+        return {
+            success: false,
+            error: "ESCROW_NOT_FOUND",
+            message: "Không tìm thấy withdrawal request"
+        };
+    }
+    
+    // Validate: escrow phải ở trạng thái admin_approved
+    if (escrow.request_status !== "admin_approved") {
+        return {
+            success: false,
+            error: "INVALID_STATUS",
+            message: `Chỉ có thể release escrow khi ở trạng thái admin_approved. Hiện tại: ${escrow.request_status}`
+        };
+    }
+    
+    // Validate: owner phải là creator của campaign
+    const campaign = escrow.campaign;
+    if (!campaign) {
+        return {
+            success: false,
+            error: "CAMPAIGN_NOT_FOUND",
+            message: "Không tìm thấy campaign"
+        };
+    }
+    
+    if (campaign.creator.toString() !== ownerId.toString()) {
+        return {
+            success: false,
+            error: "UNAUTHORIZED",
+            message: "Chỉ owner của campaign mới có thể release escrow"
+        };
+    }
+    
+    // Idempotency check: nếu đã released, không cho release lại
+    if (escrow.request_status === "released") {
+        return {
+            success: false,
+            error: "ALREADY_RELEASED",
+            message: "Escrow đã được release trước đó"
+        };
+    }
+    
+    // Validate: không cho update proof sau khi released (nếu có proof cũ)
+    if (escrow.disbursement_proof_images && escrow.disbursement_proof_images.length > 0) {
+        return {
+            success: false,
+            error: "PROOF_ALREADY_EXISTS",
+            message: "Escrow đã có bill giải ngân. Không thể update sau khi đã release."
+        };
+    }
+    
+    // Update escrow với proof images và set status = released
+    const now = new Date();
+    escrow.disbursement_proof_images = disbursement_proof_images;
+    escrow.disbursement_note = disbursement_note || null;
+    escrow.disbursed_by = ownerId;
+    escrow.request_status = "released";
+    escrow.released_at = now;
+    
+    await escrow.save();
+    
+    // Invalidate cache liên quan
+    await redisClient.del(`campaign:${campaign._id}`);
+    await redisClient.del('campaigns');
+    await redisClient.del(`escrow:${escrowId}`);
+    
+    console.log(`[Release Escrow] Escrow ${escrowId} released successfully by owner ${ownerId} with ${disbursement_proof_images.length} proof images`);
+    
+    return {
+        success: true,
+        escrow: escrow,
+        message: "Escrow đã được release thành công với bill giải ngân"
+    };
+};
+
+/**
  * Tính toán progress steps cho escrow
  * @param {Object} escrow - Escrow object với request_status
  * @returns {Object} Progress object với current_status và steps[]

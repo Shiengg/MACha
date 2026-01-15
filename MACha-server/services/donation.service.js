@@ -1022,3 +1022,81 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
     const finalCampaignForReturn = await Campaign.findById(donation.campaign);
     return { donation, campaign: finalCampaignForReturn || campaign };
 }
+
+/**
+ * Upload proof images for a donation
+ * @param {string} donationId - Donation ID
+ * @param {string} userId - User ID (must be the donor)
+ * @param {string[]} proofImages - Array of image URLs
+ * @returns {Promise<Object|null>} Updated donation or null if not found
+ */
+export const uploadDonationProof = async (donationId, userId, proofImages) => {
+    const donation = await Donation.findById(donationId).populate('campaign', 'creator');
+    
+    if (!donation) {
+        return null;
+    }
+
+    // Validate: Only donor can upload proof
+    if (donation.donor.toString() !== userId.toString()) {
+        return { error: "Chỉ người donate mới có thể tải lên minh chứng cho donation này" };
+    }
+
+    // Validate: Donation must be completed
+    if (donation.payment_status !== 'completed') {
+        return { error: "Minh chứng chỉ có thể được tải lên cho các donation đã hoàn thành" };
+    }
+
+    // Validate: Maximum 5 images
+    if (proofImages.length > 5) {
+        return { error: "Tối đa 5 ảnh minh chứng được phép" };
+    }
+
+    // Update donation with proof
+    donation.has_proof = true;
+    donation.proof_images = proofImages;
+    donation.proof_status = 'uploaded';
+    donation.proof_uploaded_at = new Date();
+    
+    await donation.save();
+
+    // Clear cache
+    await redisClient.del(`donations:${donation.campaign._id || donation.campaign}`);
+    await redisClient.del(`campaign:${donation.campaign._id || donation.campaign}`);
+
+    return { donation };
+};
+
+/**
+ * Get proof images for a donation
+ * @param {string} donationId - Donation ID
+ * @param {string} userId - User ID requesting proof
+ * @param {string} userRole - User role (admin, owner, user, organization)
+ * @returns {Promise<Object|null>} Proof data or null if not found
+ */
+export const getDonationProof = async (donationId, userId, userRole) => {
+    const donation = await Donation.findById(donationId).populate('campaign', 'creator');
+    
+    if (!donation) {
+        return null;
+    }
+
+    // Check permissions: Only donor, admin, or campaign owner can view proof
+    const isDonor = donation.donor.toString() === userId.toString();
+    const isAdmin = userRole === 'admin';
+    const isOwner = userRole === 'owner';
+    const isCampaignOwner = donation.campaign && 
+        donation.campaign.creator && 
+        donation.campaign.creator.toString() === userId.toString();
+
+    if (!isDonor && !isAdmin && !isOwner && !isCampaignOwner) {
+        return { error: "Bạn không có quyền xem minh chứng này" };
+    }
+
+    return {
+        has_proof: donation.has_proof,
+        proof_images: donation.proof_images || [],
+        proof_status: donation.proof_status,
+        proof_uploaded_at: donation.proof_uploaded_at
+    };
+};

@@ -19,15 +19,18 @@ import VotingSection from '@/components/escrow/VotingSection';
 import CreatePostModal from '@/components/shared/CreatePostModal';
 import ReportModal from '@/components/shared/ReportModal';
 import CampaignUpdateRequestModal from '@/components/campaign/CampaignUpdateRequestModal';
+import UploadProofModal from '@/components/donation/UploadProofModal';
 import { getReportsByItem } from '@/services/report.service';
 import { campaignUpdateRequestService } from '@/services/campaignUpdateRequest.service';
 import { FaFlag } from 'react-icons/fa';
 import { ArrowLeft, Share2, Users, Edit, FileEdit } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 function CampaignDetails() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const campaignId = params.campaignId as string;
     const { socket, isConnected } = useSocket();
 
@@ -66,6 +69,8 @@ function CampaignDetails() {
     const [companionId, setCompanionId] = useState<string | null>(null);
     const [showUpdateRequestModal, setShowUpdateRequestModal] = useState(false);
     const [pendingUpdateRequest, setPendingUpdateRequest] = useState<any>(null);
+    const [showProofModal, setShowProofModal] = useState(false);
+    const [latestDonationId, setLatestDonationId] = useState<string | null>(null);
 
     // Fetch pending update request for active campaigns
     useEffect(() => {
@@ -286,6 +291,50 @@ function CampaignDetails() {
             fetchDonations();
         }
     }, [campaignId]);
+
+    // Check for donation success and show proof upload modal
+    useEffect(() => {
+        const donationStatus = searchParams.get('donation');
+        
+        if (donationStatus === 'success' && user && campaignId) {
+            // Fetch donations to find the latest one for this user
+            const findLatestDonation = async () => {
+                try {
+                    const data = await donationService.getDonationsByCampaign(campaignId);
+                    // Find the most recent completed donation by this user
+                    const userDonations = data
+                        .filter((donation: Donation) => {
+                            const donorId = typeof donation.donor === 'object' 
+                                ? donation.donor._id 
+                                : donation.donor;
+                            const currentUserId = user._id || user.id;
+                            return donation.payment_status === 'completed' && 
+                                   donorId === currentUserId;
+                        })
+                        .sort((a: Donation, b: Donation) => {
+                            const dateA = new Date(a.createdAt || 0).getTime();
+                            const dateB = new Date(b.createdAt || 0).getTime();
+                            return dateB - dateA;
+                        });
+
+                    if (userDonations.length > 0) {
+                        const latestDonation = userDonations[0];
+                        setLatestDonationId(latestDonation._id);
+                        setShowProofModal(true);
+                        
+                        // Remove donation=success from URL
+                        const newUrl = new URL(window.location.href);
+                        newUrl.searchParams.delete('donation');
+                        window.history.replaceState({}, '', newUrl.toString());
+                    }
+                } catch (err) {
+                    console.error('Error finding latest donation:', err);
+                }
+            };
+
+            findLatestDonation();
+        }
+    }, [searchParams, user, campaignId]);
 
     useEffect(() => {
         const fetchUpdates = async () => {
@@ -2351,6 +2400,42 @@ function CampaignDetails() {
                         });
                     }}
                 />
+
+                {/* Upload Proof Modal */}
+                {latestDonationId && (
+                    <UploadProofModal
+                        isOpen={showProofModal}
+                        onClose={() => {
+                            setShowProofModal(false);
+                            setLatestDonationId(null);
+                        }}
+                        donationId={latestDonationId}
+                        onSuccess={() => {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Thành công!',
+                                text: 'Minh chứng đã được tải lên thành công',
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+                            // Refresh donations to show updated proof status
+                            const fetchDonations = async () => {
+                                try {
+                                    const data = await donationService.getDonationsByCampaign(campaignId);
+                                    const completedDonations = data.filter(
+                                        (donation: Donation) => 
+                                            donation.payment_status === 'completed' && 
+                                            !donation.is_anonymous
+                                    );
+                                    setDonations(completedDonations);
+                                } catch (err) {
+                                    console.error('Failed to refresh donations:', err);
+                                }
+                            };
+                            fetchDonations();
+                        }}
+                    />
+                )}
 
                 {/* Report Modal */}
                 <ReportModal

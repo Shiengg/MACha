@@ -7,6 +7,7 @@ import apiClient from '@/lib/api-client';
 import { INIT_SEPAY_PAYMENT_ROUTE } from '@/constants/api';
 import { campaignCompanionService } from '@/services/campaignCompanion.service';
 import { useAuth } from '@/contexts/AuthContext';
+import { AlertTriangle } from 'lucide-react';
 
 export default function DonatePage() {
   const params = useParams();
@@ -128,6 +129,23 @@ export default function DonatePage() {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Warning Block - Cảnh báo về minh chứng chuyển khoản */}
+          <div className="bg-amber-50 border-l-4 border-amber-400 p-3 sm:p-4 rounded-lg">
+            <div className="flex items-start">
+              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-sm sm:text-base font-semibold text-amber-800 mb-1">
+                  ⚠️ Cảnh báo quan trọng về giao dịch
+                </h3>
+                <p className="text-xs sm:text-sm text-amber-700 leading-relaxed">
+                  Vui lòng chụp lại màn hình giao dịch chuyển khoản thành công sau khi hoàn tất donate.
+                  Đây là bằng chứng quan trọng để hệ thống và đội ngũ hỗ trợ xác minh giao dịch
+                  trong trường hợp phát sinh tranh chấp, khiếu nại hoặc sai lệch dữ liệu thanh toán.
+                </p>
+              </div>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">

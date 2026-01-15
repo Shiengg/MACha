@@ -149,6 +149,41 @@ const escrowSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         default: null
+    },
+    // ==================== DISBURSEMENT PROOF FIELDS ====================
+    // Bill giải ngân - bằng chứng tài chính bắt buộc khi release escrow
+    // Được hiển thị CÔNG KHAI trong campaign để đảm bảo minh bạch
+    disbursement_proof_images: {
+        type: [String],
+        default: [],
+        validate: {
+            validator: function(v) {
+                // Nếu request_status = "released", phải có ít nhất 1 ảnh
+                if (this.request_status === "released" && (!v || v.length === 0)) {
+                    return false;
+                }
+                return true;
+            },
+            message: "Bill giải ngân là bắt buộc khi release escrow"
+        }
+    },
+    // Ghi chú giải ngân (optional)
+    disbursement_note: {
+        type: String,
+        default: null,
+        maxlength: 1000
+    },
+    // Owner đã giải ngân (User - owner của campaign)
+    disbursed_by: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+        index: true
+    },
+    // Admin verify bill (nếu có)
+    disbursement_verified_at: {
+        type: Date,
+        default: null
     }
 },
     {

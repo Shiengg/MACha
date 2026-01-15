@@ -97,6 +97,8 @@ export const SEPAY_SUCCESS_ROUTE = `${DONATION_ROUTE}/sepay/success`;
 export const SEPAY_ERROR_ROUTE = `${DONATION_ROUTE}/sepay/error`;
 export const SEPAY_CANCEL_ROUTE = `${DONATION_ROUTE}/sepay/cancel`;
 export const CREATE_DONATION_ROUTE = (campaignId: string) => `${DONATION_ROUTE}/${campaignId}/donate`;
+export const UPLOAD_DONATION_PROOF_ROUTE = (donationId: string) => `${DONATION_ROUTE}/${donationId}/proof`;
+export const GET_DONATION_PROOF_ROUTE = (donationId: string) => `${DONATION_ROUTE}/${donationId}/proof`;
 
 export const CAMPAIGN_COMPANION_ROUTE = "api";
 export const JOIN_CAMPAIGN_COMPANION_ROUTE = (campaignId: string) => `${CAMPAIGN_COMPANION_ROUTE}/campaigns/${campaignId}/companion/join`;
@@ -118,6 +120,7 @@ export const GET_WITHDRAWAL_REQUESTS_BY_CAMPAIGN_ROUTE = (campaignId: string) =>
 export const GET_WITHDRAWAL_REQUEST_BY_ID_ROUTE = (escrowId: string) => `${ESCROW_ROUTE}/${escrowId}`;
 export const SUBMIT_VOTE_ROUTE = (escrowId: string) => `${ESCROW_ROUTE}/${escrowId}/vote`;
 export const GET_VOTES_BY_ESCROW_ROUTE = (escrowId: string) => `${ESCROW_ROUTE}/${escrowId}/votes`;
+export const RELEASE_ESCROW_ROUTE = (escrowId: string) => `${ESCROW_ROUTE}/${escrowId}/release`;
 
 export const ADMIN_ESCROW_ROUTE = "api/admin";
 export const ADMIN_GET_WITHDRAWAL_REQUESTS_ROUTE = `${ADMIN_ESCROW_ROUTE}/withdrawal-requests`;

@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import OwnerSidebar from '@/components/owner/OwnerSidebar';
 import OwnerHeader from '@/components/owner/OwnerHeader';
 import OwnerContentWrapper from '@/components/owner/OwnerContentWrapper';
 import { ownerService } from '@/services/owner.service';
+import { escrowService } from '@/services/escrow.service';
+import { cloudinaryService } from '@/services/cloudinary.service';
 import { Escrow, Campaign, User } from '@/services/escrow.service';
 import { formatCurrencyVND, formatDateTime, formatWithdrawalStatus } from '@/utils/escrow.utils';
 import Swal from 'sweetalert2';
@@ -21,8 +23,12 @@ import {
   Search,
   Wallet,
   ArrowRight,
+  Upload,
+  Image as ImageIcon,
+  X,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 
 export default function OwnerWithdrawalRequests() {
   const searchParams = useSearchParams();
@@ -33,6 +39,14 @@ export default function OwnerWithdrawalRequests() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showReleaseModal, setShowReleaseModal] = useState(false);
+  const [releaseEscrow, setReleaseEscrow] = useState<Escrow | null>(null);
+  const [proofImages, setProofImages] = useState<File[]>([]);
+  const [proofImageUrls, setProofImageUrls] = useState<string[]>([]);
+  const [disbursementNote, setDisbursementNote] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [isReleasing, setIsReleasing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Helper functions to safely access nested properties
   const getCampaignTitle = (campaign: string | Campaign | undefined): string => {
@@ -115,6 +129,147 @@ export default function OwnerWithdrawalRequests() {
     setOpenMenuId(null);
     setSelectedRequest(escrow);
     setShowDetailsModal(true);
+  };
+
+  const handleReleaseEscrow = (escrow: Escrow) => {
+    setOpenMenuId(null);
+    setReleaseEscrow(escrow);
+    setShowReleaseModal(true);
+    setProofImages([]);
+    setProofImageUrls([]);
+    setDisbursementNote('');
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (imageFiles.length === 0) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Vui lòng chọn file ảnh hợp lệ (jpg, png)',
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB per image)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const invalidFiles = imageFiles.filter(file => file.size > maxSize);
+    if (invalidFiles.length > 0) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: `Một số file vượt quá 5MB. Vui lòng chọn file nhỏ hơn.`,
+      });
+      return;
+    }
+
+    // Limit to 10 images
+    const remainingSlots = 10 - proofImages.length;
+    if (imageFiles.length > remainingSlots) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Cảnh báo',
+        text: `Chỉ có thể upload tối đa 10 ảnh. Đã chọn ${remainingSlots} ảnh đầu tiên.`,
+      });
+      imageFiles.splice(remainingSlots);
+    }
+
+    setProofImages([...proofImages, ...imageFiles]);
+    
+    // Create preview URLs
+    imageFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setProofImageUrls(prev => [...prev, e.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setProofImages(prev => prev.filter((_, i) => i !== index));
+    setProofImageUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmitRelease = async () => {
+    if (proofImages.length === 0) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Vui lòng upload ít nhất 1 ảnh bill giải ngân',
+      });
+      return;
+    }
+
+    if (!releaseEscrow) return;
+
+    const result = await Swal.fire({
+      title: 'Xác nhận giải ngân',
+      html: `
+        <div class="text-left">
+          <p class="mb-2">Bạn sắp giải ngân escrow với:</p>
+          <p class="text-lg font-semibold mb-2">${formatCurrencyVND(releaseEscrow.withdrawal_request_amount)}</p>
+          <p class="text-sm text-gray-600 mb-4">${proofImages.length} ảnh bill giải ngân</p>
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+            <strong>Lưu ý:</strong> Bill giải ngân là bằng chứng tài chính bắt buộc và sẽ được công khai để đảm bảo minh bạch cho cộng đồng.
+          </div>
+        </div>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#10b981',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Xác nhận giải ngân',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      setIsReleasing(true);
+      setIsUploading(true);
+
+      // Upload images to Cloudinary
+      const uploadResults = await cloudinaryService.uploadMultipleImages(proofImages, 'escrow-proofs');
+      const imageUrls = uploadResults.map(result => result.secure_url);
+
+      // Release escrow
+      await escrowService.releaseEscrow(releaseEscrow._id, {
+        disbursement_proof_images: imageUrls,
+        disbursement_note: disbursementNote || undefined,
+      });
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Thành công!',
+        text: 'Escrow đã được giải ngân thành công với bill giải ngân',
+        timer: 3000,
+        timerProgressBar: true,
+        showConfirmButton: false,
+      });
+
+      // Reset form and close modal
+      setShowReleaseModal(false);
+      setReleaseEscrow(null);
+      setProofImages([]);
+      setProofImageUrls([]);
+      setDisbursementNote('');
+      
+      // Refresh list
+      fetchWithdrawalRequests();
+    } catch (error: any) {
+      console.error('Error releasing escrow:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || error?.message || 'Không thể giải ngân escrow',
+      });
+    } finally {
+      setIsReleasing(false);
+      setIsUploading(false);
+    }
   };
 
   const handleProcessPayment = async (escrow: Escrow) => {
@@ -334,15 +489,28 @@ export default function OwnerWithdrawalRequests() {
                           >
                             Chi tiết
                           </button>
-                          <button
-                            onClick={() => handleProcessPayment(request)}
-                            disabled={isProcessing || request.request_status !== 'admin_approved'}
-                            className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-1 sm:flex-none justify-center"
-                          >
-                            <Wallet className="w-3 h-3 sm:w-4 sm:h-4" />
-                            <span className="hidden sm:inline">Chuyển khoản</span>
-                            <span className="sm:hidden">Chuyển</span>
-                          </button>
+                          {request.request_status === 'admin_approved' && (
+                            <>
+                              <button
+                                onClick={() => handleReleaseEscrow(request)}
+                                disabled={isReleasing}
+                                className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-1 sm:flex-none justify-center"
+                              >
+                                <Upload className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden sm:inline">Giải ngân</span>
+                                <span className="sm:hidden">Giải ngân</span>
+                              </button>
+                              <button
+                                onClick={() => handleProcessPayment(request)}
+                                disabled={isProcessing}
+                                className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-1 sm:flex-none justify-center"
+                              >
+                                <Wallet className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden sm:inline">Chuyển khoản</span>
+                                <span className="sm:hidden">Chuyển</span>
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -467,18 +635,197 @@ export default function OwnerWithdrawalRequests() {
                 Đóng
               </button>
               {selectedRequest.request_status === 'admin_approved' && (
+                <>
+                  <button
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      handleReleaseEscrow(selectedRequest);
+                    }}
+                    disabled={isReleasing}
+                    className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Giải ngân với bill
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      handleProcessPayment(selectedRequest);
+                    }}
+                    disabled={isProcessing}
+                    className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Wallet className="w-4 h-4" />
+                    Chuyển khoản
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Release Escrow Modal */}
+      {showReleaseModal && releaseEscrow && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[95vh] overflow-y-auto">
+            <div className="p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-900">Giải ngân Escrow</h2>
                 <button
                   onClick={() => {
-                    setShowDetailsModal(false);
-                    handleProcessPayment(selectedRequest);
+                    setShowReleaseModal(false);
+                    setReleaseEscrow(null);
+                    setProofImages([]);
+                    setProofImageUrls([]);
+                    setDisbursementNote('');
                   }}
-                  disabled={isProcessing}
-                  className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="text-gray-400 hover:text-gray-600"
+                  disabled={isReleasing}
                 >
-                  <Wallet className="w-4 h-4" />
-                  Chuyển khoản
+                  <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
-              )}
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+              {/* Warning */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-yellow-800">
+                    <p className="font-semibold mb-1">Lưu ý quan trọng:</p>
+                    <p>Bill giải ngân là bằng chứng tài chính bắt buộc và sẽ được công khai để đảm bảo minh bạch cho cộng đồng.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Campaign Info */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-2">Chiến dịch</h3>
+                <p className="text-lg font-semibold text-gray-900">{getCampaignTitle(releaseEscrow.campaign)}</p>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-2">Số tiền giải ngân</h3>
+                <p className="text-2xl font-bold text-green-600">
+                  {formatCurrencyVND(releaseEscrow.withdrawal_request_amount)}
+                </p>
+              </div>
+
+              {/* Upload Bill Images */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Bill giải ngân <span className="text-red-500">*</span>
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageSelect}
+                    className="hidden"
+                    disabled={isReleasing || proofImages.length >= 10}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isReleasing || proofImages.length >= 10}
+                    className="w-full flex flex-col items-center justify-center py-6 text-gray-600 hover:text-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Upload className="w-10 h-10 mb-2" />
+                    <p className="text-sm font-medium">Click để upload ảnh bill</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      JPG, PNG (tối đa 5MB/ảnh, tối đa 10 ảnh)
+                    </p>
+                    {proofImages.length > 0 && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        Đã chọn: {proofImages.length}/10 ảnh
+                      </p>
+                    )}
+                  </button>
+                </div>
+
+                {/* Image Previews */}
+                {proofImageUrls.length > 0 && (
+                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {proofImageUrls.map((url, index) => (
+                      <div key={index} className="relative group">
+                        <div className="aspect-square rounded-lg overflow-hidden border border-gray-200">
+                          <Image
+                            src={url}
+                            alt={`Bill ${index + 1}`}
+                            width={200}
+                            height={200}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          disabled={isReleasing}
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition disabled:opacity-50"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Disbursement Note */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ghi chú giải ngân (tùy chọn)
+                </label>
+                <textarea
+                  value={disbursementNote}
+                  onChange={(e) => setDisbursementNote(e.target.value)}
+                  placeholder="Nhập ghi chú về việc giải ngân (nếu có)..."
+                  rows={4}
+                  maxLength={1000}
+                  disabled={isReleasing}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {disbursementNote.length}/1000 ký tự
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3 sticky bottom-0 bg-white">
+              <button
+                onClick={() => {
+                  setShowReleaseModal(false);
+                  setReleaseEscrow(null);
+                  setProofImages([]);
+                  setProofImageUrls([]);
+                  setDisbursementNote('');
+                }}
+                disabled={isReleasing}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSubmitRelease}
+                disabled={isReleasing || isUploading || proofImages.length === 0}
+                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isReleasing || isUploading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Xác nhận giải ngân
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
