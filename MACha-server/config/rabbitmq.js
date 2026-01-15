@@ -387,19 +387,57 @@ export const consumeMessages = async (queue, handler, options = {}) => {
             let content = msg.content.toString();
             try {
                 content = JSON.parse(content);
-            } catch {   
+            } catch (parseError) {
+                // JSON parse error - permanent error, don't requeue
+                logRabbitMQEvent("error", { 
+                    error: parseError, 
+                    message: `Invalid JSON in message from queue '${queue}' - discarding message` 
+                });
+                if (!defaultOptions.noAck) {
+                    channel.nack(msg, false, false); // Don't requeue - permanent error
+                }
+                return;
             }
 
+            // Call handler (handler is responsible for ack/nack with retry logic)
             await handler(content, msg, channel);
         } catch (error) {
+            // Error at consumeMessages level (should not happen if handler handles errors correctly)
+            // Check retry count from headers to prevent infinite retry
+            const headers = msg.properties?.headers || {};
+            const retryCount = Number(headers["x-retry-count"]) || 0;
+            const MAX_CONSUME_ERROR_RETRIES = 5; // Hard limit for errors at consumeMessages level
+            
             logRabbitMQEvent("error", { 
                 error, 
-                message: `Error processing message from queue '${queue}'` 
+                message: `Error at consumeMessages level for queue '${queue}' (retry count: ${retryCount})`,
+                retryCount
             });
             
             if (!defaultOptions.noAck) {
-                const requeue = options.requeueOnError !== false;
-                channel.nack(msg, false, requeue);
+                // Don't requeue if:
+                // 1. Error is permanent
+                // 2. Retry count exceeded MAX_CONSUME_ERROR_RETRIES (hard limit)
+                // 3. requeueOnError is explicitly false
+                const shouldRequeue = options.requeueOnError !== false && 
+                                     !error.isPermanent && 
+                                     retryCount < MAX_CONSUME_ERROR_RETRIES;
+                
+                if (!shouldRequeue) {
+                    const reason = error.isPermanent 
+                        ? "Permanent error" 
+                        : retryCount >= MAX_CONSUME_ERROR_RETRIES 
+                            ? `Max consume error retries (${MAX_CONSUME_ERROR_RETRIES}) exceeded`
+                            : "requeueOnError is false";
+                    
+                    logRabbitMQEvent("error", {
+                        message: `Message discarded from queue '${queue}': ${reason}`,
+                        reason,
+                        retryCount
+                    });
+                }
+                
+                channel.nack(msg, false, shouldRequeue);
             }
         }
     }, defaultOptions);

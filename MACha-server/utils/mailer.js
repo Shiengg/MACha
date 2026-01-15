@@ -976,4 +976,126 @@ Trân trọng,
     `.trim();
     return await sendEmail(to, subject, text, htmlContent);
 };
+
+export const sendPostReleaseUpdateWarningEmail = async (to, data) => {
+    const { username, campaignTitle, campaignId, milestonePercentage, commitmentDays, updateRequiredBy } = data;
+    const campaignUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/campaigns/${campaignId}`;
+    const deadlineFormatted = new Date(updateRequiredBy).toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    const subject = `⚠️ Cần cập nhật tiến độ sau giải ngân cho chiến dịch "${campaignTitle}"`;
+
+    const text = `
+Xin chào ${username},
+
+Bạn chưa cập nhật tiến độ sử dụng tiền sau giải ngân theo cam kết tại chiến dịch "${campaignTitle}".
+
+Chiến dịch: ${campaignTitle}
+Mốc giải ngân: ${milestonePercentage}%
+Thời hạn cam kết: ${commitmentDays} ngày
+Hạn chót cập nhật: ${deadlineFormatted}
+
+Việc không cập nhật có thể ảnh hưởng đến uy tín và các chiến dịch sau của bạn.
+
+Vui lòng truy cập chiến dịch và cập nhật tiến độ ngay: ${campaignUrl}
+
+Trân trọng,
+Đội ngũ MACha
+    `.trim();
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 30px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px;">⚠️ Cần cập nhật tiến độ</h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <p style="color: #374151; font-size: 16px; margin-bottom: 20px;">
+                                Xin chào <strong>${username}</strong>,
+                            </p>
+                            
+                            <p style="color: #374151; font-size: 16px; margin-bottom: 20px;">
+                                Bạn chưa cập nhật tiến độ sử dụng tiền sau giải ngân theo cam kết tại chiến dịch:
+                            </p>
+                            
+                            <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 20px; margin: 25px 0; border-radius: 4px;">
+                                <h2 style="color: #065f46; margin: 0 0 10px 0; font-size: 20px;">${campaignTitle}</h2>
+                                <p style="color: #047857; margin: 5px 0; font-size: 14px;">Mốc giải ngân: <strong>${milestonePercentage}%</strong></p>
+                            </div>
+                            
+                            <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 20px; margin: 25px 0; border-radius: 4px;">
+                                <h3 style="color: #92400e; margin: 0 0 15px 0; font-size: 18px;">📅 Thông tin cam kết</h3>
+                                <table width="100%" cellpadding="8">
+                                    <tr>
+                                        <td style="color: #6b7280; width: 40%;">Thời hạn cam kết:</td>
+                                        <td style="color: #1f2937; font-weight: 600;">${commitmentDays} ngày</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #6b7280;">Hạn chót cập nhật:</td>
+                                        <td style="color: #b45309; font-weight: 600;">${deadlineFormatted}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            
+                            <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                                <p style="margin: 0; color: #991b1b; font-size: 14px; line-height: 1.6;">
+                                    <strong>⚠️ Lưu ý quan trọng:</strong> Việc không cập nhật có thể ảnh hưởng đến uy tín và các chiến dịch sau của bạn.
+                                </p>
+                            </div>
+                            
+                            <p style="color: #374151; font-size: 16px; margin-bottom: 30px;">
+                                Vui lòng truy cập chiến dịch và cập nhật tiến độ ngay để duy trì minh bạch với cộng đồng.
+                            </p>
+                            
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="${campaignUrl}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #ffffff; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                                    Cập nhật tiến độ chiến dịch
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 25px; text-align: center; border-top: 1px solid #e5e7eb;">
+                            <p style="color: #6b7280; font-size: 14px; margin: 0 0 10px 0;">
+                                Trân trọng,<br>
+                                <strong>Đội ngũ MACha</strong>
+                            </p>
+                            <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
+                            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                                © ${new Date().getFullYear()} MACha. Tất cả quyền được bảo lưu.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+    `.trim();
+
+    return await sendEmail(to, subject, text, htmlContent);
+};
   

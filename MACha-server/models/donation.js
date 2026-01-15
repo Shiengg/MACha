@@ -106,6 +106,26 @@ const donationSchema = new mongoose.Schema({
         type: Date,
         default: null,
         index: true
+    },
+    // Proof of transaction (minh chứng chuyển khoản)
+    has_proof: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
+    proof_images: [{
+        type: String,
+        required: true
+    }],
+    proof_status: {
+        type: String,
+        enum: ["pending", "uploaded", "missing"],
+        default: "missing",
+        index: true
+    },
+    proof_uploaded_at: {
+        type: Date,
+        default: null
     }
 },
     {

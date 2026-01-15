@@ -15,7 +15,8 @@ import {
   LogOut,
   Calendar,
   AlertTriangle,
-  X
+  X,
+  FileEdit
 } from 'lucide-react';
 
 interface MenuItem {
@@ -54,6 +55,7 @@ export default function AdminSidebar() {
       items: [
         { icon: Users, label: 'Quản lý người dùng', href: '/admin/users' },
         { icon: Megaphone, label: 'Quản lý campaign', href: '/admin/campaigns' },
+        { icon: FileEdit, label: 'Yêu cầu chỉnh sửa', href: '/admin/campaign-update-requests' },
         { icon: Calendar, label: 'Quản lý sự kiện', href: '/admin/events' },
         { icon: CheckCircle, label: 'Duyệt người dùng', href: '/admin/kyc' },
         { icon: DollarSign, label: 'Yêu cầu rút tiền', href: '/admin/withdrawal-requests' },
@@ -109,7 +111,7 @@ export default function AdminSidebar() {
             </div>
             <div className="space-y-1">
               {section.items.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                 const IconComponent = item.icon;
                 return (
                   <Link

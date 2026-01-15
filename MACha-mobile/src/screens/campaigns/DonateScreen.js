@@ -300,6 +300,21 @@ export default function DonateScreen() {
               )}
             </View>
 
+            {/* Warning Block - Cảnh báo về minh chứng chuyển khoản */}
+            <View style={styles.warningContainer}>
+              <MaterialCommunityIcons name="alert" size={scale(20)} color="#F59E0B" />
+              <View style={styles.warningContent}>
+                <Text style={styles.warningTitle}>
+                  ⚠️ Cảnh báo quan trọng về giao dịch
+                </Text>
+                <Text style={styles.warningText}>
+                  Vui lòng chụp lại màn hình giao dịch chuyển khoản thành công sau khi hoàn tất donate.
+                  Đây là bằng chứng quan trọng để hệ thống và đội ngũ hỗ trợ xác minh giao dịch
+                  trong trường hợp phát sinh tranh chấp, khiếu nại hoặc sai lệch dữ liệu thanh toán.
+                </Text>
+              </View>
+            </View>
+
             {/* Form */}
             <View style={styles.form}>
               <View style={styles.inputContainer}>
@@ -1047,6 +1062,31 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#2563EB',
     textAlign: 'center',
+  },
+  warningContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FEF3C7',
+    borderLeftWidth: 4,
+    borderLeftColor: '#F59E0B',
+    padding: moderateScale(12),
+    borderRadius: moderateScale(8),
+    marginTop: verticalScale(16),
+    marginBottom: verticalScale(8),
+  },
+  warningContent: {
+    flex: 1,
+    marginLeft: moderateScale(8),
+  },
+  warningTitle: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: moderateScale(4),
+  },
+  warningText: {
+    fontSize: moderateScale(12),
+    color: '#78350F',
+    lineHeight: moderateScale(18),
   },
   form: {
     gap: scale(20),

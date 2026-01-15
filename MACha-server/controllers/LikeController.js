@@ -3,6 +3,7 @@ import * as likeService from "../services/like.service.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
 import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
+import Post from "../models/post.js";
 
 export const likePost = async (req, res) => {
     try {
@@ -15,11 +16,17 @@ export const likePost = async (req, res) => {
                 postId: postId,
                 userId: req.user._id,
             });
+            
+            // Fetch post to get postOwnerId for notification
+            const post = await Post.findById(postId).select('user').lean();
+            const postOwnerId = post?.user?.toString();
+            
             const job = createJob(
                 JOB_TYPES.POST_LIKED,
                 {
                     postId: postId,
-                    userId: req.user._id.toString()
+                    userId: req.user._id.toString(),
+                    postOwnerId: postOwnerId // Include postOwnerId to avoid DB query in worker
                 },
                 {
                     userId: req.user._id.toString(),
@@ -48,13 +55,9 @@ export const unlikePost = async (req, res) => {
                 postId: postId,
                 userId: req.user._id,
             });
-            await queueService.pushJob({
-                type: "POST_UNLIKED",
-                postId: postId,
-                userId: req.user._id
-            });
+            // Note: POST_UNLIKED job type doesn't exist - unlike doesn't need notification
         } catch (error) {
-            console.error('Error publishing event or pushing job:', error);
+            console.error('Error publishing event:', error);
         }
 
         return res.status(HTTP_STATUS.OK).json(unliked);

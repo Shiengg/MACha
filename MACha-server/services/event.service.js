@@ -433,8 +433,25 @@ export const createRSVP = async (eventId, userId, payload) => {
         return { success: false, error: 'EVENT_NOT_FOUND' };
     }
     
+    // Check if event is cancelled or completed
     if (event.status === 'completed' || event.status === 'cancelled') {
         return { success: false, error: 'EVENT_NOT_ACTIVE' };
+    }
+    
+    // Check if event has ended based on dates
+    const now = new Date();
+    const startDate = new Date(event.start_date);
+    const endDate = event.end_date ? new Date(event.end_date) : null;
+    
+    // Event has ended if:
+    // - Has end_date and end_date < now, OR
+    // - No end_date but start_date < now (event already started and no end date means it's past)
+    const hasEnded = endDate 
+        ? endDate < now 
+        : startDate < now;
+    
+    if (hasEnded) {
+        return { success: false, error: 'EVENT_NOT_ACTIVE', message: 'Cannot join event that has already ended' };
     }
     
     if (payload.status === 'going' && event.capacity) {
@@ -594,13 +611,21 @@ export const createEventUpdate = async (eventId, userId, payload) => {
     await redisClient.del(`events:updates:${eventId}`);
     
     try {
+        // Fetch RSVP user IDs to avoid DB query in worker
+        const rsvps = await EventRSVP.find({
+            event: eventId,
+            status: { $in: ['going', 'interested'] }
+        }).select('user').lean();
+        const rsvpUserIds = rsvps.map(rsvp => rsvp.user.toString());
+        
         const job = createJob(
             JOB_TYPES.EVENT_UPDATE_CREATED,
             {
                 eventId: eventId.toString(),
                 userId: userId.toString(),
                 updateContent: payload.content || 'Có cập nhật mới về sự kiện',
-                eventTitle: event.title
+                eventTitle: event.title,
+                rsvpUserIds: rsvpUserIds // Include RSVP user IDs to avoid DB query in worker
             },
             {
                 userId: userId.toString(),
@@ -819,5 +844,121 @@ export const getEventsForMap = async () => {
     await redisClient.setEx(cacheKey, 300, JSON.stringify(events));
 
     return events;
+};
+
+export const processStartedEvents = async () => {
+    const now = new Date();
+    
+    // Find events that:
+    // - Are published (not cancelled/completed)
+    // - Have start_date <= now (event has started or is starting now)
+    // - Haven't been notified yet
+    const startedEvents = await Event.find({
+        status: 'published',
+        start_date: {
+            $lte: now  // Event has started (start_date <= now)
+        },
+        notification_sent_at: { $exists: false }  // Not notified yet
+    }).select('_id title start_date creator').lean();
+    
+    console.log(`[Started Event] Found ${startedEvents.length} events that have started and not been notified`);
+    
+    const results = [];
+    
+    for (const event of startedEvents) {
+        try {
+            const eventStartDate = new Date(event.start_date);
+            const timeSinceStart = Math.floor((now - eventStartDate) / 1000 / 60); // minutes
+            
+            console.log(`[Started Event] Processing event ${event._id} (${event.title}) - Started ${timeSinceStart} minutes ago`);
+            
+            // Get all users who RSVP'd with status 'going' (they joined the event)
+            const eventObjectId = mongoose.Types.ObjectId.isValid(event._id) 
+                ? new mongoose.Types.ObjectId(event._id) 
+                : event._id;
+            
+            const rsvps = await EventRSVP.find({
+                event: eventObjectId,
+                status: 'going'
+            }).select('user').lean();
+            
+            const userIds = rsvps.map(rsvp => rsvp.user.toString());
+            
+            console.log(`[Started Event] Event ${event._id} has ${userIds.length} users who joined`);
+            
+            if (userIds.length === 0) {
+                // No one joined, just mark as notified
+                await Event.findByIdAndUpdate(event._id, {
+                    notification_sent_at: now
+                });
+                results.push({
+                    eventId: event._id.toString(),
+                    success: true,
+                    title: event.title,
+                    notifiedCount: 0,
+                    skipped: true
+                });
+                console.log(`[Started Event] Event ${event._id} - No users to notify, marked as notified`);
+                continue;
+            }
+            
+            // Create notification job for each user
+            let jobsCreated = 0;
+            for (const userId of userIds) {
+                try {
+                    const job = createJob(
+                        JOB_TYPES.EVENT_STARTED,
+                        {
+                            eventId: event._id.toString(),
+                            eventTitle: event.title,
+                            userId: userId
+                        },
+                        {
+                            userId: userId,
+                            source: JOB_SOURCE.SYSTEM
+                        }
+                    );
+                    
+                    console.log(`[Started Event] 📤 Pushing job to queue:`, {
+                        jobId: job.jobId,
+                        type: job.type,
+                        eventId: job.payload.eventId,
+                        userId: job.payload.userId,
+                        eventTitle: job.payload.eventTitle
+                    });
+                    
+                    await queueService.pushJob(job);
+                    jobsCreated++;
+                    console.log(`[Started Event] ✅ Job queued successfully for user ${userId} (jobId: ${job.jobId})`);
+                } catch (jobError) {
+                    console.error(`[Started Event] ❌ Error creating/queueing job for user ${userId}:`, jobError);
+                    console.error(`[Started Event] Error stack:`, jobError.stack);
+                }
+            }
+            
+            // Mark event as notified
+            await Event.findByIdAndUpdate(event._id, {
+                notification_sent_at: now
+            });
+            
+            results.push({
+                eventId: event._id.toString(),
+                success: true,
+                title: event.title,
+                notifiedCount: jobsCreated
+            });
+            
+            console.log(`[Started Event] ✅ Event ${event._id} (${event.title}) - Created ${jobsCreated} notification jobs for ${userIds.length} users`);
+        } catch (error) {
+            console.error(`[Started Event] ❌ Error processing event ${event._id}:`, error);
+            results.push({
+                eventId: event._id.toString(),
+                success: false,
+                error: error.message
+            });
+        }
+    }
+    
+    return results;
 };
 

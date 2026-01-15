@@ -1,4 +1,5 @@
 import Comment from "../models/comment.js";
+import Post from "../models/post.js";
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as commentService from "../services/comment.service.js";
 import * as trackingService from "../services/tracking.service.js";
@@ -30,13 +31,18 @@ export const addComment = async (req, res) => {
                 avatar: req.user.avatar
             });
 
+            // Fetch post to get postOwnerId for notification
+            const post = await Post.findById(req.params.postId).select('user').lean();
+            const postOwnerId = post?.user?.toString();
+
             const job = createJob(
                 JOB_TYPES.COMMENT_ADDED,
                 {
                     postId: req.params.postId,
                     userId: req.user._id.toString(),
                     commentId: comment._id.toString(),
-                    content_text: content_text
+                    content_text: content_text,
+                    postOwnerId: postOwnerId // Include postOwnerId to avoid DB query in worker
                 },
                 {
                     userId: req.user._id.toString(),

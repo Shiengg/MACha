@@ -7,8 +7,120 @@ import User from "../models/user.js";
 import Notification from "../models/notification.js";
 import { redisClient } from "../config/redis.js";
 import * as mailerService from "../utils/mailer.js";
+import * as queueService from "./queue.service.js";
+import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
+import { invalidateCampaignCache } from "./campaign.service.js";
 
 const VOTING_DURATION_DAYS = 3;
+
+/**
+ * Helper function: Set post-release update tracking fields cho escrow
+ * CHỈ gọi khi escrow vừa được release (request_status = "released")
+ * 
+ * Logic:
+ * 1. Nếu escrow có milestone_percentage → tìm milestone tương ứng trong Campaign.milestones
+ * 2. Lấy commitment_days từ milestone
+ * 3. Set update_required_by = released_at + commitment_days (cuối ngày)
+ * 4. Set update_fulfilled_at = null
+ * 5. Set update_warning_email_sent_at = null
+ * 
+ * @param {Object} escrow - Escrow document (đã populate campaign)
+ * @param {Date} releasedAt - Thời điểm released (nếu null thì dùng escrow.released_at)
+ * @returns {Promise<Object>} { success: boolean, error?: string, update_required_by?: Date }
+ */
+const setPostReleaseUpdateTracking = async (escrow, releasedAt = null) => {
+    try {
+        // Chỉ set tracking fields khi request_status = "released"
+        if (escrow.request_status !== "released") {
+            return {
+                success: false,
+                error: "INVALID_STATUS",
+                message: "Chỉ set tracking fields khi escrow đã released"
+            };
+        }
+
+        const releaseTime = releasedAt || escrow.released_at;
+        if (!releaseTime) {
+            return {
+                success: false,
+                error: "MISSING_RELEASED_AT",
+                message: "released_at phải được set trước khi set tracking fields"
+            };
+        }
+
+        // Nếu escrow không có milestone_percentage → không cần track (manual withdrawal request)
+        if (!escrow.milestone_percentage) {
+            console.log(`[Post-Release Tracking] Escrow ${escrow._id} không có milestone_percentage, bỏ qua tracking`);
+            return {
+                success: true,
+                skipped: true,
+                reason: "No milestone_percentage"
+            };
+        }
+
+        // Tìm milestone tương ứng trong Campaign.milestones
+        const campaign = escrow.campaign;
+        if (!campaign || !campaign.milestones || campaign.milestones.length === 0) {
+            console.warn(`[Post-Release Tracking] Campaign ${campaign?._id} không có milestones, không thể set tracking`);
+            return {
+                success: false,
+                error: "CAMPAIGN_NO_MILESTONES",
+                message: "Campaign không có milestones"
+            };
+        }
+
+        const milestone = campaign.milestones.find(
+            m => m.percentage === escrow.milestone_percentage
+        );
+
+        if (!milestone) {
+            console.error(`[Post-Release Tracking] Không tìm thấy milestone với percentage ${escrow.milestone_percentage} trong campaign ${campaign._id}`);
+            return {
+                success: false,
+                error: "MILESTONE_NOT_FOUND",
+                message: `Không tìm thấy milestone với percentage ${escrow.milestone_percentage}`
+            };
+        }
+
+        // Validate commitment_days
+        if (!milestone.commitment_days || milestone.commitment_days < 1) {
+            console.error(`[Post-Release Tracking] Milestone ${escrow.milestone_percentage}% không có commitment_days hợp lệ: ${milestone.commitment_days}`);
+            return {
+                success: false,
+                error: "INVALID_COMMITMENT_DAYS",
+                message: `commitment_days không hợp lệ: ${milestone.commitment_days}`
+            };
+        }
+
+        // Set update_required_by = released_at + commitment_days (cuối ngày 23:59:59)
+        const updateRequiredBy = new Date(releaseTime);
+        updateRequiredBy.setDate(updateRequiredBy.getDate() + milestone.commitment_days);
+        updateRequiredBy.setHours(23, 59, 59, 999); // Cuối ngày
+
+        // Set tracking fields
+        escrow.update_required_by = updateRequiredBy;
+        escrow.update_fulfilled_at = null;
+        escrow.update_warning_email_sent_at = null;
+
+        await escrow.save();
+
+        console.log(`[Post-Release Tracking] Set tracking fields cho escrow ${escrow._id}: update_required_by = ${updateRequiredBy.toISOString()}, commitment_days = ${milestone.commitment_days}`);
+
+        return {
+            success: true,
+            update_required_by: updateRequiredBy,
+            commitment_days: milestone.commitment_days,
+            milestone_percentage: escrow.milestone_percentage
+        };
+    } catch (error) {
+        console.error(`[Post-Release Tracking] Error setting tracking fields cho escrow ${escrow._id}:`, error);
+        return {
+            success: false,
+            error: "TRACKING_SET_ERROR",
+            message: error.message
+        };
+    }
+};
 
 
 export const getTotalReleasedAmount = async (campaignId) => {
@@ -241,7 +353,7 @@ export const submitVote = async (escrowId, userId, value) => {
         };
     }
     
-    if (escrow.request_status !== "voting_in_progress") {
+    if (!["voting_in_progress", "voting_extended"].includes(escrow.request_status)) {
         return {
             success: false,
             error: "VOTING_NOT_IN_PROGRESS",
@@ -299,13 +411,48 @@ export const submitVote = async (escrowId, userId, value) => {
         vote_weight: voteWeight
     });
     
+    // Check ngay sau khi vote: nếu reject > 50% donor thì trigger REJECTED_BY_COMMUNITY
+    // Chỉ check khi vote là "reject" để tránh check không cần thiết
+    if (value === "reject") {
+        try {
+            const totalDonors = eligibleVoters.length;
+            const rejectVotes = await Vote.countDocuments({
+                escrow: escrowId,
+                value: "reject"
+            });
+            const rejectDonorPercentage = totalDonors > 0 ? (rejectVotes / totalDonors) * 100 : 0;
+            
+            // Nếu reject > 50% tổng donor, trigger evaluate để set REJECTED_BY_COMMUNITY
+            if (rejectDonorPercentage > 50) {
+                console.log(`[Submit Vote] Reject > 50% (${rejectDonorPercentage.toFixed(2)}%), triggering evaluate for escrow ${escrowId}`);
+                
+                // Reload escrow để đảm bảo có latest data
+                const currentEscrow = await Escrow.findById(escrowId).populate("campaign");
+                if (currentEscrow && ["voting_in_progress", "voting_extended"].includes(currentEscrow.request_status)) {
+                    await evaluateVoteResults(escrowId);
+                    console.log(`[Submit Vote] Escrow ${escrowId} set to REJECTED_BY_COMMUNITY`);
+                }
+            }
+        } catch (evaluateError) {
+            // Log error nhưng không fail vote submission
+            console.error(`[Submit Vote] Error evaluating vote results after reject vote:`, evaluateError);
+        }
+    }
+    
     return {
         success: true,
         vote: vote
     };
 };
 
-export const finalizeVotingResult = async (escrowId) => {
+/**
+ * Đánh giá kết quả vote và quyết định trạng thái escrow
+ * Logic:
+ * - Nếu reject > 50% tổng donor -> REJECTED_BY_COMMUNITY
+ * - Nếu vote < 50% tổng donor -> giữ nguyên trạng thái để admin có thể gia hạn
+ * - Ngược lại -> voting_completed (chờ admin review)
+ */
+export const evaluateVoteResults = async (escrowId) => {
     const escrow = await Escrow.findById(escrowId).populate("campaign");
     if (!escrow) {
         return {
@@ -314,16 +461,14 @@ export const finalizeVotingResult = async (escrowId) => {
         };
     }
     
-    if (escrow.request_status !== "voting_in_progress") {
-        return {
-            success: false,
-            error: "NOT_IN_VOTING_STATUS",
-            message: `Escrow không đang trong trạng thái voting_in_progress. Hiện tại: ${escrow.request_status}`
-        };
-    }
+    // Lấy tổng số donor của campaign
+    const eligibleVoters = await getEligibleVoters(escrow.campaign._id.toString());
+    const totalDonors = eligibleVoters.length;
     
+    // Lấy tất cả votes
     const votes = await Vote.find({ escrow: escrowId });
     
+    // Tính toán vote statistics
     let totalApproveWeight = 0;
     let totalRejectWeight = 0;
     let approveCount = 0;
@@ -339,33 +484,104 @@ export const finalizeVotingResult = async (escrowId) => {
         }
     });
     
+    const totalVotes = votes.length;
     const totalWeight = totalApproveWeight + totalRejectWeight;
     
     const approvePercentage = totalWeight > 0 ? (totalApproveWeight / totalWeight) * 100 : 0;
     const rejectPercentage = totalWeight > 0 ? (totalRejectWeight / totalWeight) * 100 : 0;
     
-    const APPROVE_THRESHOLD = 50;
+    // Tính % donor đã vote và % reject theo số lượng donor (không phải weight)
+    const votePercentage = totalDonors > 0 ? (totalVotes / totalDonors) * 100 : 0;
+    const rejectDonorPercentage = totalDonors > 0 ? (rejectCount / totalDonors) * 100 : 0;
     
-    if (approvePercentage >= APPROVE_THRESHOLD) {
-        escrow.request_status = "voting_completed";
-    } else {
-        escrow.request_status = "voting_completed";
+    const voteSummary = {
+        totalDonors,
+        totalVotes,
+        approveCount,
+        rejectCount,
+        totalApproveWeight,
+        totalRejectWeight,
+        approvePercentage: approvePercentage.toFixed(2),
+        rejectPercentage: rejectPercentage.toFixed(2),
+        votePercentage: votePercentage.toFixed(2),
+        rejectDonorPercentage: rejectDonorPercentage.toFixed(2)
+    };
+    
+    // CASE 2: Reject > 50% tổng donor -> REJECTED_BY_COMMUNITY
+    if (rejectDonorPercentage > 50) {
+        escrow.request_status = "rejected_by_community";
+        escrow.community_rejected_at = new Date();
+        await escrow.save();
+        
+        console.log(`[Vote Evaluation] Escrow ${escrowId} REJECTED_BY_COMMUNITY: ${rejectDonorPercentage.toFixed(2)}% donors rejected`);
+        
+        return {
+            success: true,
+            escrow,
+            voteSummary,
+            decision: "REJECTED_BY_COMMUNITY",
+            reason: `Reject vote > 50% donors (${rejectDonorPercentage.toFixed(2)}%)`
+        };
     }
     
+    // CASE 1: Vote < 50% tổng donor -> giữ nguyên trạng thái để admin gia hạn
+    // (không tự động chuyển sang voting_completed)
+    if (votePercentage < 50) {
+        console.log(`[Vote Evaluation] Escrow ${escrowId} INSUFFICIENT_VOTES: ${votePercentage.toFixed(2)}% donors voted (< 50%)`);
+        
+        return {
+            success: true,
+            escrow,
+            voteSummary,
+            decision: "INSUFFICIENT_VOTES",
+            reason: `Vote < 50% donors (${votePercentage.toFixed(2)}%). Admin can extend voting period.`,
+            canExtend: true
+        };
+    }
+    
+    // Trường hợp còn lại: vote đủ, không reject quá nhiều -> voting_completed
+    escrow.request_status = "voting_completed";
     await escrow.save();
+    
+    console.log(`[Vote Evaluation] Escrow ${escrowId} VOTING_COMPLETED: ${votePercentage.toFixed(2)}% voted, ${approvePercentage.toFixed(2)}% approve`);
     
     return {
         success: true,
-        escrow: escrow,
-        voteSummary: {
-            totalVotes: votes.length,
-            approveCount,
-            rejectCount,
-            totalApproveWeight,
-            totalRejectWeight,
-            approvePercentage: approvePercentage.toFixed(2),
-            rejectPercentage: rejectPercentage.toFixed(2)
-        }
+        escrow,
+        voteSummary,
+        decision: "VOTING_COMPLETED",
+        reason: "Vote completed, waiting for admin review"
+    };
+};
+
+/**
+ * Legacy function - giữ lại để backward compatibility
+ * Sử dụng evaluateVoteResults mới
+ */
+export const finalizeVotingResult = async (escrowId) => {
+    const result = await evaluateVoteResults(escrowId);
+    
+    if (!result.success) {
+        return result;
+    }
+    
+    // Nếu là INSUFFICIENT_VOTES, vẫn set voting_completed để backward compatible
+    // nhưng trong logic mới sẽ xử lý riêng
+    if (result.decision === "INSUFFICIENT_VOTES") {
+        // Giữ nguyên trạng thái voting_in_progress hoặc voting_extended
+        // để admin có thể gia hạn
+        return {
+            success: true,
+            escrow: result.escrow,
+            voteSummary: result.voteSummary,
+            canExtend: true
+        };
+    }
+    
+    return {
+        success: true,
+        escrow: result.escrow,
+        voteSummary: result.voteSummary
     };
 };
 
@@ -373,8 +589,9 @@ export const finalizeVotingResult = async (escrowId) => {
 export const processExpiredVotingPeriods = async () => {
     const now = new Date();
     
+    // Tìm các escrow đã hết thời gian vote (cả voting_in_progress và voting_extended)
     const expiredEscrows = await Escrow.find({
-        request_status: "voting_in_progress",
+        request_status: { $in: ["voting_in_progress", "voting_extended"] },
         voting_end_date: { $lte: now }
     });
     
@@ -382,19 +599,29 @@ export const processExpiredVotingPeriods = async () => {
     
     for (const escrow of expiredEscrows) {
         try {
-            const result = await finalizeVotingResult(escrow._id.toString());
+            const result = await evaluateVoteResults(escrow._id.toString());
+            
             results.push({
                 escrowId: escrow._id.toString(),
                 success: result.success,
                 error: result.error,
-                voteSummary: result.voteSummary
+                voteSummary: result.voteSummary,
+                decision: result.decision,
+                reason: result.reason,
+                canExtend: result.canExtend || false
             });
             
             if (result.success) {
-                console.log(`[Voting] Đã finalize voting result cho escrow ${escrow._id}: ${result.voteSummary.approvePercentage}% approve`);
+                if (result.decision === "REJECTED_BY_COMMUNITY") {
+                    console.log(`[Voting] Escrow ${escrow._id} REJECTED_BY_COMMUNITY: ${result.voteSummary.rejectDonorPercentage}% donors rejected`);
+                } else if (result.decision === "INSUFFICIENT_VOTES") {
+                    console.log(`[Voting] Escrow ${escrow._id} INSUFFICIENT_VOTES: ${result.voteSummary.votePercentage}% donors voted (< 50%)`);
+                } else {
+                    console.log(`[Voting] Escrow ${escrow._id} VOTING_COMPLETED: ${result.voteSummary.approvePercentage}% approve`);
+                }
             }
         } catch (error) {
-            console.error(`[Voting] Error finalizing voting for escrow ${escrow._id}:`, error);
+            console.error(`[Voting] Error evaluating voting for escrow ${escrow._id}:`, error);
             results.push({
                 escrowId: escrow._id.toString(),
                 success: false,
@@ -407,15 +634,29 @@ export const processExpiredVotingPeriods = async () => {
 };
 
 
-export const getWithdrawalRequestsForReview = async (status = "voting_completed") => {
-    const escrows = await Escrow.find({ request_status: status })
-        .populate("campaign", "title goal_amount current_amount creator")
+export const getWithdrawalRequestsForReview = async (status = null) => {
+    // Query cả voting_completed và rejected_by_community để admin xem
+    const query = {};
+    if (status) {
+        query.request_status = status;
+    } else {
+        // Mặc định: hiển thị các escrow cần admin review
+        query.request_status = { $in: ["voting_completed", "rejected_by_community"] };
+    }
+    
+    const escrows = await Escrow.find(query)
+        .populate("campaign", "title goal_amount current_amount creator status")
         .populate("requested_by", "username email fullname")
+        .populate("voting_extended_by", "username fullname")
         .sort({ createdAt: -1 });
     
     // Tính voting results cho mỗi escrow
     const escrowsWithVotingResults = await Promise.all(
         escrows.map(async (escrow) => {
+            // Lấy tổng số donor
+            const eligibleVoters = await getEligibleVoters(escrow.campaign._id.toString());
+            const totalDonors = eligibleVoters.length;
+            
             const votes = await Vote.find({ escrow: escrow._id });
             
             let totalApproveWeight = 0;
@@ -433,20 +674,52 @@ export const getWithdrawalRequestsForReview = async (status = "voting_completed"
                 }
             });
             
+            const totalVotes = votes.length;
             const totalWeight = totalApproveWeight + totalRejectWeight;
             const approvePercentage = totalWeight > 0 ? (totalApproveWeight / totalWeight) * 100 : 0;
             const rejectPercentage = totalWeight > 0 ? (totalRejectWeight / totalWeight) * 100 : 0;
             
+            // Tính % donor đã vote và % reject theo số lượng donor
+            const votePercentage = totalDonors > 0 ? (totalVotes / totalDonors) * 100 : 0;
+            const rejectDonorPercentage = totalDonors > 0 ? (rejectCount / totalDonors) * 100 : 0;
+            
+            // Tính progress cho mỗi escrow
+            const progress = calculateEscrowProgress(escrow);
+            
+            // Xác định admin actions
+            const now = new Date();
+            const isExpired = escrow.voting_end_date && escrow.voting_end_date < now;
+            
+            // CASE 1: Vote < 50% → cho phép gia hạn
+            const canExtend = (escrow.request_status === "voting_in_progress" || 
+                              escrow.request_status === "voting_extended" || 
+                              (escrow.request_status === "voting_completed" && votePercentage < 50)) &&
+                             votePercentage < 50;
+            
+            // CASE 2: Reject > 50% → cho phép huỷ campaign
+            const canCancel = escrow.request_status === "rejected_by_community" &&
+                             escrow.campaign.status !== "cancelled";
+            
             return {
                 ...escrow.toObject(),
                 votingResults: {
-                    totalVotes: votes.length,
+                    totalDonors,
+                    totalVotes,
                     approveCount,
                     rejectCount,
                     totalApproveWeight,
                     totalRejectWeight,
                     approvePercentage: approvePercentage.toFixed(2),
-                    rejectPercentage: rejectPercentage.toFixed(2)
+                    rejectPercentage: rejectPercentage.toFixed(2),
+                    votePercentage: votePercentage.toFixed(2),
+                    rejectDonorPercentage: rejectDonorPercentage.toFixed(2)
+                },
+                escrow_progress: progress,
+                adminActions: {
+                    canExtend,
+                    canCancel,
+                    canApprove: escrow.request_status === "voting_completed",
+                    canReject: escrow.request_status === "voting_completed"
                 }
             };
         })
@@ -482,6 +755,75 @@ export const approveWithdrawalRequest = async (escrowId, adminId) => {
     escrow.admin_reviewed_at = now;
     escrow.approved_at = now;
     await escrow.save();
+    
+    // Invalidate cache
+    await redisClient.del(`campaign:${escrow.campaign._id}`);
+    await redisClient.del('campaigns');
+    await redisClient.del(`escrow:${escrowId}`);
+    
+    // Emit event ESCROW_APPROVED_BY_ADMIN để gửi notification cho tất cả donors
+    // Chỉ emit nếu chưa được notify (idempotency)
+    if (!escrow.admin_approved_notified_at) {
+        try {
+            // Lấy danh sách unique donors (chỉ những người đã donate thành công)
+            const uniqueDonors = await Donation.aggregate([
+                {
+                    $match: {
+                        campaign: escrow.campaign._id,
+                        payment_status: "completed"
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$donor"
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        donorId: "$_id"
+                    }
+                }
+            ]);
+            
+            const donorIds = uniqueDonors.map(d => d.donorId.toString());
+            
+            if (donorIds.length > 0) {
+                console.log(`[Escrow Approval] Emitting ESCROW_APPROVED_BY_ADMIN event for escrow ${escrow._id}, campaign ${escrow.campaign._id}, ${donorIds.length} donors`);
+                
+                const job = createJob(
+                    JOB_TYPES.ESCROW_APPROVED_BY_ADMIN,
+                    {
+                        escrowId: escrow._id.toString(),
+                        campaignId: escrow.campaign._id.toString(),
+                        campaignTitle: escrow.campaign.title,
+                        withdrawalAmount: escrow.withdrawal_request_amount,
+                        donorIds: donorIds // Pass donor IDs để worker không cần query DB
+                    },
+                    {
+                        userId: adminId.toString(),
+                        source: JOB_SOURCE.ADMIN,
+                        requestId: `escrow-approved-${escrow._id}-${Date.now()}`
+                    }
+                );
+                
+                await queueService.pushJob(job);
+                
+                // Đánh dấu đã notify (idempotency)
+                escrow.admin_approved_notified_at = new Date();
+                await escrow.save();
+                
+                console.log(`[Escrow Approval] ✅ ESCROW_APPROVED_BY_ADMIN job queued successfully for escrow ${escrow._id}`);
+            } else {
+                console.log(`[Escrow Approval] ⚠️ No donors found for campaign ${escrow.campaign._id}, skipping notification`);
+            }
+        } catch (error) {
+            // Log error nhưng không fail toàn bộ flow
+            console.error(`[Escrow Approval] ❌ Error emitting ESCROW_APPROVED_BY_ADMIN event for escrow ${escrow._id}:`, error);
+        }
+    } else {
+        console.log(`[Escrow Approval] ⚠️ Escrow ${escrow._id} already notified (admin_approved_notified_at: ${escrow.admin_approved_notified_at}), skipping`);
+    }
     
     return {
         success: true,
@@ -531,6 +873,303 @@ export const rejectWithdrawalRequest = async (escrowId, adminId, rejectionReason
     };
 };
 
+/**
+ * Admin gia hạn thời gian vote cho escrow
+ * @param {string} escrowId - ID của escrow
+ * @param {string} adminId - ID của admin
+ * @param {number} extensionDays - Số ngày gia hạn (3 hoặc 5)
+ * @returns {Promise<Object>} Result object
+ */
+export const extendVotingPeriod = async (escrowId, adminId, extensionDays) => {
+    const requestId = `extend-vote-${escrowId}-${Date.now()}`;
+    
+    console.log(`[Extend Voting] Starting extend voting period`, {
+        requestId,
+        escrowId,
+        adminId,
+        extensionDays,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Validate extension days
+    if (![3, 5].includes(extensionDays)) {
+        return {
+            success: false,
+            error: "INVALID_EXTENSION_DAYS",
+            message: "Số ngày gia hạn phải là 3 hoặc 5"
+        };
+    }
+    
+    const escrow = await Escrow.findById(escrowId).populate("campaign");
+    if (!escrow) {
+        return {
+            success: false,
+            error: "ESCROW_NOT_FOUND",
+            message: "Không tìm thấy withdrawal request"
+        };
+    }
+    
+    // Chỉ cho phép gia hạn khi:
+    // - Đang ở trạng thái voting_in_progress hoặc voting_extended
+    // - Hoặc đã hết thời gian vote nhưng chưa có đủ vote (<50% donor voted)
+    const allowedStatuses = ["voting_in_progress", "voting_extended"];
+    const now = new Date();
+    const isExpired = escrow.voting_end_date && escrow.voting_end_date < now;
+    
+    if (!allowedStatuses.includes(escrow.request_status) && !isExpired) {
+        return {
+            success: false,
+            error: "INVALID_STATUS",
+            message: `Không thể gia hạn vote khi escrow ở trạng thái: ${escrow.request_status}`
+        };
+    }
+    
+    // Gia hạn thời gian vote
+    const currentEndDate = escrow.voting_end_date || new Date();
+    const newEndDate = new Date(currentEndDate);
+    newEndDate.setDate(newEndDate.getDate() + extensionDays);
+    
+    escrow.voting_end_date = newEndDate;
+    escrow.request_status = "voting_extended";
+    escrow.voting_extended_count = (escrow.voting_extended_count || 0) + 1;
+    escrow.last_extended_at = now;
+    escrow.voting_extended_by = adminId;
+    await escrow.save();
+    
+    console.log(`[Extend Voting] Voting period extended successfully`, {
+        requestId,
+        escrowId,
+        extensionDays,
+        newEndDate: newEndDate.toISOString(),
+        extendedCount: escrow.voting_extended_count
+    });
+    
+    // Invalidate cache
+    await redisClient.del(`campaign:${escrow.campaign._id}`);
+    await redisClient.del(`escrow:${escrowId}`);
+    
+    // Gửi notification cho tất cả donor về việc gia hạn
+    try {
+        const eligibleVoters = await getEligibleVoters(escrow.campaign._id.toString());
+        const donorIds = eligibleVoters.map(v => v.donorId.toString());
+        
+        if (donorIds.length > 0) {
+            const notifications = donorIds.map(donorId => ({
+                receiver: donorId,
+                sender: null, // System notification
+                type: 'voting_extended',
+                campaign: escrow.campaign._id,
+                message: `Thời gian vote đã được gia hạn thêm ${extensionDays} ngày`,
+                content: `Thời gian vote cho withdrawal request của campaign "${escrow.campaign.title}" đã được gia hạn thêm ${extensionDays} ngày. Hãy tham gia vote!`,
+                is_read: false
+            }));
+            
+            await Notification.insertMany(notifications);
+            
+            // Publish real-time notifications
+            for (const notif of notifications) {
+                try {
+                    await redisClient.publish('notification:new', JSON.stringify({
+                        recipientId: notif.receiver.toString(),
+                        notification: {
+                            type: 'voting_extended',
+                            message: notif.message,
+                            campaign: {
+                                _id: escrow.campaign._id.toString(),
+                                title: escrow.campaign.title
+                            },
+                            is_read: false,
+                            createdAt: new Date()
+                        }
+                    }));
+                } catch (publishError) {
+                    console.error(`[Extend Voting] Error publishing notification to ${notif.receiver}:`, publishError);
+                }
+            }
+            
+            await redisClient.del(donorIds.map(id => `notifications:${id}`));
+            
+            console.log(`[Extend Voting] ✅ Notifications sent to ${donorIds.length} donors`);
+        }
+    } catch (notifError) {
+        console.error(`[Extend Voting] ❌ Error sending notifications:`, notifError);
+        // Không fail toàn bộ flow nếu notification lỗi
+    }
+    
+    return {
+        success: true,
+        escrow,
+        newEndDate: newEndDate.toISOString(),
+        extensionDays,
+        extendedCount: escrow.voting_extended_count
+    };
+};
+
+/**
+ * Admin huỷ campaign do bị từ chối bởi cộng đồng và khởi tạo refund
+ * @param {string} escrowId - ID của escrow
+ * @param {string} adminId - ID của admin
+ * @returns {Promise<Object>} Result object
+ */
+export const cancelCampaignByCommunityRejection = async (escrowId, adminId) => {
+    const requestId = `cancel-community-reject-${escrowId}-${Date.now()}`;
+    
+    console.log(`[Cancel Campaign] Starting cancel campaign by community rejection`, {
+        requestId,
+        escrowId,
+        adminId,
+        timestamp: new Date().toISOString()
+    });
+    
+    const escrow = await Escrow.findById(escrowId).populate("campaign");
+    if (!escrow) {
+        return {
+            success: false,
+            error: "ESCROW_NOT_FOUND",
+            message: "Không tìm thấy withdrawal request"
+        };
+    }
+    
+    if (escrow.request_status !== "rejected_by_community") {
+        return {
+            success: false,
+            error: "INVALID_STATUS",
+            message: `Escrow không ở trạng thái rejected_by_community. Hiện tại: ${escrow.request_status}`
+        };
+    }
+    
+    const campaignId = escrow.campaign._id.toString();
+    const campaign = escrow.campaign;
+    
+    // Idempotency check: kiểm tra campaign đã bị cancel chưa
+    if (campaign.status === "cancelled") {
+        console.log(`[Cancel Campaign] Campaign ${campaignId} already cancelled (idempotency)`, {
+            requestId,
+            cancelledAt: campaign.cancelled_at
+        });
+        return {
+            success: true,
+            campaign,
+            wasAlreadyCancelled: true,
+            message: "Campaign đã bị huỷ trước đó"
+        };
+    }
+    
+    // Cancel campaign
+    campaign.status = "cancelled";
+    campaign.cancelled_at = new Date();
+    campaign.cancellation_reason = "Campaign bị từ chối bởi cộng đồng (>50% donors reject withdrawal request)";
+    await campaign.save();
+    
+    console.log(`[Cancel Campaign] Campaign ${campaignId} cancelled successfully`, {
+        requestId,
+        campaignId
+    });
+    
+    // Cancel tất cả pending withdrawal requests của campaign
+    await cancelPendingWithdrawalRequests(campaignId);
+    
+    // Invalidate cache
+    await invalidateCampaignCache(campaignId, campaign.category, requestId, campaign.creator.toString());
+    
+    // Khởi tạo refund flow (reuse logic từ report.service)
+    try {
+        const refundServiceModule = await import('./refund.service.js');
+        const escrowServiceModule = await import('./escrow.service.js');
+        
+        // Cancel pending withdrawal requests (đã làm ở trên, nhưng double-check)
+        await escrowServiceModule.cancelPendingWithdrawalRequests(campaignId);
+        
+        // Process refund
+        const refundResult = await refundServiceModule.processProportionalRefund(
+            campaignId,
+            adminId,
+            "Campaign đã bị huỷ do cộng đồng từ chối withdrawal request (>50% donors reject)"
+        );
+        
+        if (!refundResult.success) {
+            console.error(`[Cancel Campaign] Refund failed: ${refundResult.error || refundResult.message}`, {
+                requestId,
+                campaignId
+            });
+            // Không throw error, chỉ log - campaign đã được cancel, refund có thể retry sau
+        } else {
+            console.log(`[Cancel Campaign] ✅ Refund processed successfully`, {
+                requestId,
+                campaignId,
+                refundsCount: refundResult.refunds?.length || 0,
+                totalRefunded: refundResult.totalRefunded || 0
+            });
+        }
+        
+        // Gửi notification và email cho tất cả donor
+        try {
+            const eligibleVoters = await getEligibleVoters(campaignId);
+            const donorIds = eligibleVoters.map(v => v.donorId.toString());
+            
+            if (donorIds.length > 0) {
+                // Tạo notifications
+                const notifications = donorIds.map(donorId => ({
+                    receiver: donorId,
+                    sender: null, // System notification
+                    type: 'campaign_cancelled',
+                    campaign: campaign._id,
+                    message: `Campaign đã bị huỷ do cộng đồng từ chối`,
+                    content: `Campaign "${campaign.title}" đã bị huỷ do cộng đồng từ chối withdrawal request. Tiền donate sẽ được hoàn lại.`,
+                    is_read: false
+                }));
+                
+                await Notification.insertMany(notifications);
+                
+                // Publish real-time notifications
+                for (const notif of notifications) {
+                    try {
+                        await redisClient.publish('notification:new', JSON.stringify({
+                            recipientId: notif.receiver.toString(),
+                            notification: {
+                                type: 'campaign_cancelled',
+                                message: notif.message,
+                                campaign: {
+                                    _id: campaign._id.toString(),
+                                    title: campaign.title
+                                },
+                                is_read: false,
+                                createdAt: new Date()
+                            }
+                        }));
+                    } catch (publishError) {
+                        console.error(`[Cancel Campaign] Error publishing notification:`, publishError);
+                    }
+                }
+                
+                await redisClient.del(donorIds.map(id => `notifications:${id}`));
+                
+                console.log(`[Cancel Campaign] ✅ Notifications sent to ${donorIds.length} donors`);
+            }
+        } catch (notifError) {
+            console.error(`[Cancel Campaign] ❌ Error sending notifications:`, notifError);
+        }
+        
+        return {
+            success: true,
+            campaign,
+            refund: refundResult,
+            requestId
+        };
+    } catch (error) {
+        console.error(`[Cancel Campaign] ❌ Error processing refund:`, error);
+        // Campaign đã được cancel, nhưng refund failed
+        // Trả về success với warning
+        return {
+            success: true,
+            campaign,
+            refund: { success: false, error: error.message },
+            warning: "Campaign đã bị huỷ nhưng refund processing có lỗi. Vui lòng kiểm tra và xử lý thủ công.",
+            requestId
+        };
+    }
+};
+
 
 export const getWithdrawalRequestsByCampaign = async (campaignId, status = null) => {
     const query = { campaign: campaignId };
@@ -568,6 +1207,9 @@ export const getWithdrawalRequestsByCampaign = async (campaignId, status = null)
             const approvePercentage = totalWeight > 0 ? (totalApproveWeight / totalWeight) * 100 : 0;
             const rejectPercentage = totalWeight > 0 ? (totalRejectWeight / totalWeight) * 100 : 0;
             
+            // Tính progress cho mỗi escrow
+            const progress = calculateEscrowProgress(escrow);
+            
             return {
                 ...escrow.toObject(),
                 votingResults: {
@@ -578,7 +1220,8 @@ export const getWithdrawalRequestsByCampaign = async (campaignId, status = null)
                     totalRejectWeight,
                     approvePercentage: approvePercentage.toFixed(2),
                     rejectPercentage: rejectPercentage.toFixed(2)
-                }
+                },
+                escrow_progress: progress
             };
         })
     );
@@ -623,6 +1266,9 @@ export const getWithdrawalRequestById = async (escrowId) => {
     const approvePercentage = totalWeight > 0 ? (totalApproveWeight / totalWeight) * 100 : 0;
     const rejectPercentage = totalWeight > 0 ? (totalRejectWeight / totalWeight) * 100 : 0;
     
+    // Tính progress
+    const progress = calculateEscrowProgress(escrow);
+    
     return {
         ...escrow.toObject(),
         votingResults: {
@@ -633,7 +1279,8 @@ export const getWithdrawalRequestById = async (escrowId) => {
             totalRejectWeight,
             approvePercentage: approvePercentage.toFixed(2),
             rejectPercentage: rejectPercentage.toFixed(2)
-        }
+        },
+        escrow_progress: progress
     };
 };
 
@@ -786,13 +1433,27 @@ export const updateSepayWithdrawalStatus = async (orderInvoiceNumber, status, se
         updateData.sepay_transaction_id = sepayData.transaction_id;
     }
     
+    const now = new Date();
     if (newStatus === 'released') {
-        updateData.released_at = new Date();
+        updateData.released_at = now;
         escrow.request_status = 'released';
     }
 
     Object.assign(escrow, updateData);
     await escrow.save();
+    
+    // Set post-release update tracking fields (nếu có milestone)
+    // Reload escrow với populated campaign để ensure có latest data
+    if (newStatus === 'released') {
+        const escrowWithCampaign = await Escrow.findById(escrow._id).populate("campaign");
+        if (escrowWithCampaign) {
+            const trackingResult = await setPostReleaseUpdateTracking(escrowWithCampaign, now);
+            if (!trackingResult.success && !trackingResult.skipped) {
+                // Log warning nhưng không fail release
+                console.warn(`[Update Sepay Status] Warning: Could not set post-release tracking fields for escrow ${escrow._id}:`, trackingResult.error || trackingResult.message);
+            }
+        }
+    }
     
     const campaign = escrow.campaign;
     if (campaign && newStatus === 'released') {
@@ -867,4 +1528,311 @@ export const updateSepayWithdrawalStatus = async (orderInvoiceNumber, status, se
     }
     
     return { escrow, campaign };
+};
+
+/**
+ * Owner release escrow với bill giải ngân bắt buộc
+ * 
+ * Mục tiêu:
+ * - Minh bạch tài chính: Bill giải ngân được hiển thị CÔNG KHAI trong campaign
+ * - Tăng uy tín campaign & owner
+ * - Không phá vỡ flow escrow hiện tại
+ * 
+ * @param {string} escrowId - ID của escrow
+ * @param {string} ownerId - ID của owner (phải là creator của campaign)
+ * @param {Object} releaseData - Dữ liệu release
+ * @param {string[]} releaseData.disbursement_proof_images - Mảng URL ảnh bill (REQUIRED)
+ * @param {string} releaseData.disbursement_note - Ghi chú giải ngân (optional)
+ * @returns {Promise<Object>} Result object
+ */
+export const releaseEscrow = async (escrowId, ownerId, releaseData) => {
+    const { disbursement_proof_images, disbursement_note } = releaseData;
+    
+    // Validate: disbursement_proof_images là bắt buộc
+    if (!disbursement_proof_images || !Array.isArray(disbursement_proof_images) || disbursement_proof_images.length === 0) {
+        return {
+            success: false,
+            error: "MISSING_PROOF_IMAGES",
+            message: "Bill giải ngân là bắt buộc. Vui lòng upload ít nhất 1 ảnh bill."
+        };
+    }
+    
+    // Validate: mỗi ảnh phải là URL hợp lệ
+    const urlPattern = /^https?:\/\/.+/;
+    for (const imageUrl of disbursement_proof_images) {
+        if (typeof imageUrl !== 'string' || !urlPattern.test(imageUrl)) {
+            return {
+                success: false,
+                error: "INVALID_IMAGE_URL",
+                message: "Mỗi ảnh bill phải là URL hợp lệ"
+            };
+        }
+    }
+    
+    // Validate: tối đa 10 ảnh
+    if (disbursement_proof_images.length > 10) {
+        return {
+            success: false,
+            error: "TOO_MANY_IMAGES",
+            message: "Tối đa 10 ảnh bill giải ngân"
+        };
+    }
+    
+    // Validate: disbursement_note không quá 1000 ký tự
+    if (disbursement_note && disbursement_note.length > 1000) {
+        return {
+            success: false,
+            error: "NOTE_TOO_LONG",
+            message: "Ghi chú giải ngân không được vượt quá 1000 ký tự"
+        };
+    }
+    
+    // Tìm escrow và populate campaign
+    const escrow = await Escrow.findById(escrowId).populate("campaign");
+    if (!escrow) {
+        return {
+            success: false,
+            error: "ESCROW_NOT_FOUND",
+            message: "Không tìm thấy withdrawal request"
+        };
+    }
+    
+    // Validate: escrow phải ở trạng thái admin_approved
+    if (escrow.request_status !== "admin_approved") {
+        return {
+            success: false,
+            error: "INVALID_STATUS",
+            message: `Chỉ có thể release escrow khi ở trạng thái admin_approved. Hiện tại: ${escrow.request_status}`
+        };
+    }
+    
+    // Validate: owner phải là creator của campaign
+    const campaign = escrow.campaign;
+    if (!campaign) {
+        return {
+            success: false,
+            error: "CAMPAIGN_NOT_FOUND",
+            message: "Không tìm thấy campaign"
+        };
+    }
+    
+    if (campaign.creator.toString() !== ownerId.toString()) {
+        return {
+            success: false,
+            error: "UNAUTHORIZED",
+            message: "Chỉ owner của campaign mới có thể release escrow"
+        };
+    }
+    
+    // Idempotency check: nếu đã released, không cho release lại
+    if (escrow.request_status === "released") {
+        return {
+            success: false,
+            error: "ALREADY_RELEASED",
+            message: "Escrow đã được release trước đó"
+        };
+    }
+    
+    // Validate: không cho update proof sau khi released (nếu có proof cũ)
+    if (escrow.disbursement_proof_images && escrow.disbursement_proof_images.length > 0) {
+        return {
+            success: false,
+            error: "PROOF_ALREADY_EXISTS",
+            message: "Escrow đã có bill giải ngân. Không thể update sau khi đã release."
+        };
+    }
+    
+    // Update escrow với proof images và set status = released
+    const now = new Date();
+    escrow.disbursement_proof_images = disbursement_proof_images;
+    escrow.disbursement_note = disbursement_note || null;
+    escrow.disbursed_by = ownerId;
+    escrow.request_status = "released";
+    escrow.released_at = now;
+    
+    await escrow.save();
+    
+    // Set post-release update tracking fields (nếu có milestone)
+    // Reload escrow với populated campaign để ensure có latest data
+    const escrowWithCampaign = await Escrow.findById(escrowId).populate("campaign");
+    if (escrowWithCampaign) {
+        const trackingResult = await setPostReleaseUpdateTracking(escrowWithCampaign, now);
+        if (!trackingResult.success && !trackingResult.skipped) {
+            // Log warning nhưng không fail release
+            console.warn(`[Release Escrow] Warning: Could not set post-release tracking fields for escrow ${escrowId}:`, trackingResult.error || trackingResult.message);
+        }
+    }
+    
+    // Invalidate cache liên quan
+    await redisClient.del(`campaign:${campaign._id}`);
+    await redisClient.del('campaigns');
+    await redisClient.del(`escrow:${escrowId}`);
+    
+    console.log(`[Release Escrow] Escrow ${escrowId} released successfully by owner ${ownerId} with ${disbursement_proof_images.length} proof images`);
+    
+    return {
+        success: true,
+        escrow: escrow,
+        message: "Escrow đã được release thành công với bill giải ngân"
+    };
+};
+
+/**
+ * Tính toán progress steps cho escrow
+ * @param {Object} escrow - Escrow object với request_status
+ * @returns {Object} Progress object với current_status và steps[]
+ */
+export const calculateEscrowProgress = (escrow) => {
+    if (!escrow || !escrow.request_status) {
+        return null;
+    }
+
+    const status = escrow.request_status;
+    
+    // Định nghĩa các steps
+    const allSteps = [
+        { key: 'milestone_reached', label: 'Đạt mốc giải ngân', order: 1 },
+        { key: 'community_voting', label: 'Cộng đồng bỏ phiếu', order: 2 },
+        { key: 'admin_review', label: 'Admin duyệt', order: 3 },
+        { key: 'owner_disbursement', label: 'Owner giải ngân', order: 4 },
+        { key: 'completed', label: 'Hoàn tất', order: 5 }
+    ];
+
+    // Map status sang progress steps
+    let steps = [];
+    
+    switch (status) {
+        case 'pending_voting':
+            // Escrow vừa được tạo, chưa bắt đầu vote
+            steps = allSteps.map(step => {
+                if (step.order === 1) {
+                    return { ...step, state: 'DONE' };
+                } else if (step.order === 2) {
+                    return { ...step, state: 'WAITING' };
+                } else {
+                    return { ...step, state: 'WAITING' };
+                }
+            });
+            break;
+            
+        case 'voting_in_progress':
+            // Đang trong quá trình vote
+            steps = allSteps.map(step => {
+                if (step.order === 1) {
+                    return { ...step, state: 'DONE' };
+                } else if (step.order === 2) {
+                    return { ...step, state: 'ACTIVE' };
+                } else {
+                    return { ...step, state: 'WAITING' };
+                }
+            });
+            break;
+            
+        case 'voting_extended':
+            // Đã gia hạn thời gian vote
+            steps = allSteps.map(step => {
+                if (step.order === 1) {
+                    return { ...step, state: 'DONE' };
+                } else if (step.order === 2) {
+                    return { ...step, state: 'ACTIVE' };
+                } else {
+                    return { ...step, state: 'WAITING' };
+                }
+            });
+            break;
+            
+        case 'voting_completed':
+            // Vote xong, chờ admin duyệt
+            steps = allSteps.map(step => {
+                if (step.order <= 2) {
+                    return { ...step, state: 'DONE' };
+                } else if (step.order === 3) {
+                    return { ...step, state: 'ACTIVE' };
+                } else {
+                    return { ...step, state: 'WAITING' };
+                }
+            });
+            break;
+            
+        case 'admin_approved':
+            // Admin đã duyệt, chờ owner giải ngân
+            steps = allSteps.map(step => {
+                if (step.order <= 3) {
+                    return { ...step, state: 'DONE' };
+                } else if (step.order === 4) {
+                    return { ...step, state: 'ACTIVE' };
+                } else {
+                    return { ...step, state: 'WAITING' };
+                }
+            });
+            break;
+            
+        case 'released':
+            // Đã giải ngân hoàn tất
+            steps = allSteps.map(step => ({
+                ...step,
+                state: 'DONE'
+            }));
+            break;
+            
+        case 'admin_rejected':
+            // Admin từ chối
+            steps = allSteps.map(step => {
+                if (step.order <= 2) {
+                    return { ...step, state: 'DONE' };
+                } else if (step.order === 3) {
+                    return { ...step, state: 'REJECTED' };
+                } else {
+                    return { ...step, state: 'CANCELLED' };
+                }
+            });
+            break;
+            
+        case 'rejected_by_community':
+            // Bị từ chối bởi cộng đồng (>50% reject)
+            steps = allSteps.map(step => {
+                if (step.order <= 2) {
+                    return { ...step, state: 'DONE' };
+                } else if (step.order === 2) {
+                    return { ...step, state: 'REJECTED' }; // Community voting step bị reject
+                } else {
+                    return { ...step, state: 'CANCELLED' };
+                }
+            });
+            break;
+            
+        case 'cancelled':
+            // Đã hủy
+            steps = allSteps.map(step => {
+                if (step.order === 1) {
+                    return { ...step, state: 'DONE' };
+                } else {
+                    return { ...step, state: 'CANCELLED' };
+                }
+            });
+            break;
+            
+        default:
+            // Unknown status
+            steps = allSteps.map(step => ({
+                ...step,
+                state: 'WAITING'
+            }));
+    }
+
+    return {
+        current_status: status,
+        steps: steps,
+        // Thêm metadata hữu ích
+        metadata: {
+            voting_start_date: escrow.voting_start_date || null,
+            voting_end_date: escrow.voting_end_date || null,
+            admin_reviewed_at: escrow.admin_reviewed_at || null,
+            released_at: escrow.released_at || null,
+            milestone_percentage: escrow.milestone_percentage || null,
+            voting_extended_count: escrow.voting_extended_count || 0,
+            last_extended_at: escrow.last_extended_at || null,
+            community_rejected_at: escrow.community_rejected_at || null
+        }
+    };
 };

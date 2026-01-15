@@ -138,6 +138,9 @@ export default function NotificationDropdown() {
         return '✅';
       case 'campaign_rejected':
         return '❌';
+      case 'escrow_threshold_reached':
+      case 'escrow_approved':
+        return '🎯';
       default:
         return '🔔';
     }
@@ -245,14 +248,18 @@ export default function NotificationDropdown() {
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-gray-900 dark:text-white">
-                          {/* Với campaign_approved/rejected, chỉ hiển thị message */}
-                          {notification.type === 'campaign_approved' || notification.type === 'campaign_rejected' ? (
+                          {/* System notifications (no sender) - chỉ hiển thị message */}
+                          {!notification.sender || 
+                           notification.type === 'campaign_approved' || 
+                           notification.type === 'campaign_rejected' ||
+                           notification.type === 'escrow_threshold_reached' ||
+                           notification.type === 'escrow_approved' ? (
                             <span className="text-gray-700 dark:text-gray-300">
                               {notification.message}
                             </span>
                           ) : (
                             <>
-                              <span className="font-semibold">{notification.sender?.username || 'Unknown User'}</span>
+                              <span className="font-semibold">{notification.sender?.username || 'System'}</span>
                               {' '}
                               <span className="text-gray-700 dark:text-gray-300">
                                 {notification.message}

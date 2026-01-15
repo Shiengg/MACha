@@ -37,13 +37,15 @@ const escrowSchema = new mongoose.Schema({
     request_status: {
         type: String,
         enum: [
-            "pending_voting",      // Đang chờ donors vote
-            "voting_in_progress",  // Đang trong quá trình vote
-            "voting_completed",    // Vote xong, chờ admin quyết định
-            "admin_approved",      // Admin đã duyệt, chờ chuyển tiền
-            "admin_rejected",      // Admin từ chối
-            "released",            // Đã chuyển tiền
-            "cancelled"            // Creator hủy request
+            "pending_voting",          // Đang chờ donors vote
+            "voting_in_progress",      // Đang trong quá trình vote (WAITING_FOR_VOTE)
+            "voting_extended",         // Đã gia hạn thời gian vote (VOTING_EXTENDED)
+            "voting_completed",        // Vote xong, chờ admin quyết định
+            "rejected_by_community",   // Bị từ chối bởi cộng đồng (>50% reject) (REJECTED_BY_COMMUNITY)
+            "admin_approved",          // Admin đã duyệt, chờ chuyển tiền (APPROVED_BY_ADMIN)
+            "admin_rejected",          // Admin từ chối
+            "released",                // Đã chuyển tiền
+            "cancelled"                // Creator hủy request
         ],
         default: "pending_voting",
         index: true
@@ -107,6 +109,102 @@ const escrowSchema = new mongoose.Schema({
     sepay_response_data: {
         type: mongoose.Schema.Types.Mixed,
         default: null
+    },
+    // Idempotency fields để tránh gửi notification trùng
+    threshold_notified_at: {
+        type: Date,
+        default: null,
+        index: true
+    },
+    admin_approved_notified_at: {
+        type: Date,
+        default: null,
+        index: true
+    },
+    // Idempotency field để tránh gửi email trùng khi escrow đạt threshold
+    vote_email_sent_at: {
+        type: Date,
+        default: null,
+        index: true
+    },
+    // Audit fields cho community rejection
+    community_rejected_at: {
+        type: Date,
+        default: null,
+        index: true
+    },
+    // Field để track số lần gia hạn vote
+    voting_extended_count: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    // Field để track lần gia hạn cuối
+    last_extended_at: {
+        type: Date,
+        default: null
+    },
+    // Field để track admin đã gia hạn vote
+    voting_extended_by: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null
+    },
+    // ==================== DISBURSEMENT PROOF FIELDS ====================
+    // Bill giải ngân - bằng chứng tài chính bắt buộc khi release escrow
+    // Được hiển thị CÔNG KHAI trong campaign để đảm bảo minh bạch
+    disbursement_proof_images: {
+        type: [String],
+        default: [],
+        validate: {
+            validator: function(v) {
+                // Nếu request_status = "released", phải có ít nhất 1 ảnh
+                if (this.request_status === "released" && (!v || v.length === 0)) {
+                    return false;
+                }
+                return true;
+            },
+            message: "Bill giải ngân là bắt buộc khi release escrow"
+        }
+    },
+    // Ghi chú giải ngân (optional)
+    disbursement_note: {
+        type: String,
+        default: null,
+        maxlength: 1000
+    },
+    // Owner đã giải ngân (User - owner của campaign)
+    disbursed_by: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+        index: true
+    },
+    // Admin verify bill (nếu có)
+    disbursement_verified_at: {
+        type: Date,
+        default: null
+    },
+    // ==================== POST-RELEASE UPDATE TRACKING FIELDS ====================
+    // Các fields này CHỈ áp dụng khi request_status = "released"
+    // Track nghĩa vụ creator phải cập nhật tiến độ sau khi được giải ngân
+    // Deadline phải update (dựa trên milestone.commitment_days)
+    update_required_by: {
+        type: Date,
+        default: null,
+        index: true
+    },
+    // Thời điểm creator đã update hợp lệ (fulfilled requirement)
+    update_fulfilled_at: {
+        type: Date,
+        default: null,
+        index: true
+    },
+    // Thời điểm đã gửi email cảnh báo (idempotency - tránh gửi mail trùng)
+    update_warning_email_sent_at: {
+        type: Date,
+        default: null,
+        index: true
     }
 },
     {
@@ -135,6 +233,24 @@ escrowSchema.index(
             }
         },
         name: 'unique_milestone_withdrawal_request'
+    }
+);
+
+// Index for checking overdue updates (used in background job)
+escrowSchema.index(
+    { 
+        request_status: 1, 
+        update_fulfilled_at: 1, 
+        update_required_by: 1, 
+        update_warning_email_sent_at: 1 
+    },
+    { 
+        name: 'overdue_update_check_index',
+        // Partial index: chỉ index các escrow released và chưa fulfilled
+        partialFilterExpression: {
+            request_status: 'released',
+            update_fulfilled_at: null
+        }
     }
 );
 

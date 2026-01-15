@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Clock, CheckCircle2, XCircle, AlertCircle, DollarSign, Calendar, Users, TrendingUp, TrendingDown } from 'lucide-react';
+import { Clock, CheckCircle2, XCircle, AlertCircle, DollarSign, Calendar, Users, TrendingUp, TrendingDown, Image as ImageIcon, FileText } from 'lucide-react';
 import { Escrow, Vote, WithdrawalRequestStatus } from '@/services/escrow.service';
+import EscrowProgressBar from './EscrowProgressBar';
+import Image from 'next/image';
 
 interface WithdrawalRequestCardProps {
   escrow: Escrow;
@@ -93,6 +95,18 @@ export default function WithdrawalRequestCard({
         bgColor: 'bg-purple-100 dark:bg-purple-900/30',
         icon: <CheckCircle2 className="w-4 h-4" />,
       },
+      voting_extended: {
+        label: 'Đã gia hạn vote',
+        color: 'text-yellow-700 dark:text-yellow-400',
+        bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
+        icon: <Clock className="w-4 h-4" />,
+      },
+      rejected_by_community: {
+        label: 'Cộng đồng từ chối',
+        color: 'text-red-700 dark:text-red-400',
+        bgColor: 'bg-red-100 dark:bg-red-900/30',
+        icon: <XCircle className="w-4 h-4" />,
+      },
       admin_approved: {
         label: 'Admin đã duyệt',
         color: 'text-green-700 dark:text-green-400',
@@ -168,6 +182,16 @@ export default function WithdrawalRequestCard({
 
       {/* Content */}
       <div className="p-4 space-y-4">
+        {/* Progress Bar */}
+        {escrow.escrow_progress && (
+          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              Tiến trình giải ngân
+            </h4>
+            <EscrowProgressBar progress={escrow.escrow_progress} compact={false} />
+          </div>
+        )}
+
         {/* Request Reason */}
         {escrow.request_reason && (
           <div>
@@ -292,6 +316,72 @@ export default function WithdrawalRequestCard({
                 <span className="font-medium">Lý do từ chối:</span> {escrow.admin_rejection_reason}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Disbursement Section - Hiển thị CÔNG KHAI bill giải ngân khi escrow đã released */}
+        {escrow.request_status === 'released' && escrow.disbursement_proof_images && escrow.disbursement_proof_images.length > 0 && (
+          <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 rounded-lg p-4 border border-emerald-200 dark:border-emerald-800">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Giải ngân - Bill chứng từ
+              </h4>
+            </div>
+            
+            {/* Disbursement Info */}
+            <div className="mb-3 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+              {escrow.released_at && (
+                <div>
+                  <span className="font-medium">Thời gian giải ngân:</span> {formatDate(escrow.released_at)}
+                </div>
+              )}
+              <div>
+                <span className="font-medium">Số tiền giải ngân:</span> {formatAmount(escrow.withdrawal_request_amount)}
+              </div>
+            </div>
+
+            {/* Disbursement Note */}
+            {escrow.disbursement_note && (
+              <div className="mb-3 p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  <span className="font-medium">Ghi chú:</span> {escrow.disbursement_note}
+                </p>
+              </div>
+            )}
+
+            {/* Proof Images Gallery - PUBLIC, read-only */}
+            <div>
+              <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Bill giải ngân ({escrow.disbursement_proof_images.length} ảnh):
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {escrow.disbursement_proof_images.map((imageUrl, index) => (
+                  <div
+                    key={index}
+                    className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 cursor-pointer hover:border-emerald-400 dark:hover:border-emerald-600 transition"
+                    onClick={() => {
+                      // Open image in new tab for full view
+                      window.open(imageUrl, '_blank');
+                    }}
+                  >
+                    <Image
+                      src={imageUrl}
+                      alt={`Bill giải ngân ${index + 1}`}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 50vw, 33vw"
+                    />
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 italic">
+                * Bill giải ngân được công khai để đảm bảo minh bạch tài chính
+              </p>
+            </div>
           </div>
         )}
       </div>

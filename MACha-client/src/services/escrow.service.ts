@@ -5,12 +5,15 @@ import {
   GET_WITHDRAWAL_REQUEST_BY_ID_ROUTE,
   SUBMIT_VOTE_ROUTE,
   GET_VOTES_BY_ESCROW_ROUTE,
+  RELEASE_ESCROW_ROUTE,
 } from '@/constants/api';
 
 export type WithdrawalRequestStatus =
   | 'pending_voting'
   | 'voting_in_progress'
+  | 'voting_extended'
   | 'voting_completed'
+  | 'rejected_by_community'
   | 'admin_approved'
   | 'admin_rejected'
   | 'released'
@@ -33,6 +36,7 @@ export interface Campaign {
 }
 
 export interface VotingResults {
+  totalDonors?: number;
   totalVotes: number;
   approveCount: number;
   rejectCount: number;
@@ -40,6 +44,36 @@ export interface VotingResults {
   totalRejectWeight: number;
   approvePercentage: string;
   rejectPercentage: string;
+  votePercentage?: string;
+  rejectDonorPercentage?: string;
+}
+
+export type ProgressStepState = 'DONE' | 'ACTIVE' | 'WAITING' | 'REJECTED' | 'CANCELLED';
+
+export interface ProgressStep {
+  key: string;
+  label: string;
+  order: number;
+  state: ProgressStepState;
+}
+
+export interface EscrowProgress {
+  current_status: WithdrawalRequestStatus;
+  steps: ProgressStep[];
+  metadata?: {
+    voting_start_date: string | null;
+    voting_end_date: string | null;
+    admin_reviewed_at: string | null;
+    released_at: string | null;
+    milestone_percentage: number | null;
+  };
+}
+
+export interface AdminActions {
+  canExtend: boolean;
+  canCancel: boolean;
+  canApprove: boolean;
+  canReject: boolean;
 }
 
 export interface Escrow {
@@ -60,9 +94,20 @@ export interface Escrow {
   milestone_percentage: number | null;
   approved_at: string | null;
   released_at: string | null;
+  community_rejected_at?: string | null;
+  voting_extended_count?: number;
+  last_extended_at?: string | null;
+  voting_extended_by?: string | User | null;
+  // Disbursement proof fields
+  disbursement_proof_images?: string[];
+  disbursement_note?: string | null;
+  disbursed_by?: string | User | null;
+  disbursement_verified_at?: string | null;
   createdAt: string;
   updatedAt: string;
   votingResults?: VotingResults;
+  escrow_progress?: EscrowProgress;
+  adminActions?: AdminActions;
 }
 
 export interface CreateWithdrawalRequestPayload {
@@ -107,6 +152,16 @@ export interface SubmitVoteResponse {
 export interface GetVotesResponse {
   votes: Vote[];
   count: number;
+}
+
+export interface ReleaseEscrowPayload {
+  disbursement_proof_images: string[];
+  disbursement_note?: string;
+}
+
+export interface ReleaseEscrowResponse {
+  message: string;
+  escrow: Escrow;
 }
 
 export const escrowService = {
@@ -195,6 +250,26 @@ export const escrowService = {
       return response.data.votes;
     } catch (error: any) {
       console.error('Error fetching votes:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Owner release escrow với bill giải ngân bắt buộc
+   * Bill giải ngân sẽ được hiển thị CÔNG KHAI trong campaign để đảm bảo minh bạch
+   */
+  async releaseEscrow(
+    escrowId: string,
+    payload: ReleaseEscrowPayload
+  ): Promise<Escrow> {
+    try {
+      const response = await apiClient.post<ReleaseEscrowResponse>(
+        RELEASE_ESCROW_ROUTE(escrowId),
+        payload
+      );
+      return response.data.escrow;
+    } catch (error: any) {
+      console.error('Error releasing escrow:', error);
       throw error;
     }
   },

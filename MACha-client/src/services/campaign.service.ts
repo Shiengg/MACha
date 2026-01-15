@@ -178,9 +178,18 @@ export const campaignService = {
     return response.data.campaign;
   },
 
-  async getAllCampaigns(page: number = 0, limit: number = 20): Promise<{ campaigns: Campaign[]; total: number; page: number; limit: number; totalPages: number }> {
+  async getAllCampaigns(
+    page: number = 0, 
+    limit: number = 20, 
+    status?: string | null
+  ): Promise<{ campaigns: Campaign[]; total: number; page: number; limit: number; totalPages: number }> {
+    const params: { page: number; limit: number; status?: string } = { page, limit };
+    if (status) {
+      params.status = status;
+    }
+    
     const response = await apiClient.get(GET_ALL_CAMPAIGNS_ROUTE, {
-      params: { page, limit },
+      params,
     });
     return {
       campaigns: response.data.campaigns,

@@ -16,6 +16,8 @@ import './jobs/cleanupUnverifiedUsers.job.js';
 import './jobs/finalizeVotingPeriods.job.js';
 import './jobs/processExpiredCampaigns.job.js';
 import './jobs/processExpiredEvents.job.js';
+import './jobs/processStartedEvents.job.js';
+import './jobs/checkOverduePostReleaseUpdates.job.js';
 
 dotenv.config();
 

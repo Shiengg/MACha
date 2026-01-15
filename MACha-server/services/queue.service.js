@@ -50,6 +50,7 @@ export const pushJob = async (job) => {
         case JOB_TYPES.CAMPAIGN_REJECTED:
         case JOB_TYPES.CAMPAIGN_REMOVED:
         case JOB_TYPES.DONATION_THANK_YOU:
+        case JOB_TYPES.ESCROW_THRESHOLD_EMAIL:
             targetQueue = QUEUE_NAMES.MAIL_SEND;
             break;
 
@@ -61,7 +62,10 @@ export const pushJob = async (job) => {
         case JOB_TYPES.USER_WARNED:
         case JOB_TYPES.EVENT_UPDATE_CREATED:
         case JOB_TYPES.EVENT_REMOVED:
+        case JOB_TYPES.EVENT_STARTED:
         case JOB_TYPES.CAMPAIGN_CREATED:
+        case JOB_TYPES.ESCROW_THRESHOLD_REACHED:
+        case JOB_TYPES.ESCROW_APPROVED_BY_ADMIN:
             targetQueue = QUEUE_NAMES.NOTIFICATION_CREATE;
             break;
 

@@ -70,6 +70,8 @@ export const REJECT_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/re
 export const CREATE_CAMPAIGN_UPDATE_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/updates`;
 export const GET_CAMPAIGN_UPDATES_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/updates`;
 export const DELETE_CAMPAIGN_UPDATE_ROUTE = (updateId: string) => `${CAMPAIGN_ROUTE}/updates/${updateId}`;
+export const CREATE_CAMPAIGN_UPDATE_REQUEST_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/update-request`;
+export const GET_CAMPAIGN_UPDATE_REQUESTS_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/update-requests`;
 
 export const KYC_ROUTE = "api/kyc";
 export const GET_PENDING_KYC_ROUTE = `${KYC_ROUTE}/pending`;
@@ -95,6 +97,8 @@ export const SEPAY_SUCCESS_ROUTE = `${DONATION_ROUTE}/sepay/success`;
 export const SEPAY_ERROR_ROUTE = `${DONATION_ROUTE}/sepay/error`;
 export const SEPAY_CANCEL_ROUTE = `${DONATION_ROUTE}/sepay/cancel`;
 export const CREATE_DONATION_ROUTE = (campaignId: string) => `${DONATION_ROUTE}/${campaignId}/donate`;
+export const UPLOAD_DONATION_PROOF_ROUTE = (donationId: string) => `${DONATION_ROUTE}/${donationId}/proof`;
+export const GET_DONATION_PROOF_ROUTE = (donationId: string) => `${DONATION_ROUTE}/${donationId}/proof`;
 
 export const CAMPAIGN_COMPANION_ROUTE = "api";
 export const JOIN_CAMPAIGN_COMPANION_ROUTE = (campaignId: string) => `${CAMPAIGN_COMPANION_ROUTE}/campaigns/${campaignId}/companion/join`;
@@ -116,11 +120,14 @@ export const GET_WITHDRAWAL_REQUESTS_BY_CAMPAIGN_ROUTE = (campaignId: string) =>
 export const GET_WITHDRAWAL_REQUEST_BY_ID_ROUTE = (escrowId: string) => `${ESCROW_ROUTE}/${escrowId}`;
 export const SUBMIT_VOTE_ROUTE = (escrowId: string) => `${ESCROW_ROUTE}/${escrowId}/vote`;
 export const GET_VOTES_BY_ESCROW_ROUTE = (escrowId: string) => `${ESCROW_ROUTE}/${escrowId}/votes`;
+export const RELEASE_ESCROW_ROUTE = (escrowId: string) => `${ESCROW_ROUTE}/${escrowId}/release`;
 
 export const ADMIN_ESCROW_ROUTE = "api/admin";
 export const ADMIN_GET_WITHDRAWAL_REQUESTS_ROUTE = `${ADMIN_ESCROW_ROUTE}/withdrawal-requests`;
 export const ADMIN_APPROVE_WITHDRAWAL_REQUEST_ROUTE = (escrowId: string) => `${ADMIN_ESCROW_ROUTE}/withdrawal-requests/${escrowId}/approve`;
 export const ADMIN_REJECT_WITHDRAWAL_REQUEST_ROUTE = (escrowId: string) => `${ADMIN_ESCROW_ROUTE}/withdrawal-requests/${escrowId}/reject`;
+export const ADMIN_EXTEND_VOTING_PERIOD_ROUTE = (escrowId: string) => `${ADMIN_ESCROW_ROUTE}/withdrawal-requests/${escrowId}/extend-vote`;
+export const ADMIN_CANCEL_CAMPAIGN_BY_REJECTION_ROUTE = (escrowId: string) => `${ADMIN_ESCROW_ROUTE}/withdrawal-requests/${escrowId}/cancel-campaign`;
 
 export const REPORT_ROUTE = "api/reports";
 export const CREATE_REPORT_ROUTE = `${REPORT_ROUTE}`;
@@ -203,3 +210,7 @@ export const GET_ANONYMOUS_RECOMMENDATIONS_ROUTE = `${RECOMMENDATION_ROUTE}/anon
 
 export const ADMIN_ROUTE = "api/admin";
 export const ADMIN_DASHBOARD_ROUTE = `${ADMIN_ROUTE}/dashboard`;
+export const ADMIN_GET_CAMPAIGN_UPDATE_REQUESTS_ROUTE = `${ADMIN_ROUTE}/campaign-update-requests`;
+export const ADMIN_GET_CAMPAIGN_UPDATE_REQUEST_BY_ID_ROUTE = (requestId: string) => `${ADMIN_ROUTE}/campaign-update-requests/${requestId}`;
+export const ADMIN_APPROVE_CAMPAIGN_UPDATE_REQUEST_ROUTE = (requestId: string) => `${ADMIN_ROUTE}/campaign-update-requests/${requestId}/approve`;
+export const ADMIN_REJECT_CAMPAIGN_UPDATE_REQUEST_ROUTE = (requestId: string) => `${ADMIN_ROUTE}/campaign-update-requests/${requestId}/reject`;

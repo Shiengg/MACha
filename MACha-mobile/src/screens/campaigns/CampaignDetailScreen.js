@@ -26,6 +26,7 @@ import { campaignCompanionService } from '../../services/campaignCompanion.servi
 import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
+import EscrowProgressBar from '../../components/escrow/EscrowProgressBar';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -1055,6 +1056,11 @@ export default function CampaignDetailScreen() {
                     </Text>
                   </View>
                 </View>
+                {escrow.escrow_progress && (
+                  <View style={styles.progressContainer}>
+                    <EscrowProgressBar progress={escrow.escrow_progress} compact={true} />
+                  </View>
+                )}
                 {escrow.request_reason && (
                   <Text style={styles.withdrawalReason}>{escrow.request_reason}</Text>
                 )}
@@ -2031,6 +2037,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
     marginLeft: scale(8),
+  },
+  progressContainer: {
+    marginVertical: scale(12),
+    padding: scale(12),
+    backgroundColor: '#F9FAFB',
+    borderRadius: scale(8),
   },
   withdrawalCard: {
     backgroundColor: '#F9FAFB',

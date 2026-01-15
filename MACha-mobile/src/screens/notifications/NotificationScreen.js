@@ -228,7 +228,7 @@ export default function NotificationScreen() {
               ) : (
                 <>
                   <Text style={styles.notificationSender}>
-                    {notification.sender?.username || 'Unknown User'}
+                    {notification.sender?.username || 'System'}
                   </Text>
                   {' '}
                   <Text style={styles.notificationMessage}>

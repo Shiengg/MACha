@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createDonation, getDonationsByCampaign } from "../controllers/DonationController.js";
+import { createDonation, getDonationsByCampaign, uploadDonationProof, getDonationProof } from "../controllers/DonationController.js";
 import { initSepayPayment, sepayCallback, sepaySuccess, sepayError, sepayCancel } from "../controllers/SePayController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { checkRole } from "../middlewares/checkRole.js";
@@ -18,6 +18,10 @@ donationRoutes.get('/sepay/cancel', rateLimitByIP(300, 60), sepayCancel);
 
 // Xem danh sách donation của campaign: IP-based
 donationRoutes.get('/:campaignId/donations', rateLimitByIP(300, 60), getDonationsByCampaign);
+
+// Proof endpoints: Upload and view proof (minh chứng chuyển khoản)
+donationRoutes.post('/:id/proof', authMiddleware, checkRole('user', 'organization'), rateLimitByUserId(30, 60), uploadDonationProof);
+donationRoutes.get('/:id/proof', authMiddleware, rateLimitByUserId(100, 60), getDonationProof);
 
 /**
  * @swagger

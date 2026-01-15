@@ -1,4 +1,4 @@
-import { createSubcriber } from "../config/redis.js";
+import { createSubcriber, redisClient } from "../config/redis.js";
 
 export const initNotificationSubscriber = async (io) => {
     const sub = await createSubcriber();
@@ -6,9 +6,20 @@ export const initNotificationSubscriber = async (io) => {
     console.log("✅ Notification subscriber connected");
     console.log("📡 Listening to: notification:new\n");
     
-    await sub.subscribe("notification:new", (message) => {
+    await sub.subscribe("notification:new", async (message) => {
         try {
             const event = JSON.parse(message);
+            
+            // Invalidate Redis cache for this user's notifications
+            // This ensures the next API call fetches fresh data from DB
+            const notificationCacheKey = `notifications:${event.recipientId}`;
+            try {
+                await redisClient.del(notificationCacheKey);
+                console.log(`🗑️  Invalidated notification cache for user: ${event.recipientId}`);
+            } catch (cacheError) {
+                console.error('❌ Error invalidating notification cache:', cacheError.message);
+                // Don't throw - continue with emitting notification
+            }
             
             // Emit CHỈ cho user cụ thể (vào room của họ)
             const userRoom = `user:${event.recipientId}`;

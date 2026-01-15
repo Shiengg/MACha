@@ -7,6 +7,12 @@ import {
     normalizeSearchTerm, 
     splitSearchWords 
 } from "../utils/similarity.js";
+import { 
+    CAMPAIGN_STATUS, 
+    FILTER_STATUS_ALL, 
+    DEFAULT_DISCOVER_STATUS,
+    CAMPAIGN_STATUS_VALUES 
+} from "../constants/campaign.js";
 
 export const invalidateCampaignCache = async (campaignId = null, category = null, requestId = null, creatorId = null) => {
     const logContext = {
@@ -55,11 +61,24 @@ export const invalidateCampaignCache = async (campaignId = null, category = null
         
         // Also clear common cache keys that might be used by admin (with large limits)
         // This ensures admin sees new/updated campaigns immediately
+        // Clear both status-filtered and non-filtered cache keys
         const commonLimits = [20, 50, 100, 500, 1000, 5000, 10000, 50000];
+        const commonStatuses = [CAMPAIGN_STATUS.ACTIVE, CAMPAIGN_STATUS.PENDING, CAMPAIGN_STATUS.COMPLETED, FILTER_STATUS_ALL];
+        
         for (const limit of commonLimits) {
+            // Clear non-filtered keys
             const pageKey = `campaigns:all:page:0:limit:${limit}`;
             cachesToInvalidate.push(redisClient.del(pageKey));
             invalidatedKeys.push(pageKey);
+            
+            // Clear status-filtered keys
+            for (const status of commonStatuses) {
+                const statusKey = status === FILTER_STATUS_ALL ? ':status:all' : `:status:${status}`;
+                const statusPageKey = `campaigns:all:page:0:limit:${limit}${statusKey}`;
+                const statusTotalKey = `campaigns:all:total${statusKey}`;
+                cachesToInvalidate.push(redisClient.del(statusPageKey, statusTotalKey));
+                invalidatedKeys.push(statusPageKey, statusTotalKey);
+            }
         }
         
         // Clear category caches if category provided
@@ -70,8 +89,8 @@ export const invalidateCampaignCache = async (campaignId = null, category = null
         }
         
         // Clear creator-based cache keys if creatorId provided
-        // This is important when campaign status changes (pending -> active)
-        // because creator cache filters by status
+        // This is important when campaign status changes (pending -> active, rejected, etc.)
+        // because creator cache filters by status and profile pages need to show updated statuses
         if (creatorId) {
             // Clear basic creator cache
             const creatorKey = `campaigns:creator:${creatorId}`;
@@ -79,9 +98,10 @@ export const invalidateCampaignCache = async (campaignId = null, category = null
             invalidatedKeys.push(creatorKey);
             
             // Note: Creator pagination caches have viewer-specific keys
-            // We can't easily invalidate all viewer combinations without SCAN
-            // But the basic creator cache invalidation will help
-            // For pagination caches, they'll be repopulated on next request with correct data
+            // Pattern: campaigns:creator:${creatorId}:viewer:${viewerId || 'public'}:page:${page}:limit:${limit}
+            // These caches have 5-minute TTL, so they'll expire and repopulate with correct data
+            // For immediate invalidation, we'd need SCAN which is async and complex
+            // The 5-minute TTL is acceptable for profile page updates
         }
         
         // Clear the key set itself
@@ -132,9 +152,25 @@ export const getTotalCampaignsCount = async () => {
     return total;
 }
 
-export const getCampaigns = async (page = 0, limit = 20, userId = null) => {
-    const campaignKey = `campaigns:all:page:${page}:limit:${limit}`;
-    const totalKey = `campaigns:all:total`;
+export const getCampaigns = async (page = 0, limit = 20, userId = null, status = null) => {
+    // Normalize status: default to ACTIVE if not provided, handle 'ALL' specially
+    let filterStatus = status;
+    if (!filterStatus || filterStatus === '') {
+        filterStatus = DEFAULT_DISCOVER_STATUS;
+    }
+    
+    // Handle 'ALL' filter - don't filter by status
+    const shouldFilterByStatus = filterStatus && filterStatus !== FILTER_STATUS_ALL;
+    
+    // Validate status if filtering by status
+    if (shouldFilterByStatus && !CAMPAIGN_STATUS_VALUES.includes(filterStatus)) {
+        throw new Error(`Invalid campaign status: ${filterStatus}. Valid values: ${CAMPAIGN_STATUS_VALUES.join(', ')}, or 'ALL'`);
+    }
+    
+    // Build cache key with status
+    const statusKey = shouldFilterByStatus ? `:status:${filterStatus}` : ':status:all';
+    const campaignKey = `campaigns:all:page:${page}:limit:${limit}${statusKey}`;
+    const totalKey = `campaigns:all:total${statusKey}`;
 
     // 1. Check cache first
     const cached = await redisClient.get(campaignKey);
@@ -148,9 +184,12 @@ export const getCampaigns = async (page = 0, limit = 20, userId = null) => {
     }
 
     // 2. Cache miss - Query database
+    // Build query with optional status filter
+    const query = shouldFilterByStatus ? { status: filterStatus } : {};
+    
     // Optimized: Use select() to reduce payload size and use index efficiently
     const [campaigns, total] = await Promise.all([
-        Campaign.find()
+        Campaign.find(query)
             .select('-contact_info -expected_timeline -milestones') // Exclude heavy fields for list view
             .populate("creator", "username fullname avatar")
             .populate("hashtag", "name")
@@ -158,7 +197,7 @@ export const getCampaigns = async (page = 0, limit = 20, userId = null) => {
             .skip(page * limit)
             .limit(limit)
             .lean(), // Use lean() for better performance
-        Campaign.countDocuments()
+        Campaign.countDocuments(query)
     ]);
 
     // 3. Cache for 5 minutes (300 seconds) - same as message
@@ -377,9 +416,10 @@ export const getCampaignsByCreatorWithPagination = async (creatorId, viewerId = 
     let query = { creator: creatorId };
     
     if (!isOwner) {
-        // Public view: Only show active, completed, approved, voting campaigns
-        // Exclude: pending, rejected, cancelled
-        query.status = { $in: ['active', 'completed', 'approved', 'voting'] };
+        // Public view: Show all campaigns that were once public
+        // Include: pending, active, completed, rejected (to show trust/transparency)
+        // Exclude: cancelled (user action, not public status), draft (doesn't exist in system)
+        query.status = { $in: ['pending', 'active', 'completed', 'rejected', 'approved', 'voting'] };
     }
     // Owner can see all campaigns including pending/rejected/cancelled
     
