@@ -1,84 +1,141 @@
 import { sendEmail, validateEmails } from "../services/mail.service.js";
-import { RESEND_CONFIG } from "../constants/index.js";
+import { EMAIL_CONFIG } from "../constants/index.js";
+import * as emailTemplates from "../templates/email.templates.js";
+import { JOB_TYPES } from "../schemas/job.schema.js";
 
-const normalizeRecipients = (to) => {
-    if (!to) {
-        throw new Error("Recipient 'to' is required");
+/**
+ * Handle mail job with standardized format
+ * 
+ * @param {Object} job - Standardized job object with { jobId, type, payload, meta }
+ * @returns {Promise<Object>} Result from sendEmail
+ */
+export const handleMailJob = async (job) => {
+    if (!job || !job.type || !job.payload) {
+        throw new Error("Invalid job: must have type and payload");
     }
 
-    const recipients = Array.isArray(to) ? to : [to];
-    
-    const normalized = recipients
-        .filter(email => email && typeof email === "string")
-        .map(email => email.trim().toLowerCase())
-        .filter(email => email.length > 0);
+    const { type, payload, meta } = job;
+    const requestId = meta?.requestId || "unknown";
+    const userId = meta?.userId || "unknown";
 
-    if (normalized.length === 0) {
-        throw new Error("No valid recipients provided");
+    // Validate email address
+    if (!payload.email || typeof payload.email !== "string") {
+        throw new Error("Missing or invalid email address in payload");
     }
 
-    return normalized;
-};
-
-const validatePayload = (payload) => {
-    if (!payload || typeof payload !== "object") {
-        throw new Error("Invalid payload: must be an object");
-    }
-
-    if (!payload.to) {
-        throw new Error("Missing required field: 'to'");
-    }
-
-    const recipients = normalizeRecipients(payload.to);
-    
-    if (!validateEmails(recipients)) {
+    const email = payload.email.trim().toLowerCase();
+    if (!validateEmails([email])) {
         throw new Error("Invalid email address format");
     }
 
-    if (!payload.subject || typeof payload.subject !== "string" || payload.subject.trim().length === 0) {
-        throw new Error("Missing or invalid 'subject'");
+    // Generate email template based on job type
+    let emailData = null;
+
+    switch (type) {
+        case JOB_TYPES.SEND_OTP:
+            if (!payload.username || !payload.otp || !payload.expiresIn) {
+                throw new Error("Missing required fields for SEND_OTP: username, otp, expiresIn");
+            }
+            emailData = emailTemplates.generateOtpEmail({
+                username: payload.username,
+                otp: payload.otp,
+                expiresIn: payload.expiresIn
+            });
+            break;
+
+        case JOB_TYPES.SEND_OTP_SIGNUP:
+            if (!payload.username || !payload.otp || !payload.expiresIn) {
+                throw new Error("Missing required fields for SEND_OTP_SIGNUP: username, otp, expiresIn");
+            }
+            emailData = emailTemplates.generateOtpSignupEmail({
+                username: payload.username,
+                otp: payload.otp,
+                expiresIn: payload.expiresIn
+            });
+            break;
+
+        case JOB_TYPES.SEND_FORGOT_PASSWORD:
+            if (!payload.username || !payload.newPassword) {
+                throw new Error("Missing required fields for SEND_FORGOT_PASSWORD: username, newPassword");
+            }
+            emailData = emailTemplates.generateForgotPasswordEmail({
+                username: payload.username,
+                newPassword: payload.newPassword
+            });
+            break;
+
+        case JOB_TYPES.SEND_KYC_APPROVED:
+            if (!payload.username) {
+                throw new Error("Missing required field for SEND_KYC_APPROVED: username");
+            }
+            emailData = emailTemplates.generateKycApprovedEmail({
+                username: payload.username
+            });
+            break;
+
+        case JOB_TYPES.CAMPAIGN_APPROVED:
+            if (!payload.username || !payload.campaignTitle || !payload.campaignId) {
+                throw new Error("Missing required fields for CAMPAIGN_APPROVED: username, campaignTitle, campaignId");
+            }
+            emailData = emailTemplates.generateCampaignApprovedEmail({
+                username: payload.username,
+                campaignTitle: payload.campaignTitle,
+                campaignId: payload.campaignId
+            });
+            break;
+
+        case JOB_TYPES.CAMPAIGN_REJECTED:
+            if (!payload.username || !payload.campaignTitle || !payload.campaignId) {
+                throw new Error("Missing required fields for CAMPAIGN_REJECTED: username, campaignTitle, campaignId");
+            }
+            emailData = emailTemplates.generateCampaignRejectedEmail({
+                username: payload.username,
+                campaignTitle: payload.campaignTitle,
+                campaignId: payload.campaignId,
+                reason: payload.reason || 'Không có lý do cụ thể'
+            });
+            break;
+
+        case JOB_TYPES.CAMPAIGN_REMOVED:
+            if (!payload.username || !payload.campaignTitle || !payload.campaignId) {
+                throw new Error("Missing required fields for CAMPAIGN_REMOVED: username, campaignTitle, campaignId");
+            }
+            emailData = emailTemplates.generateCampaignRemovedEmail({
+                username: payload.username,
+                campaignTitle: payload.campaignTitle,
+                campaignId: payload.campaignId,
+                resolutionDetails: payload.resolutionDetails || 'Chiến dịch của bạn đã bị người dùng khác đánh dấu là vi phạm Tiêu chuẩn của MACha'
+            });
+            break;
+
+        default:
+            throw new Error(`Unknown email job type: ${type}`);
     }
 
-    if (!payload.html && !payload.text && !payload.template) {
-        throw new Error("Missing content: provide 'html', 'text', or 'template'");
-    }
-
-    if (payload.template && !payload.html && !payload.text) {
-        throw new Error("Template rendering not implemented yet. Please provide 'html' or 'text'");
-    }
-};
-
-export const handleMailJob = async (payload) => {
-    validatePayload(payload);
-
-    const recipients = normalizeRecipients(payload.to);
-
-    const emailParams = {
-        to: recipients.length === 1 ? recipients[0] : recipients,
-        subject: payload.subject.trim(),
-        html: payload.html,
-        text: payload.text,
-        from: payload.from || RESEND_CONFIG.FROM_EMAIL,
-        fromName: payload.fromName || RESEND_CONFIG.FROM_NAME,
-    };
-
-    const requestId = payload.meta?.requestId || "unknown";
-    const userId = payload.meta?.userId || "unknown";
     console.log(`[Mail Handler] Processing email job:`, {
         requestId,
         userId,
-        to: recipients,
-        subject: emailParams.subject,
+        type,
+        email,
     });
 
-    const result = await sendEmail(emailParams);
+    // Send via Nodemailer with Gmail
+    const result = await sendEmail({
+        to: email,
+        subject: emailData.subject,
+        html: emailData.html,
+        text: emailData.text,
+        from: EMAIL_CONFIG.FROM_EMAIL,
+        fromName: EMAIL_CONFIG.FROM_NAME
+    });
 
     if (result.success) {
         console.log(`[Mail Handler] Email sent successfully:`, {
             requestId,
             userId,
+            type,
             messageId: result.messageId,
-            to: recipients,
+            email,
         });
         return result;
     }
@@ -87,8 +144,9 @@ export const handleMailJob = async (payload) => {
         console.error(`[Mail Handler] Permanent error, not retrying:`, {
             requestId,
             userId,
+            type,
             error: result.error.message,
-            to: recipients,
+            email,
         });
         throw result.error;
     }
@@ -96,11 +154,12 @@ export const handleMailJob = async (payload) => {
     console.warn(`[Mail Handler] Temporary error, will retry:`, {
         requestId,
         userId,
+        type,
         error: result.error.message,
         errorType: result.errorType,
-        to: recipients,
+        email,
     });
-    
+
     throw result.error;
 };
 

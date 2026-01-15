@@ -1,12 +1,16 @@
+/**
+ * Notification Consumer for Worker
+ * 
+ * Consumes messages from notification.create queue and processes them
+ */
+
 import { consumeMessages, ackMessage, nackMessage } from "../config/rabbitmq.js";
-import { handleMailJob } from "../handlers/mail.handler.js";
+import { handleNotificationJob } from "../handlers/notification.handler.js";
 import { assertJob } from "../schemas/job.schema.js";
 import { QUEUE_NAMES, RETRY_CONFIG } from "../constants/index.js";
 
 const getRetryCount = (msg) => {
-    if (!msg.properties.headers) {
-        return 0;
-    }
+    if (!msg.properties.headers) return 0;
     return Number(msg.properties.headers["x-retry-count"]) || 0;
 };
 
@@ -21,28 +25,22 @@ const incrementRetryCount = (msg) => {
 
 const shouldRetry = (msg, error) => {
     const retryCount = getRetryCount(msg);
-    
-    if (retryCount >= RETRY_CONFIG.MAX_RETRIES) {
-        return false;
-    }
-
-    if (error && error.isPermanent) {
-        return false;
-    }
-
+    if (retryCount >= RETRY_CONFIG.MAX_RETRIES) return false;
+    if (error && error.isPermanent) return false;
     return true;
 };
 
-const processMailMessage = async (content, msg, channel) => {
+const processNotificationMessage = async (content, msg, channel) => {
     const requestId = content.meta?.requestId || msg.properties.messageId || "unknown";
     const userId = content.meta?.userId || "unknown";
     const retryCount = getRetryCount(msg);
 
-    console.log(`[Mail Consumer] Received message:`, {
+    console.log(`[Notification Consumer] Received message:`, {
         requestId,
         userId,
         retryCount,
-        queue: QUEUE_NAMES.MAIL_SEND,
+        jobType: content.type,
+        queue: QUEUE_NAMES.NOTIFICATION_CREATE,
     });
 
     try {
@@ -53,22 +51,22 @@ const processMailMessage = async (content, msg, channel) => {
         // Validate job format (fail fast)
         assertJob(content);
 
-        const result = await handleMailJob(content);
+        const result = await handleNotificationJob(content);
 
         await ackMessage(msg);
         
-        console.log(`[Mail Consumer] Message processed successfully:`, {
+        console.log(`[Notification Consumer] Message processed successfully:`, {
             requestId,
             userId,
-            messageId: result.messageId,
+            jobType: content.type,
+            skipped: result.skipped || false,
+            count: result.count || 1,
         });
     } catch (error) {
         const canRetry = shouldRetry(msg, error);
 
         if (canRetry) {
-            const newHeaders = incrementRetryCount(msg);
-            
-            console.warn(`[Mail Consumer] Retrying message:`, {
+            console.warn(`[Notification Consumer] Retrying message:`, {
                 requestId,
                 userId,
                 retryCount: getRetryCount(msg) + 1,
@@ -82,7 +80,7 @@ const processMailMessage = async (content, msg, channel) => {
                 ? "Max retries exceeded" 
                 : "Permanent error";
 
-            console.error(`[Mail Consumer] Message failed permanently:`, {
+            console.error(`[Notification Consumer] Message failed permanently:`, {
                 requestId,
                 userId,
                 retryCount: getRetryCount(msg),
@@ -95,23 +93,23 @@ const processMailMessage = async (content, msg, channel) => {
     }
 };
 
-export const startMailConsumer = async () => {
+export const startNotificationConsumer = async () => {
     try {
-        console.log(`[Mail Consumer] Starting consumer for queue: ${QUEUE_NAMES.MAIL_SEND}`);
+        console.log(`[Notification Consumer] Starting consumer for queue: ${QUEUE_NAMES.NOTIFICATION_CREATE}`);
         
         const consumerTag = await consumeMessages(
-            QUEUE_NAMES.MAIL_SEND,
-            processMailMessage,
+            QUEUE_NAMES.NOTIFICATION_CREATE,
+            processNotificationMessage,
             {
                 requeueOnError: true,
             }
         );
 
         const tag = consumerTag?.consumerTag || consumerTag || "unknown";
-        console.log(`[Mail Consumer] Consumer started successfully (tag: ${tag})`);
+        console.log(`[Notification Consumer] Consumer started successfully (tag: ${tag})`);
         return consumerTag;
     } catch (error) {
-        console.error(`[Mail Consumer] Failed to start consumer:`, error);
+        console.error(`[Notification Consumer] Failed to start consumer:`, error);
         throw error;
     }
 };

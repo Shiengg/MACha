@@ -198,21 +198,46 @@ server.listen(PORT, '0.0.0.0', () => {
 // ============================================
 // GRACEFUL SHUTDOWN
 // ============================================
-// Graceful shutdown - cleanup Redis connections
-process.on('SIGTERM', async () => {
-    console.log('🛑 SIGTERM received, closing server...');
-    await closeSubscriber();
-    server.close(() => {
-        console.log('✅ Server closed');
-        process.exit(0);
-    });
-});
+let isShuttingDown = false;
 
-process.on('SIGINT', async () => {
-    console.log('🛑 SIGINT received, closing server...');
-    await closeSubscriber();
+const gracefulShutdown = async (signal) => {
+    if (isShuttingDown) {
+        console.log('⚠️  Shutdown already in progress...');
+        return;
+    }
+
+    isShuttingDown = true;
+    console.log(`\n🛑 ${signal} received, initiating graceful shutdown...`);
+
+    // 1. Stop accepting new requests
     server.close(() => {
-        console.log('✅ Server closed');
-        process.exit(0);
+        console.log('✅ HTTP server closed');
     });
-});
+
+    try {
+        // 2. Close Redis subscriber (for pub/sub)
+        console.log('🔌 Closing Redis subscriber...');
+        await closeSubscriber();
+
+        // 3. Close RabbitMQ connections (channels and connection)
+        console.log('🔌 Closing RabbitMQ connections...');
+        await disconnectRabbitMQ();
+
+        // 4. Close Redis main client
+        console.log('🔌 Closing Redis main client...');
+        await disconnectRedis();
+
+        // 5. Close MongoDB connections (last, most critical)
+        console.log('🔌 Closing MongoDB connections...');
+        await disconnectDB();
+
+        console.log('✅ Graceful shutdown completed');
+        process.exit(0);
+    } catch (error) {
+        console.error('❌ Error during shutdown:', error);
+        process.exit(1);
+    }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

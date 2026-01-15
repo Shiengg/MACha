@@ -2,6 +2,7 @@ import { HTTP_STATUS } from "../utils/status.js";
 import * as likeService from "../services/like.service.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
+import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
 
 export const likePost = async (req, res) => {
     try {
@@ -14,11 +15,18 @@ export const likePost = async (req, res) => {
                 postId: postId,
                 userId: req.user._id,
             });
-            await queueService.pushJob({
-                type: "POST_LIKED",
-                postId: postId,
-                userId: req.user._id
-            });
+            const job = createJob(
+                JOB_TYPES.POST_LIKED,
+                {
+                    postId: postId,
+                    userId: req.user._id.toString()
+                },
+                {
+                    userId: req.user._id.toString(),
+                    source: JOB_SOURCE.API
+                }
+            );
+            await queueService.pushJob(job);
         } catch (error) {
             console.error('Error publishing event or pushing job:', error);
         }

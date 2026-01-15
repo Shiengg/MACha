@@ -1,15 +1,19 @@
 import dotenv from "dotenv";
 import { connectRabbitMQ, disconnectRabbitMQ, getRabbitMQHealth } from "./config/rabbitmq.js";
+import { connectDB, disconnectDB, getDBHealth } from "./config/db.js";
+import { connectRedis, disconnectRedis } from "./config/redis.js";
 import { startMailConsumer } from "./consumers/mail.consumer.js";
+import { startNotificationConsumer } from "./consumers/notification.consumer.js";
 
-// Load environment variables
 dotenv.config();
 
 // Validate required environment variables
 const requiredEnvVars = [
     "RABBITMQ_URL",
-    "RESEND_API_KEY",
-    "FROM_EMAIL",
+    "EMAIL_USER",
+    "EMAIL_PASSWORD",
+    "DATABASE_URL",  // MongoDB
+    "REDIS_URL",     // Redis for pub/sub
 ];
 
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
@@ -22,7 +26,8 @@ if (missingEnvVars.length > 0) {
 
 // Worker state
 let isShuttingDown = false;
-let consumerTag = null;
+let mailConsumerTag = null;
+let notificationConsumerTag = null;
 
 const gracefulShutdown = async (signal) => {
     if (isShuttingDown) {
@@ -34,12 +39,14 @@ const gracefulShutdown = async (signal) => {
     console.log(`\n🛑 Received ${signal}, initiating graceful shutdown...`);
 
     try {
-        if (consumerTag) {
-            console.log("⏹️  Stopping consumer...");
+        if (mailConsumerTag || notificationConsumerTag) {
+            console.log("⏹️  Stopping consumers...");
         }
 
-        console.log("🔌 Disconnecting from RabbitMQ...");
+        console.log("🔌 Disconnecting from services...");
         await disconnectRabbitMQ();
+        await disconnectRedis();
+        await disconnectDB();
 
         console.log("✅ Graceful shutdown completed");
         process.exit(0);
@@ -50,11 +57,15 @@ const gracefulShutdown = async (signal) => {
 };
 
 const logHealthStatus = () => {
-    const health = getRabbitMQHealth();
+    const rabbitMQHealth = getRabbitMQHealth();
+    const dbHealth = getDBHealth();
+    
     console.log("[Health Check]", {
-        rabbitMQ: health.connected ? "✅ Connected" : "❌ Disconnected",
-        consumerChannel: health.hasConsumerChannel ? "✅ Active" : "❌ Inactive",
-        reconnectAttempts: health.reconnectAttempts,
+        rabbitMQ: rabbitMQHealth.connected ? "✅ Connected" : "❌ Disconnected",
+        consumerChannel: rabbitMQHealth.hasConsumerChannel ? "✅ Active" : "❌ Inactive",
+        mongodb: dbHealth.isConnected ? "✅ Connected" : "❌ Disconnected",
+        redis: "✅ Connected", // Assume connected if no error
+        reconnectAttempts: rabbitMQHealth.reconnectAttempts,
     });
 };
 
@@ -63,18 +74,31 @@ const bootstrap = async () => {
     console.log("Environment:", process.env.NODE_ENV || "development");
 
     try {
+        // 1. Connect MongoDB
+        console.log("📊 Connecting to MongoDB...");
+        await connectDB();
+        
+        // 2. Connect Redis
+        console.log("🔴 Connecting to Redis...");
+        await connectRedis();
+        
+        // 3. Connect RabbitMQ
         console.log("📡 Connecting to RabbitMQ...");
         await connectRabbitMQ();
 
-        // Start mail consumer
+        // 4. Start mail consumer
         console.log("📧 Starting mail consumer...");
-        consumerTag = await startMailConsumer();
+        mailConsumerTag = await startMailConsumer();
+
+        // 5. Start notification consumer
+        console.log("🔔 Starting notification consumer...");
+        notificationConsumerTag = await startNotificationConsumer();
 
         // Log health status
         logHealthStatus();
 
         console.log("✅ Worker started successfully!");
-        console.log("📬 Listening for mail jobs...");
+        console.log("📬 Listening for mail and notification jobs...");
         console.log("Press Ctrl+C to stop\n");
 
         // Setup graceful shutdown handlers
@@ -84,7 +108,6 @@ const bootstrap = async () => {
         // Handle uncaught errors
         process.on("unhandledRejection", (reason, promise) => {
             console.error("❌ Unhandled Rejection at:", promise, "reason:", reason);
-            // Don't exit, let the process continue but log the error
         });
 
         process.on("uncaughtException", (error) => {

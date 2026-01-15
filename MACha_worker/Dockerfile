@@ -1,5 +1,5 @@
 # MACha Worker Dockerfile
-# Background worker for processing email jobs with RabbitMQ and Resend
+# Background worker for processing email jobs with RabbitMQ and Nodemailer
 
 FROM node:20-alpine
 

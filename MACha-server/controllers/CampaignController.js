@@ -5,7 +5,9 @@ import * as queueService from "../services/queue.service.js";
 import * as userService from "../services/user.service.js";
 import * as recommendationService from "../services/recommendation.service.js";
 import * as searchService from "../services/search.service.js";
+import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
+import User from "../models/user.js";
 
 export const getAllCampaigns = async (req, res) => {
     try {
@@ -247,11 +249,18 @@ export const createCampaign = async (req, res) => {
                 proof_documents_url: campaign.proof_documents_url,
                 category: campaign.category,
             });
-            await queueService.pushJob({
-                type: "CAMPAIGN_CREATED",
-                campaignId: campaign._id,
-                userId: req.user._id
-            });
+            const job = createJob(
+                JOB_TYPES.CAMPAIGN_CREATED,
+                {
+                    campaignId: campaign._id.toString(),
+                    userId: req.user._id.toString()
+                },
+                {
+                    userId: req.user._id.toString(),
+                    source: JOB_SOURCE.API
+                }
+            );
+            await queueService.pushJob(job);
         } catch (eventError) {
             console.error('Error publishing event or pushing job:', eventError);
         }
@@ -445,12 +454,24 @@ export const approveCampaign = async (req, res) => {
                 approved_at: result.campaign.approved_at
             });
 
-            await queueService.pushJob({
-                type: "CAMPAIGN_APPROVED",
-                campaignId: result.campaign._id,
-                creatorId: result.campaign.creator,
-                adminId: req.user._id
-            });
+            // Fetch creator data for email
+            const creator = await User.findById(result.campaign.creator).select('email username');
+            const job = createJob(
+                JOB_TYPES.CAMPAIGN_APPROVED,
+                {
+                    email: creator?.email || '',
+                    username: creator?.username || '',
+                    campaignTitle: result.campaign.title,
+                    campaignId: result.campaign._id.toString(),
+                    creatorId: result.campaign.creator.toString(),
+                    adminId: req.user._id.toString()
+                },
+                {
+                    userId: req.user._id.toString(),
+                    source: JOB_SOURCE.ADMIN
+                }
+            );
+            await queueService.pushJob(job);
         } catch (eventError) {
             console.error('Error publishing event or pushing job:', eventError);
         }
@@ -503,13 +524,25 @@ export const rejectCampaign = async (req, res) => {
                 rejected_at: result.campaign.rejected_at
             });
 
-            await queueService.pushJob({
-                type: "CAMPAIGN_REJECTED",
-                campaignId: result.campaign._id,
-                creatorId: result.campaign.creator,
-                adminId: req.user._id,
-                reason: reason
-            });
+            // Fetch creator data for email
+            const creator = await User.findById(result.campaign.creator).select('email username');
+            const job = createJob(
+                JOB_TYPES.CAMPAIGN_REJECTED,
+                {
+                    email: creator?.email || '',
+                    username: creator?.username || '',
+                    campaignTitle: result.campaign.title,
+                    campaignId: result.campaign._id.toString(),
+                    creatorId: result.campaign.creator.toString(),
+                    adminId: req.user._id.toString(),
+                    reason: reason
+                },
+                {
+                    userId: req.user._id.toString(),
+                    source: JOB_SOURCE.ADMIN
+                }
+            );
+            await queueService.pushJob(job);
         } catch (eventError) {
             console.error('Error publishing event or pushing job:', eventError);
         }

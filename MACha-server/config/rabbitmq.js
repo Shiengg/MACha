@@ -293,6 +293,49 @@ export const publishMessage = async (exchange, routingKey, content, options = {}
     });
 };
 
+/**
+ * Send message directly to a queue (without exchange)
+ * @param {string} queueName - Queue name
+ * @param {Object|string|Buffer} content - Message content
+ * @param {Object} options - Message options
+ * @returns {Promise<boolean>} - True if message was sent successfully
+ */
+export const sendToQueue = async (queueName, content, options = {}) => {
+    const channel = await getPublisherChannel();
+    
+    // Ensure queue exists
+    try {
+        await channel.assertQueue(queueName, { durable: true });
+    } catch (error) {
+        logRabbitMQEvent("error", { error, message: `Failed to assert queue '${queueName}'` });
+        throw error;
+    }
+    
+    const message = Buffer.isBuffer(content) 
+        ? content 
+        : Buffer.from(typeof content === "string" ? content : JSON.stringify(content));
+
+    const defaultOptions = {
+        persistent: true,
+        timestamp: Date.now(),
+        ...options,
+    };
+
+    try {
+        const sent = channel.sendToQueue(queueName, message, defaultOptions);
+        if (!sent) {
+            // Channel buffer is full, wait for drain
+            await new Promise((resolve) => channel.once('drain', resolve));
+        }
+        // For confirm channels, sendToQueue returns boolean immediately
+        // The channel handles confirmations internally
+        return sent;
+    } catch (error) {
+        logRabbitMQEvent("error", { error, message: `Error sending to queue '${queueName}'` });
+        throw error;
+    }
+};
+
 export const assertExchange = async (name, type = "direct", options = {}) => {
     const channel = await getPublisherChannel();
     

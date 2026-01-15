@@ -1,28 +1,56 @@
-import { Resend } from "resend";
-import { RESEND_CONFIG, ERROR_TYPES } from "../constants/index.js";
+import nodemailer from "nodemailer";
+import { EMAIL_CONFIG, ERROR_TYPES } from "../constants/index.js";
 
-const resend = new Resend(RESEND_CONFIG.API_KEY);
+// Create reusable transporter using Gmail SMTP
+const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+        user: EMAIL_CONFIG.USER,
+        pass: EMAIL_CONFIG.PASSWORD,
+    },
+    tls: {
+        rejectUnauthorized: false,
+    },
+});
 
 const isRetryableError = (error) => {
+    // Network errors - retryable
     if (error.code === "ECONNRESET" || 
         error.code === "ETIMEDOUT" || 
         error.code === "ENOTFOUND" ||
+        error.code === "ECONNREFUSED" ||
         error.message?.includes("timeout")) {
         return { retryable: true, type: ERROR_TYPES.TEMPORARY };
     }
 
-    if (error.status === 429 || error.message?.includes("rate limit")) {
+    // Rate limiting - retryable
+    if (error.code === "ETIMEDOUT" || error.message?.includes("rate limit") || error.responseCode === 421) {
         return { retryable: true, type: ERROR_TYPES.RATE_LIMIT };
     }
 
-    if (error.status >= 500 && error.status < 600) {
-        return { retryable: true, type: ERROR_TYPES.TEMPORARY };
-    }
-
-    if (error.status >= 400 && error.status < 500) {
+    // Authentication errors - permanent
+    if (error.code === "EAUTH" || error.responseCode === 535) {
         return { retryable: false, type: ERROR_TYPES.PERMANENT };
     }
 
+    // Invalid email addresses - permanent
+    if (error.responseCode === 550 || error.code === "EENVELOPE") {
+        return { retryable: false, type: ERROR_TYPES.PERMANENT };
+    }
+
+    // Other SMTP errors - check response code
+    if (error.responseCode) {
+        // 4xx - permanent client errors
+        if (error.responseCode >= 400 && error.responseCode < 500) {
+            return { retryable: false, type: ERROR_TYPES.PERMANENT };
+        }
+        // 5xx - temporary server errors
+        if (error.responseCode >= 500 && error.responseCode < 600) {
+            return { retryable: true, type: ERROR_TYPES.TEMPORARY };
+        }
+    }
+
+    // Default to retryable for unknown errors
     return { retryable: true, type: ERROR_TYPES.TEMPORARY };
 };
 
@@ -32,8 +60,8 @@ export const sendEmail = async (params) => {
         subject,
         html,
         text,
-        from = RESEND_CONFIG.FROM_EMAIL,
-        fromName = RESEND_CONFIG.FROM_NAME,
+        from = EMAIL_CONFIG.FROM_EMAIL,
+        fromName = EMAIL_CONFIG.FROM_NAME,
     } = params;
 
     if (!to || !subject) {
@@ -48,68 +76,44 @@ export const sendEmail = async (params) => {
         throw error;
     }
 
+    // Format from field
     let fromField = from;
     if (fromName && fromName.trim()) {
         const sanitizedName = fromName.trim().replace(/[<>]/g, '');
         fromField = `${sanitizedName} <${from}>`;
     }
 
-    const emailPayload = {
+    // Prepare mail options for nodemailer
+    const mailOptions = {
         from: fromField,
-        to: Array.isArray(to) ? to : [to],
+        to: Array.isArray(to) ? to.join(', ') : to,
         subject,
     };
 
     if (html) {
-        emailPayload.html = html;
+        mailOptions.html = html;
     }
 
     if (text) {
-        emailPayload.text = text;
+        mailOptions.text = text;
     }
 
     try {
+        // Create timeout promise
         const timeoutPromise = new Promise((_, reject) => {
             setTimeout(
-                () => reject(new Error(`Resend API timeout after ${RESEND_CONFIG.TIMEOUT}ms`)),
-                RESEND_CONFIG.TIMEOUT
+                () => reject(new Error(`Email sending timeout after ${EMAIL_CONFIG.TIMEOUT}ms`)),
+                EMAIL_CONFIG.TIMEOUT
             );
         });
 
-        const sendPromise = resend.emails.send(emailPayload);
-
+        // Send email with timeout
+        const sendPromise = transporter.sendMail(mailOptions);
         const result = await Promise.race([sendPromise, timeoutPromise]);
-
-        if (result.error) {
-            const error = new Error(result.error.message || "Resend API error");
-            error.status = result.error.status || result.error.statusCode;
-            error.code = result.error.code;
-            
-            const { retryable, type } = isRetryableError(error);
-            error.isPermanent = !retryable;
-            error.errorType = type;
-
-            console.error(`[Mail Service] Resend API returned error:`, {
-                to,
-                subject,
-                error: error.message,
-                status: error.status,
-                code: error.code,
-                retryable,
-                type,
-            });
-
-            return {
-                success: false,
-                error,
-                retryable,
-                errorType: type,
-            };
-        }
 
         return {
             success: true,
-            messageId: result.data?.id,
+            messageId: result.messageId || result.response?.replace(/.*<([^>]+)>.*/, '$1'),
         };
     } catch (error) {
         const { retryable, type } = isRetryableError(error);
@@ -121,8 +125,8 @@ export const sendEmail = async (params) => {
             to,
             subject,
             error: error.message,
-            status: error.status,
             code: error.code,
+            responseCode: error.responseCode,
             retryable,
             type,
         });
@@ -151,4 +155,5 @@ export const validateEmails = (emails) => {
     }
     return validateEmail(emails);
 };
+
 

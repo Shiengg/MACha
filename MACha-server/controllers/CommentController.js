@@ -3,6 +3,7 @@ import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as commentService from "../services/comment.service.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
+import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
 
 export const addComment = async (req, res) => {
     try {
@@ -29,13 +30,20 @@ export const addComment = async (req, res) => {
                 avatar: req.user.avatar
             });
 
-            await queueService.pushJob({
-                type: "COMMENT_ADDED",
-                postId: req.params.postId,
-                userId: req.user._id,
-                commentId: comment._id,
-                content_text: content_text
-            });
+            const job = createJob(
+                JOB_TYPES.COMMENT_ADDED,
+                {
+                    postId: req.params.postId,
+                    userId: req.user._id.toString(),
+                    commentId: comment._id.toString(),
+                    content_text: content_text
+                },
+                {
+                    userId: req.user._id.toString(),
+                    source: JOB_SOURCE.API
+                }
+            );
+            await queueService.pushJob(job);
         } catch (error) {
             console.error('Error publishing event or pushing job:', error);
         }
