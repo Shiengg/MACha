@@ -14,8 +14,13 @@ export const getAllCampaigns = async (req, res) => {
         const page = parseInt(req.query.page) || 0;
         const limit = parseInt(req.query.limit) || 20;
         const userId = req.user?._id;
+        const userRole = req.user?.role;
         
-        if (page === 0 && userId) {
+        // Admin và các role khác cần thấy tất cả campaigns (bao gồm pending)
+        // nên skip recommendation service
+        const isAdmin = userRole === 'admin';
+        
+        if (page === 0 && userId && !isAdmin) {
             try {
                 const recommendationResult = await recommendationService.getRecommendedCampaigns(
                     userId.toString(),
@@ -38,7 +43,7 @@ export const getAllCampaigns = async (req, res) => {
             }
         }
         
-        // Các trang sau hoặc user chưa login: get bình thường
+        // Admin, các trang sau, hoặc user chưa login: get bình thường (tất cả campaigns)
         const result = await campaignService.getCampaigns(page, limit, userId);
         res.status(HTTP_STATUS.OK).json({ 
             campaigns: result.campaigns,
@@ -136,6 +141,58 @@ export const getCampaignsByCreator = async (req, res) => {
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
+    }
+}
+
+/**
+ * Get campaigns by creator with pagination
+ * Supports permission-based filtering (owner sees all, public sees only active/completed/approved/voting)
+ * 
+ * Query params:
+ * - creatorId (required): User ID of campaign creator
+ * - page (optional, default: 1): Page number
+ * - limit (optional, default: 10): Items per page (max: 50)
+ */
+export const getCampaignsByCreatorPagination = async (req, res) => {
+    try {
+        const creatorId = req.query.creatorId || req.params.userId;
+        const viewerId = req.user?._id || null; // Current logged-in user (null if anonymous)
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        
+        // Validate creatorId
+        if (!creatorId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: "creatorId is required" 
+            });
+        }
+        
+        // Validate pagination params
+        if (page < 1) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: "page must be >= 1" 
+            });
+        }
+        
+        if (limit < 1 || limit > 50) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: "limit must be between 1 and 50" 
+            });
+        }
+        
+        const result = await campaignService.getCampaignsByCreatorWithPagination(
+            creatorId,
+            viewerId,
+            page,
+            limit
+        );
+        
+        res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        console.error('[Campaign Controller] Error getting campaigns by creator:', error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
+            message: error.message || 'Internal server error' 
+        });
     }
 }
 

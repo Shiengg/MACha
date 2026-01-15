@@ -75,12 +75,19 @@ export default function AdminCampaignApproval() {
     try {
       setLoading(true);
       let data: Campaign[] = [];
+      
       // Khi lọc theo "pending" thì gọi API riêng cho admin để lấy danh sách chờ duyệt
       if (statusFilter === 'pending') {
         data = await getPendingCampaigns();
+      } else if (statusFilter === 'all') {
+        // Khi filter "Tất cả", fetch tất cả campaigns bao gồm cả pending
+        // Đảm bảo lấy được tất cả campaigns không bị giới hạn bởi pagination
+        data = await getAllCampaigns(50000); // Sử dụng limit lớn để lấy tất cả
       } else {
-        data = await getAllCampaigns();
+        // Các filter khác (active, rejected, completed, cancelled)
+        data = await getAllCampaigns(50000); // Cũng dùng limit lớn để đảm bảo lấy đủ
       }
+      
       setCampaigns(data);
     } catch (error: any) {
       Swal.fire({

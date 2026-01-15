@@ -2,10 +2,13 @@ import Donation from "../models/donation.js";
 import Campaign from "../models/campaign.js";
 import Escrow from "../models/escrow.js";
 import CampaignCompanion from "../models/campaignCompanion.js";
+import User from "../models/user.js";
 import { redisClient } from "../config/redis.js";
 import * as trackingService from "./tracking.service.js";
 import * as escrowService from "./escrow.service.js";
 import * as campaignCompanionService from "./campaignCompanion.service.js";
+import * as queueService from "./queue.service.js";
+import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
 
 const checkAndCreateMilestoneWithdrawalRequest = async (campaign, isExpired = false) => {
     const percentage = (campaign.current_amount / campaign.goal_amount) * 100;
@@ -605,6 +608,69 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
             });
         } catch (eventError) {
             console.error('Error publishing donation status changed event:', eventError);
+        }
+
+
+        if (oldPaymentStatus !== 'completed' && !donation.thank_you_mail_sent_at) {
+            try {
+                // Reload donation để đảm bảo có giá trị mới nhất (tránh race condition)
+                const freshDonation = await Donation.findById(donation._id);
+                
+                // Double check: Nếu đã có người khác set thank_you_mail_sent_at, skip
+                if (freshDonation.thank_you_mail_sent_at) {
+                    console.log(`[Donation Service] Thank you email already sent for donation ${donation._id} (race condition detected), skipping`);
+                    return { donation: freshDonation, campaign };
+                }
+
+                // Populate donor để lấy email
+                const donor = await User.findById(donation.donor).select("email username fullname");
+                
+                if (!donor || !donor.email) {
+                    console.warn(`[Donation Service] Cannot send thank you email: donor not found or no email for donation ${donation._id}`);
+                } else {
+                    console.log(`[Donation Service][${donation.sepay_transaction_id || donation.order_invoice_number}] Preparing thank you email for donation ${donation._id} to ${donor.email}`);
+
+                    // Tạo job để gửi email cảm ơn
+                    const thankYouJob = createJob(
+                        JOB_TYPES.DONATION_THANK_YOU,
+                        {
+                            email: donor.email,
+                            donorName: donor.fullname || donor.username || null,
+                            amount: donation.amount,
+                            currency: donation.currency,
+                            transactionId: donation.sepay_transaction_id || donation.order_invoice_number || null,
+                            transactionTime: donation.paid_at || donation.updatedAt || new Date().toISOString(),
+                            createdAt: donation.createdAt || new Date().toISOString(),
+                            donationId: donation._id.toString(),
+                        },
+                        {
+                            userId: donation.donor.toString(),
+                            source: JOB_SOURCE.SYSTEM,
+                            requestId: `donation-${donation._id}-${Date.now()}`,
+                        }
+                    );
+
+                    // Push job vào queue
+                    await queueService.pushJob(thankYouJob);
+
+                    // Đánh dấu đã push job (idempotency)
+                    // Note: Field thank_you_mail_sent_at được set ngay sau khi push job thành công
+                    // để tránh gửi lại khi callback bị gọi lại
+                    freshDonation.thank_you_mail_sent_at = new Date();
+                    await freshDonation.save();
+
+                    console.log(`[Donation Service][${donation.sepay_transaction_id || donation.order_invoice_number}] Thank you email job queued successfully for donation ${donation._id} to ${donor.email}`);
+                    
+                    // Update donation reference để return đúng giá trị
+                    donation.thank_you_mail_sent_at = freshDonation.thank_you_mail_sent_at;
+                }
+            } catch (mailError) {
+                // Log error nhưng không fail toàn bộ flow
+                // Mail có thể retry sau
+                console.error(`[Donation Service][${donation.sepay_transaction_id || donation.order_invoice_number}] Failed to queue thank you email for donation ${donation._id}:`, mailError);
+            }
+        } else if (donation.thank_you_mail_sent_at) {
+            console.log(`[Donation Service] Thank you email already sent for donation ${donation._id} (thank_you_mail_sent_at: ${donation.thank_you_mail_sent_at}), skipping`);
         }
     }
     

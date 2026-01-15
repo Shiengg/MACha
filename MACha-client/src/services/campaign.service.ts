@@ -13,6 +13,7 @@ import {
   SEARCH_CAMPAIGNS_BY_TITLE_ROUTE,
   GET_ACTIVE_CATEGORIES_ROUTE,
   GET_CAMPAIGNS_BY_CREATOR_ROUTE,
+  GET_CAMPAIGNS_BY_CREATOR_PAGINATED_ROUTE,
   CREATE_CAMPAIGN_UPDATE_ROUTE,
   GET_CAMPAIGN_UPDATES_ROUTE,
   DELETE_CAMPAIGN_UPDATE_ROUTE,
@@ -212,6 +213,23 @@ export const campaignService = {
       params: { creatorId },
     });
     return response.data.campaigns;
+  },
+
+  async getCampaignsByCreatorPaginated(
+    creatorId: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<{
+    campaigns: Campaign[];
+    total: number;
+    totalPages: number;
+    currentPage: number;
+    limit: number;
+  }> {
+    const response = await apiClient.get(GET_CAMPAIGNS_BY_CREATOR_PAGINATED_ROUTE, {
+      params: { creatorId, page, limit },
+    });
+    return response.data;
   },
 
   async updateCampaign(id: string, payload: UpdateCampaignPayload): Promise<Campaign> {

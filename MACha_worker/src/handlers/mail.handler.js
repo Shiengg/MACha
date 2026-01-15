@@ -108,6 +108,19 @@ export const handleMailJob = async (job) => {
             });
             break;
 
+        case JOB_TYPES.DONATION_THANK_YOU:
+            if (!payload.email || !payload.amount || !payload.currency) {
+                throw new Error("Missing required fields for DONATION_THANK_YOU: email, amount, currency");
+            }
+            emailData = emailTemplates.generateDonationThankYouEmail({
+                donorName: payload.donorName || null,
+                amount: payload.amount,
+                currency: payload.currency,
+                transactionTime: payload.transactionTime || payload.createdAt || new Date().toISOString(),
+                transactionId: payload.transactionId || null
+            });
+            break;
+
         default:
             throw new Error(`Unknown email job type: ${type}`);
     }

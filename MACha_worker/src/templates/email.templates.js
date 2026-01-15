@@ -541,6 +541,147 @@ Trân trọng,
     return { subject, text, html };
 };
 
+export const generateDonationThankYouEmail = (data) => {
+    const { donorName, amount, currency, transactionTime, transactionId } = data;
+    
+    // Format amount with currency
+    const formatAmount = (amount, currency) => {
+        if (currency === 'VND') {
+            return new Intl.NumberFormat('vi-VN').format(amount) + ' VNĐ';
+        } else if (currency === 'USD') {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        } else if (currency === 'EUR') {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }).format(amount);
+        }
+        return amount + ' ' + currency;
+    };
+
+    // Format date time
+    const formatDateTime = (dateTime) => {
+        if (!dateTime) return 'N/A';
+        const date = new Date(dateTime);
+        return new Intl.DateTimeFormat('vi-VN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Asia/Ho_Chi_Minh'
+        }).format(date);
+    };
+
+    const displayName = donorName || 'Bạn';
+    const formattedAmount = formatAmount(amount, currency);
+    const formattedTime = formatDateTime(transactionTime);
+
+    const subject = "Cảm ơn bạn đã donate ❤️";
+
+    const text = `
+Xin chào ${displayName},
+
+Cảm ơn bạn đã ủng hộ và đóng góp cho chiến dịch!
+
+Thông tin giao dịch:
+- Số tiền: ${formattedAmount}
+- Thời gian: ${formattedTime}
+${transactionId ? `- Mã giao dịch: ${transactionId}` : ''}
+
+Sự đóng góp của bạn có ý nghĩa rất lớn và sẽ giúp ích cho những người cần được hỗ trợ.
+
+Chúc bạn có một ngày tốt lành!
+
+Trân trọng,
+Đội ngũ MACha
+    `.trim();
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f6f8; padding: 32px 16px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 30px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: bold;">❤️ Cảm ơn bạn!</h1>
+                            <p style="color: #ffffff; margin: 12px 0 0 0; font-size: 18px; opacity: 0.95;">Chúng tôi rất biết ơn sự đóng góp của bạn</p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                                Xin chào <strong>${displayName}</strong>,
+                            </p>
+                            
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
+                                Cảm ơn bạn đã ủng hộ và đóng góp cho chiến dịch! Sự đóng góp của bạn có ý nghĩa rất lớn và sẽ giúp ích cho những người cần được hỗ trợ.
+                            </p>
+                            
+                            <!-- Transaction Info -->
+                            <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 24px; margin: 24px 0;">
+                                <h2 style="color: #111827; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">📋 Thông tin giao dịch</h2>
+                                
+                                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                                    <tr>
+                                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 40%;">Số tiền:</td>
+                                        <td style="padding: 8px 0; color: #111827; font-size: 16px; font-weight: bold;">${formattedAmount}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Thời gian:</td>
+                                        <td style="padding: 8px 0; color: #111827; font-size: 14px;">${formattedTime}</td>
+                                    </tr>
+                                    ${transactionId ? `
+                                    <tr>
+                                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Mã giao dịch:</td>
+                                        <td style="padding: 8px 0; color: #111827; font-size: 14px; font-family: monospace;">${transactionId}</td>
+                                    </tr>
+                                    ` : ''}
+                                </table>
+                            </div>
+                            
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 24px 0;">
+                                💝 Mỗi đóng góp của bạn đều có giá trị và góp phần tạo nên sự khác biệt tích cực trong cộng đồng.
+                            </p>
+                            
+                            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+                                Chúc bạn có một ngày tốt lành và tràn đầy niềm vui!
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                            <p style="color: #6b7280; font-size: 14px; margin: 0 0 12px 0;">
+                                Trân trọng,
+                            </p>
+                            <p style="color: #111827; font-size: 16px; font-weight: bold; margin: 0 0 16px 0;">
+                                Đội ngũ MACha
+                            </p>
+                            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                                © ${new Date().getFullYear()} MACha. Tất cả quyền được bảo lưu.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+    `.trim();
+    
+    return { subject, text, html };
+};
+
 export const generateCampaignRemovedEmail = (data) => {
     const { username, campaignTitle, campaignId, resolutionDetails } = data;
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';

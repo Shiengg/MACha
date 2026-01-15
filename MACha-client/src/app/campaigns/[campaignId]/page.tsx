@@ -39,7 +39,7 @@ function CampaignDetails() {
     const [activeTab, setActiveTab] = useState<'story' | 'updates' | 'supporters' | 'withdrawals'>('story');
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const itemsPerPage = 10; // <----- Phân trang chỗ này này
     const { user } = useAuth();
     const [showStickyBar, setShowStickyBar] = useState(false);
     const donateCardRef = useRef<HTMLDivElement>(null);
@@ -1064,6 +1064,14 @@ function CampaignDetails() {
 
                                 {/* Donate Button */}
                                 {(() => {
+                                    // Check if user is the creator - hide donate button for creator
+                                    const isCreator = user && campaign && campaign.creator && 
+                                        (user._id === campaign.creator._id || user.id === campaign.creator._id);
+                                    
+                                    if (isCreator) {
+                                        return null; // Don't show donate button for creator
+                                    }
+                                    
                                     // Check if campaign has ended
                                     if (campaign.end_date && daysLeft === 0) {
                                         return (
@@ -1989,6 +1997,10 @@ function CampaignDetails() {
                                 {/* Action Buttons */}
                                 <div className="space-y-3">
                                     {(() => {
+                                        // Check if user is the creator - hide donate button for creator
+                                        const isCreator = user && campaign && campaign.creator && 
+                                            (user._id === campaign.creator._id || user.id === campaign.creator._id);
+                                        
                                         // Check if campaign has ended
                                         if (campaign.end_date && daysLeft === 0) {
                                             return (
@@ -2010,15 +2022,18 @@ function CampaignDetails() {
                                         if (allowedStatuses.includes(campaign.status)) {
                                             return (
                                                 <>
-                                                    <button 
-                                                        onClick={handleDonate} 
-                                                        className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
-                                                        {isCompanion ? 'Ủng hộ qua bạn' : 'Ủng hộ ngay'}
-                                                    </button>
+                                                    {/* Only show donate button if user is not the creator */}
+                                                    {!isCreator && (
+                                                        <button 
+                                                            onClick={handleDonate} 
+                                                            className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            {isCompanion ? 'Ủng hộ qua bạn' : 'Ủng hộ ngay'}
+                                                        </button>
+                                                    )}
                                                     {canJoinCompanion && (
                                                         <button 
                                                             onClick={handleJoinCompanion}

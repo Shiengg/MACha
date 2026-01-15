@@ -5,17 +5,19 @@ import { useRouter } from 'next/navigation';
 import { Share2 } from 'lucide-react';
 import { donationService, Donation } from '@/services/donation.service';
 import { Campaign } from '@/services/campaign.service';
+import StatusBadge from './StatusBadge';
 
 
 
 interface CampaignCardProps {
   campaign: Campaign;
   showCreator?: boolean;
+  showStatusBadge?: boolean; // New prop to show/hide status badge
   onClick?: (campaign: Campaign) => void;
   disableNavigation?: boolean;
 }
 
-export default function CampaignCard({ campaign, showCreator = false, onClick, disableNavigation = false }: CampaignCardProps) {
+export default function CampaignCard({ campaign, showCreator = false, showStatusBadge = false, onClick, disableNavigation = false }: CampaignCardProps) {
   const router = useRouter();
   const [donations, setDonations] = useState<Donation[]>([]);
   const [isSharing, setIsSharing] = useState(false);
@@ -158,14 +160,21 @@ export default function CampaignCard({ campaign, showCreator = false, onClick, d
           </div>
         )}
         
+        {/* Status Badge - Top Right (if enabled) */}
+        {showStatusBadge && campaign.status && (
+          <div className="absolute top-3 right-3 z-10">
+            <StatusBadge status={campaign.status} />
+          </div>
+        )}
+        
         {/* Category Badge */}
-        <div className="absolute top-3 left-3 flex items-center gap-1 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+        <div className={`absolute top-3 ${showStatusBadge ? 'left-3' : 'left-3'} flex items-center gap-1 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium`}>
           <span>{getCategoryIcon(campaign.category)}</span>
           <span>{getCategoryLabel(campaign.category)}</span>
         </div>
 
-        {/* Donor Count Badge */}
-        <div className="absolute top-3 right-3 flex items-center gap-1 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+        {/* Donor Count Badge - Bottom Right (moved down if status badge shown) */}
+        <div className={`absolute ${showStatusBadge ? 'bottom-3 right-3' : 'top-3 right-3'} flex items-center gap-1 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium`}>
           <span>❤️</span>
           <span>Còn {daysLeft > 0 ? daysLeft : 0} ngày</span>
         </div>

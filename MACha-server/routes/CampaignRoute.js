@@ -5,6 +5,7 @@ import {
     getCampaignsByCategory,
     getActiveCategories,
     getCampaignsByCreator,
+    getCampaignsByCreatorPagination,
     createCampaign,
     updateCampaign,
     deleteCampaign,
@@ -40,6 +41,7 @@ campaignRoutes.get('/categories/active', rateLimitByIP(300, 60), getActiveCatego
 campaignRoutes.get('/category', rateLimitByIP(300, 60), getCampaignsByCategory);
 campaignRoutes.get('/pending', authMiddleware, checkRole('admin'), rateLimitByIP(150, 60), getPendingCampaigns);
 campaignRoutes.get('/creator', authMiddleware, rateLimitByUserId(150, 60), getCampaignsByCreator);
+campaignRoutes.get('/creator/paginated', optionalAuthMiddleware, rateLimitByIP(300, 60), getCampaignsByCreatorPagination); // Public endpoint with optional auth
 campaignRoutes.get('/:id', optionalAuthMiddleware, rateLimitByIP(300, 60), getCampaignById);
 
 // Write endpoints – per userId, chặt hơn

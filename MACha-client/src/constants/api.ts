@@ -59,6 +59,7 @@ export const UPDATE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}`;
 export const DELETE_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}`;
 export const CANCEL_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/cancel`;
 export const GET_CAMPAIGNS_BY_CREATOR_ROUTE = `${CAMPAIGN_ROUTE}/creator`;
+export const GET_CAMPAIGNS_BY_CREATOR_PAGINATED_ROUTE = `${CAMPAIGN_ROUTE}/creator/paginated`;
 export const GET_CAMPAIGNS_BY_CATEGORY_ROUTE = `${CAMPAIGN_ROUTE}/category`;
 export const SEARCH_CAMPAIGNS_BY_HASHTAG_ROUTE = `${CAMPAIGN_ROUTE}/search/hashtag`;
 export const SEARCH_CAMPAIGNS_BY_TITLE_ROUTE = `${CAMPAIGN_ROUTE}/search/title`;

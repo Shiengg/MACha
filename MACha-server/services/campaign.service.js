@@ -8,6 +8,44 @@ import {
     splitSearchWords 
 } from "../utils/similarity.js";
 
+const invalidateCampaignCache = async (campaignId = null, category = null) => {
+    const keySet = 'campaigns:all:keys';
+    const keys = await redisClient.sMembers(keySet);
+    
+    // Clear all campaign-related cache keys
+    const cachesToInvalidate = [
+        redisClient.del('campaigns:pending'), // Clear pending campaigns cache
+        redisClient.del('campaigns:all:total'), // Clear total count cache
+        redisClient.del('campaigns:map'), // Invalidate map cache
+        redisClient.del('campaigns:map:statistics'), // Invalidate map statistics cache
+        redisClient.del(keySet), // Clear the key set itself
+    ];
+    
+    // Clear individual campaign cache if campaignId provided
+    if (campaignId) {
+        cachesToInvalidate.push(redisClient.del(`campaign:${campaignId}`));
+    }
+    
+    // Clear all paginated campaign cache keys
+    if (keys.length > 0) {
+        cachesToInvalidate.push(redisClient.del(...keys));
+    }
+    
+    // Also clear common cache keys that might be used by admin (with large limits)
+    // This ensures admin sees new/updated campaigns immediately
+    const commonLimits = [20, 50, 100, 500, 1000, 5000, 10000, 50000];
+    for (const limit of commonLimits) {
+        cachesToInvalidate.push(redisClient.del(`campaigns:all:page:0:limit:${limit}`));
+    }
+    
+    // Clear category caches if category provided
+    if (category) {
+        cachesToInvalidate.push(redisClient.del(`campaigns:category:${category}`));
+    }
+    
+    await Promise.all(cachesToInvalidate);
+};
+
 export const getTotalCampaignsCount = async () => {
     const totalKey = `campaigns:all:total`;
     
@@ -155,16 +193,7 @@ export const createCampaign = async (payload) => {
     }
 
     // Invalidate all campaign cache keys
-    const keySet = 'campaigns:all:keys';
-    const keys = await redisClient.sMembers(keySet);
-    if (keys.length > 0) {
-        await redisClient.del(...keys);
-    }
-    await redisClient.del(keySet);
-    await redisClient.del('campaigns:all:total');
-    await redisClient.del('campaigns:pending');
-    await redisClient.del('campaigns:map'); // Invalidate map cache
-    await redisClient.del('campaigns:map:statistics'); // Invalidate map statistics cache
+    await invalidateCampaignCache(campaign._id, campaign.category);
 
     // Populate hashtag before returning
     await campaign.populate('hashtag', 'name');
@@ -250,6 +279,87 @@ export const getCampaignsByCreator = async (creatorId) => {
     await redisClient.setEx(campaignKey, 300, JSON.stringify(campaigns));
     return campaigns;
 
+}
+
+/**
+ * Get campaigns by creator with pagination and permission-based filtering
+ * 
+ * @param {string} creatorId - User ID of campaign creator
+ * @param {string|null} viewerId - Current user ID (null if not logged in)
+ * @param {number} page - Page number (1-based)
+ * @param {number} limit - Items per page
+ * @returns {Promise<Object>} { campaigns, total, totalPages, currentPage, limit }
+ */
+export const getCampaignsByCreatorWithPagination = async (creatorId, viewerId = null, page = 1, limit = 10) => {
+    // Validate inputs
+    if (!creatorId) {
+        throw new Error('creatorId is required');
+    }
+    
+    // Ensure page and limit are positive integers
+    page = Math.max(1, parseInt(page) || 1);
+    limit = Math.max(1, Math.min(50, parseInt(limit) || 10)); // Max 50 per page
+    
+    const skip = (page - 1) * limit;
+    
+    // Determine if viewer is the owner
+    const isOwner = viewerId && viewerId.toString() === creatorId.toString();
+    
+    // Build query based on permission
+    let query = { creator: creatorId };
+    
+    if (!isOwner) {
+        // Public view: Only show active, completed, approved, voting campaigns
+        // Exclude: pending, rejected, cancelled
+        query.status = { $in: ['active', 'completed', 'approved', 'voting'] };
+    }
+    // Owner can see all campaigns including pending/rejected/cancelled
+    
+    // Cache key includes viewerId to differentiate owner vs public view
+    const cacheKey = `campaigns:creator:${creatorId}:viewer:${viewerId || 'public'}:page:${page}:limit:${limit}`;
+    const totalCacheKey = `campaigns:creator:${creatorId}:viewer:${viewerId || 'public'}:total`;
+    
+    // Check cache
+    const cached = await redisClient.get(cacheKey);
+    const cachedTotal = await redisClient.get(totalCacheKey);
+    
+    if (cached && cachedTotal) {
+        return {
+            campaigns: JSON.parse(cached),
+            total: parseInt(cachedTotal),
+            totalPages: Math.ceil(parseInt(cachedTotal) / limit),
+            currentPage: page,
+            limit
+        };
+    }
+    
+    // Query database with pagination
+    const [campaigns, total] = await Promise.all([
+        Campaign.find(query)
+            .select('-contact_info -expected_timeline -milestones -proof_documents_url') // Exclude sensitive/heavy fields
+            .populate("creator", "username fullname avatar")
+            .populate("hashtag", "name")
+            .sort({ createdAt: -1 }) // Newest first (uses index: { creator: 1, status: 1 })
+            .skip(skip)
+            .limit(limit)
+            .lean(),
+        Campaign.countDocuments(query)
+    ]);
+    
+    // Cache for 5 minutes (300 seconds)
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(campaigns));
+    await redisClient.setEx(totalCacheKey, 300, total.toString());
+    
+    // Invalidate old cache when new campaign is created/updated
+    // This is handled in createCampaign/updateCampaign functions
+    
+    return {
+        campaigns,
+        total,
+        totalPages: Math.ceil(total / limit),
+        currentPage: page,
+        limit
+    };
 }
 
 export const updateCampaign = async (campaignId, userId, payload) => {
@@ -498,22 +608,7 @@ export const approveCampaign = async (campaignId, adminId) => {
     await campaign.save();
 
     // Invalidate all campaign cache keys
-    const keySet = 'campaigns:all:keys';
-    const keys = await redisClient.sMembers(keySet);
-    const cachesToInvalidate = [
-        redisClient.del(`campaign:${campaignId}`),
-        redisClient.del('campaigns:pending'),
-        redisClient.del(`campaigns:category:${campaign.category}`)
-    ];
-    if (keys.length > 0) {
-        cachesToInvalidate.push(redisClient.del(...keys));
-    }
-        cachesToInvalidate.push(redisClient.del(keySet));
-        cachesToInvalidate.push(redisClient.del('campaigns:all:total'));
-        cachesToInvalidate.push(redisClient.del('campaigns:map')); // Invalidate map cache
-        cachesToInvalidate.push(redisClient.del('campaigns:map:statistics')); // Invalidate map statistics cache
-        
-        await Promise.all(cachesToInvalidate);
+    await invalidateCampaignCache(campaignId, campaign.category);
 
     return { success: true, campaign };
 }
@@ -548,22 +643,7 @@ export const rejectCampaign = async (campaignId, adminId, reason) => {
     await campaign.save();
 
     // Invalidate all campaign cache keys
-    const keySet = 'campaigns:all:keys';
-    const keys = await redisClient.sMembers(keySet);
-    const cachesToInvalidate = [
-        redisClient.del(`campaign:${campaignId}`),
-        redisClient.del('campaigns:pending'),
-        redisClient.del(`campaigns:category:${campaign.category}`)
-    ];
-    if (keys.length > 0) {
-        cachesToInvalidate.push(redisClient.del(...keys));
-    }
-        cachesToInvalidate.push(redisClient.del(keySet));
-        cachesToInvalidate.push(redisClient.del('campaigns:all:total'));
-        cachesToInvalidate.push(redisClient.del('campaigns:map')); // Invalidate map cache
-        cachesToInvalidate.push(redisClient.del('campaigns:map:statistics')); // Invalidate map statistics cache
-        
-        await Promise.all(cachesToInvalidate);
+    await invalidateCampaignCache(campaignId, campaign.category);
 
     return { success: true, campaign };
 }
