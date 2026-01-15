@@ -329,11 +329,23 @@ export const createCampaign = async (req, res) => {
 }
 
 export const updateCampaign = async (req, res) => {
+    const requestId = `update-ctrl-${req.params.id}-${Date.now()}`;
+    const campaignId = req.params.id;
+    const userId = req.user._id;
+
     try {
+        console.log(`[Campaign Update Controller] Starting update`, {
+            requestId,
+            campaignId,
+            userId,
+            payloadFields: Object.keys(req.body)
+        });
+
         const result = await campaignService.updateCampaign(
-            req.params.id,
-            req.user._id,
-            req.body
+            campaignId,
+            userId,
+            req.body,
+            requestId
         );
 
         if (!result.success) {
@@ -358,26 +370,94 @@ export const updateCampaign = async (req, res) => {
                     message: result.message
                 });
             }
+            if (result.error === 'CANNOT_CHANGE_STATUS_WHEN_PENDING') {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: result.message
+                });
+            }
+            if (result.error === 'STATUS_CHANGED_DURING_UPDATE' || result.error === 'CONCURRENT_UPDATE') {
+                return res.status(HTTP_STATUS.CONFLICT).json({
+                    message: result.message,
+                    currentStatus: result.currentStatus
+                });
+            }
+            if (result.error === 'UPDATE_FAILED') {
+                return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+                    message: "Failed to update campaign. Please try again."
+                });
+            }
+
+            // Fallback for unknown errors
+            console.error(`[Campaign Update Controller] Unknown error`, {
+                requestId,
+                campaignId,
+                error: result.error
+            });
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: result.message || "Failed to update campaign"
+            });
         }
 
-        // Publish tracking event
+        // Publish tracking event AFTER DB is committed and cache is invalidated
         try {
-            await trackingService.publishEvent("tracking:campaign:updated", {
+            const eventPayload = {
                 campaignId: result.campaign._id,
-                userId: req.user._id,
+                userId: userId,
                 title: result.campaign.title,
                 goal_amount: result.campaign.goal_amount,
                 current_amount: result.campaign.current_amount,
                 status: result.campaign.status,
                 category: result.campaign.category,
+                requestId: result.requestId || requestId,
+                timestamp: new Date().toISOString(),
+                // Add flag to indicate if this was a PENDING campaign update
+                wasPending: result.campaign.status === 'pending' || req.body.status === 'pending'
+            };
+
+            // Publish specific event for PENDING updates
+            if (result.campaign.status === 'pending') {
+                await trackingService.publishEvent("tracking:campaign:updated:when:pending", {
+                    ...eventPayload,
+                    updatedFields: Object.keys(req.body)
+                });
+            }
+
+            // Also publish general update event
+            await trackingService.publishEvent("tracking:campaign:updated", eventPayload);
+
+            console.log(`[Campaign Update Controller] Event published successfully`, {
+                requestId,
+                campaignId,
+                status: result.campaign.status
             });
         } catch (error) {
-            console.error('Error publishing event:', error);
+            // Log but don't fail - event publishing is non-critical
+            console.error(`[Campaign Update Controller] Error publishing event (non-critical)`, {
+                requestId,
+                campaignId,
+                error: error.message
+            });
         }
 
-        return res.status(HTTP_STATUS.OK).json({ campaign: result.campaign });
+        console.log(`[Campaign Update Controller] Update completed successfully`, {
+            requestId,
+            campaignId,
+            status: result.campaign.status
+        });
+
+        return res.status(HTTP_STATUS.OK).json({ 
+            campaign: result.campaign 
+        });
     } catch (error) {
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+        console.error(`[Campaign Update Controller] Unexpected error`, {
+            requestId,
+            campaignId,
+            error: error.message,
+            stack: error.stack
+        });
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
+            message: error.message 
+        });
     }
 };
 

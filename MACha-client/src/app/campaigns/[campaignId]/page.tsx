@@ -20,7 +20,7 @@ import CreatePostModal from '@/components/shared/CreatePostModal';
 import ReportModal from '@/components/shared/ReportModal';
 import { getReportsByItem } from '@/services/report.service';
 import { FaFlag } from 'react-icons/fa';
-import { ArrowLeft, Share2, Users } from 'lucide-react';
+import { ArrowLeft, Share2, Users, Edit } from 'lucide-react';
 import Link from 'next/link';
 
 function CampaignDetails() {
@@ -1142,12 +1142,55 @@ function CampaignDetails() {
                                 <span className="text-sm font-medium">Quay lại Tài chính Campaign</span>
                             </Link>
                         )}
-                        <h1 className="text-4xl md:text-5xl font-bold text-white mb-3 drop-shadow-lg break-words">
-                            {campaign.title}
-                        </h1>
-                        <p className="text-white/80 text-sm mb-3">
-                            Tổ chức bởi <span className="text-orange-300 font-bold">{campaign.contact_info?.fullname || campaign.creator?.fullname}</span>
-                        </p>
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                            <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-lg break-words flex-1">
+                                {campaign.title}
+                            </h1>
+                            {/* Edit Button - Only show for creator when campaign is PENDING */}
+                            {(() => {
+                                const isCreator = user && campaign && campaign.creator && 
+                                    (user._id === campaign.creator._id || user.id === campaign.creator._id);
+                                const canEdit = isCreator && campaign.status === 'pending';
+                                
+                                if (!canEdit) return null;
+                                
+                                return (
+                                    <Link
+                                        href={`/campaigns/${campaignId}/edit`}
+                                        className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/20 text-white transition-all group"
+                                        title="Chỉnh sửa chiến dịch (chỉ có thể chỉnh sửa khi đang chờ duyệt)"
+                                    >
+                                        <Edit className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                        <span className="text-sm font-medium hidden sm:inline">Chỉnh sửa</span>
+                                    </Link>
+                                );
+                            })()}
+                        </div>
+                        <div className="flex items-center gap-3 mb-3 flex-wrap">
+                            <p className="text-white/80 text-sm">
+                                Tổ chức bởi <span className="text-orange-300 font-bold">{campaign.contact_info?.fullname || campaign.creator?.fullname}</span>
+                            </p>
+                            {/* PENDING Badge - Only show for creator when campaign is PENDING */}
+                            {(() => {
+                                const isCreator = user && campaign && campaign.creator && 
+                                    (user._id === campaign.creator._id || user.id === campaign.creator._id);
+                                
+                                if (isCreator && campaign.status === 'pending') {
+                                    return (
+                                        <span 
+                                            className="inline-flex items-center gap-1.5 bg-yellow-500/20 backdrop-blur-sm px-3 py-1 rounded-full border border-yellow-400/30 text-yellow-200 text-xs font-medium"
+                                            title="Chiến dịch đang chờ admin duyệt. Bạn có thể chỉnh sửa chiến dịch."
+                                        >
+                                            <svg className="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                            </svg>
+                                            Đang chờ duyệt
+                                        </span>
+                                    );
+                                }
+                                return null;
+                            })()}
+                        </div>
                         {campaign.category && (
                             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20">
                                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

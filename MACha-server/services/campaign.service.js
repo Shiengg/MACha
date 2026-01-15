@@ -430,24 +430,159 @@ export const getCampaignsByCreatorWithPagination = async (creatorId, viewerId = 
     };
 }
 
-export const updateCampaign = async (campaignId, userId, payload) => {
+export const updateCampaign = async (campaignId, userId, payload, requestId = null) => {
+    const logRequestId = requestId || `update-${campaignId}-${Date.now()}`;
+    
+    console.log(`[Campaign Update] Starting update process`, {
+        requestId: logRequestId,
+        campaignId,
+        userId,
+        payloadFields: Object.keys(payload),
+        timestamp: new Date().toISOString()
+    });
+
+    // Step 1: Find campaign with optimistic locking check
     const campaign = await Campaign.findById(campaignId);
 
     if (!campaign) {
+        console.log(`[Campaign Update] Campaign not found`, {
+            requestId: logRequestId,
+            campaignId
+        });
         return { success: false, error: 'NOT_FOUND' };
     }
 
+    // Step 2: Check permission - only creator can update
     if (campaign.creator.toString() !== userId.toString()) {
+        console.log(`[Campaign Update] Forbidden - not creator`, {
+            requestId: logRequestId,
+            campaignId,
+            userId,
+            creatorId: campaign.creator.toString()
+        });
         return { success: false, error: 'FORBIDDEN' };
     }
 
     const oldCategory = campaign.category;
     const oldStatus = campaign.status;
+    const oldUpdatedAt = campaign.updatedAt;
 
+    console.log(`[Campaign Update] Campaign found`, {
+        requestId: logRequestId,
+        campaignId,
+        currentStatus: oldStatus,
+        currentAmount: campaign.current_amount,
+        category: oldCategory
+    });
+
+    // Step 3: Handle PENDING status - Creator can edit but cannot change status
+    if (oldStatus === 'pending') {
+        // Creator cannot change status when pending (only admin can approve/reject)
+        if (payload.status !== undefined && payload.status !== 'pending') {
+            console.log(`[Campaign Update] Invalid status change attempt when pending`, {
+                requestId: logRequestId,
+                campaignId,
+                currentStatus: oldStatus,
+                attemptedStatus: payload.status
+            });
+            return {
+                success: false,
+                error: 'CANNOT_CHANGE_STATUS_WHEN_PENDING',
+                message: 'Cannot change campaign status when pending. Only admin can approve or reject the campaign.'
+            };
+        }
+
+        // Remove status from payload if it's set to pending (redundant)
+        const { status, ...payloadWithoutStatus } = payload;
+        const finalPayload = status === 'pending' ? payloadWithoutStatus : payload;
+
+        // Use atomic update with status check to prevent race condition
+        // This ensures campaign is still pending when we update
+        const updateResult = await Campaign.findOneAndUpdate(
+            {
+                _id: campaignId,
+                status: 'pending', // Atomic check - only update if still pending
+                creator: userId   // Double check creator
+            },
+            finalPayload,
+            { 
+                new: true, 
+                runValidators: true 
+            }
+        );
+
+        if (!updateResult) {
+            // Campaign status changed or not found - possible race condition
+            const currentCampaign = await Campaign.findById(campaignId);
+            if (!currentCampaign) {
+                console.log(`[Campaign Update] Campaign not found after atomic check`, {
+                    requestId: logRequestId,
+                    campaignId
+                });
+                return { success: false, error: 'NOT_FOUND' };
+            }
+            
+            if (currentCampaign.status !== 'pending') {
+                console.log(`[Campaign Update] Race condition detected - status changed during update`, {
+                    requestId: logRequestId,
+                    campaignId,
+                    oldStatus: 'pending',
+                    currentStatus: currentCampaign.status
+                });
+                return {
+                    success: false,
+                    error: 'STATUS_CHANGED_DURING_UPDATE',
+                    message: `Campaign status changed from pending to ${currentCampaign.status} during update. Please refresh and try again.`,
+                    currentStatus: currentCampaign.status
+                };
+            }
+            
+            // Should not reach here, but handle just in case
+            return { success: false, error: 'UPDATE_FAILED' };
+        }
+
+        console.log(`[Campaign Update] Database updated successfully (PENDING)`, {
+            requestId: logRequestId,
+            campaignId,
+            updatedFields: Object.keys(finalPayload),
+            oldStatus,
+            newStatus: updateResult.status
+        });
+
+        // Step 4: Invalidate cache AFTER DB is committed
+        try {
+            await invalidateCampaignCache(
+                campaignId,
+                updateResult.category || oldCategory,
+                logRequestId,
+                userId.toString()
+            );
+            console.log(`[Campaign Update] Cache invalidated successfully (PENDING)`, {
+                requestId: logRequestId,
+                campaignId,
+                category: updateResult.category || oldCategory
+            });
+        } catch (cacheError) {
+            // Log but don't fail - cache will be stale but DB is correct
+            console.error(`[Campaign Update] Cache invalidation failed (non-critical)`, {
+                requestId: logRequestId,
+                campaignId,
+                error: cacheError.message
+            });
+        }
+
+        return { 
+            success: true, 
+            campaign: updateResult,
+            requestId: logRequestId
+        };
+    }
+
+    // Step 4: Handle campaigns with donations (current_amount > 0)
     if (campaign.current_amount > 0) {
         const allowedFields = [
             'description',
-            'gallery_images',  // Changed from media_url
+            'gallery_images',
             'proof_documents_url',
             'status'
         ];
@@ -479,66 +614,119 @@ export const updateCampaign = async (campaignId, userId, payload) => {
             };
         }
 
-        const updatedCampaign = await Campaign.findByIdAndUpdate(
-            campaignId,
+        // Use atomic update with optimistic locking
+        const updatedCampaign = await Campaign.findOneAndUpdate(
+            {
+                _id: campaignId,
+                updatedAt: oldUpdatedAt // Optimistic lock - ensure no concurrent updates
+            },
             updates,
             { new: true, runValidators: true }
         );
 
-        // Invalidate all campaign cache keys
-        const keySet = 'campaigns:all:keys';
-        const keys = await redisClient.sMembers(keySet);
-        const cachesToInvalidate = [
-            redisClient.del(`campaign:${campaignId}`),
-            redisClient.del(`campaigns:category:${oldCategory}`)
-        ];
-        if (keys.length > 0) {
-            cachesToInvalidate.push(redisClient.del(...keys));
+        if (!updatedCampaign) {
+            // Optimistic lock failed - concurrent update detected
+            const currentCampaign = await Campaign.findById(campaignId);
+            console.log(`[Campaign Update] Optimistic lock failed - concurrent update detected`, {
+                requestId: logRequestId,
+                campaignId,
+                oldUpdatedAt,
+                currentUpdatedAt: currentCampaign?.updatedAt
+            });
+            return {
+                success: false,
+                error: 'CONCURRENT_UPDATE',
+                message: 'Campaign was updated by another process. Please refresh and try again.'
+            };
         }
-        cachesToInvalidate.push(redisClient.del(keySet));
-        cachesToInvalidate.push(redisClient.del('campaigns:all:total'));
 
-        if (oldStatus === 'pending') {
-            cachesToInvalidate.push(redisClient.del('campaigns:pending'));
+        console.log(`[Campaign Update] Database updated successfully (with donations)`, {
+            requestId: logRequestId,
+            campaignId,
+            updatedFields: Object.keys(updates),
+            oldStatus,
+            newStatus: updatedCampaign.status
+        });
+
+        // Invalidate cache AFTER DB commit
+        try {
+            await invalidateCampaignCache(
+                campaignId,
+                updatedCampaign.category || oldCategory,
+                logRequestId,
+                userId.toString()
+            );
+        } catch (cacheError) {
+            console.error(`[Campaign Update] Cache invalidation failed (non-critical)`, {
+                requestId: logRequestId,
+                campaignId,
+                error: cacheError.message
+            });
         }
-        cachesToInvalidate.push(redisClient.del('campaigns:map')); // Invalidate map cache
-        cachesToInvalidate.push(redisClient.del('campaigns:map:statistics')); // Invalidate map statistics cache
 
-        await Promise.all(cachesToInvalidate);
-
-        return { success: true, campaign: updatedCampaign };
+        return { 
+            success: true, 
+            campaign: updatedCampaign,
+            requestId: logRequestId
+        };
     }
 
-    const updatedCampaign = await Campaign.findByIdAndUpdate(
-        campaignId,
+    // Step 5: Handle campaigns without donations (current_amount = 0) and not pending
+    // Use atomic update with optimistic locking
+    const updatedCampaign = await Campaign.findOneAndUpdate(
+        {
+            _id: campaignId,
+            updatedAt: oldUpdatedAt // Optimistic lock
+        },
         payload,
         { new: true, runValidators: true }
     );
 
-    // Invalidate all campaign cache keys
-    const keySet = 'campaigns:all:keys';
-    const keys = await redisClient.sMembers(keySet);
-    const cachesToInvalidate = [
-        redisClient.del(`campaign:${campaignId}`),
-        redisClient.del(`campaigns:category:${oldCategory}`)
-    ];
-    if (keys.length > 0) {
-        cachesToInvalidate.push(redisClient.del(...keys));
+    if (!updatedCampaign) {
+        // Optimistic lock failed
+        const currentCampaign = await Campaign.findById(campaignId);
+        console.log(`[Campaign Update] Optimistic lock failed - concurrent update detected`, {
+            requestId: logRequestId,
+            campaignId,
+            oldUpdatedAt,
+            currentUpdatedAt: currentCampaign?.updatedAt
+        });
+        return {
+            success: false,
+            error: 'CONCURRENT_UPDATE',
+            message: 'Campaign was updated by another process. Please refresh and try again.'
+        };
     }
-    cachesToInvalidate.push(redisClient.del(keySet));
 
-    if (payload.category && payload.category !== oldCategory) {
-        cachesToInvalidate.push(redisClient.del(`campaigns:category:${payload.category}`));
+    console.log(`[Campaign Update] Database updated successfully (no donations)`, {
+        requestId: logRequestId,
+        campaignId,
+        updatedFields: Object.keys(payload),
+        oldStatus,
+        newStatus: updatedCampaign.status
+    });
+
+    // Invalidate cache AFTER DB commit
+    try {
+        await invalidateCampaignCache(
+            campaignId,
+            updatedCampaign.category || oldCategory,
+            logRequestId,
+            userId.toString()
+        );
+    } catch (cacheError) {
+        console.error(`[Campaign Update] Cache invalidation failed (non-critical)`, {
+            requestId: logRequestId,
+            campaignId,
+            error: cacheError.message
+        });
     }
 
-    if (oldStatus === 'pending' || payload.status === 'pending') {
-        cachesToInvalidate.push(redisClient.del('campaigns:pending'));
-    }
-    cachesToInvalidate.push(redisClient.del('campaigns:map')); // Invalidate map cache
-
-    await Promise.all(cachesToInvalidate);
-
-    return { success: true, campaign: updatedCampaign };
+    return { 
+        success: true, 
+        campaign: updatedCampaign,
+        requestId: logRequestId
+    };
 }
 
 export const deleteCampaign = async (campaignId, userId) => {

@@ -118,14 +118,33 @@ export interface CreateCampaignPayload {
 }
 
 export interface UpdateCampaignPayload {
+  // Contact Information
+  contact_info?: {
+    fullname?: string;
+    phone?: string;
+    email?: string;
+    social_links?: {
+      facebook?: string;
+      instagram?: string;
+      twitter?: string;
+      website?: string;
+    };
+    address?: string;
+  };
+  // Campaign Information
   title?: string;
   description?: string;
   goal_amount?: number;
+  start_date?: string;
   end_date?: string;
   category?: string;
   banner_image?: string;
   gallery_images?: string[];
   proof_documents_url?: string;
+  milestones?: Milestone[];
+  expected_timeline?: TimelineItem[];
+  hashtag?: string;
+  location_name?: string;
 }
 
 export interface CategoryWithCount {
