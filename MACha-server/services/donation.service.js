@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Donation from "../models/donation.js";
 import Campaign from "../models/campaign.js";
 import Escrow from "../models/escrow.js";
@@ -296,12 +297,22 @@ export const createDonation = async (campaignId, donorId, donationData) => {
         companion: companion ? companion._id : null,
     });
     
-    campaign.current_amount += amount;
-    campaign.completed_donations_count += 1;
-    await campaign.save();
+    // ✅ FIX: Sử dụng $inc operator để đảm bảo atomic update, tránh race condition
+    await Campaign.findByIdAndUpdate(
+        campaignId,
+        { 
+            $inc: { 
+                current_amount: amount,
+                completed_donations_count: 1
+            } 
+        }
+    );
+    
+    // Reload campaign để có giá trị mới nhất cho các operations sau
+    const updatedCampaign = await Campaign.findById(campaignId);
     
     try {
-        await checkAndCreateMilestoneWithdrawalRequest(campaign);
+        await checkAndCreateMilestoneWithdrawalRequest(updatedCampaign);
     } catch (milestoneError) {
         console.error('Error checking milestone withdrawal request:', milestoneError);
     }
@@ -325,29 +336,29 @@ export const createDonation = async (campaignId, donorId, donationData) => {
             is_anonymous: donation.is_anonymous,
             donation: populatedDonation,
             campaign: {
-                _id: campaign._id,
-                title: campaign.title,
-                current_amount: campaign.current_amount,
-                goal_amount: campaign.goal_amount,
-                completed_donations_count: campaign.completed_donations_count
+                _id: updatedCampaign._id,
+                title: updatedCampaign.title,
+                current_amount: updatedCampaign.current_amount,
+                goal_amount: updatedCampaign.goal_amount,
+                completed_donations_count: updatedCampaign.completed_donations_count
             }
         });
         
         await trackingService.publishEvent("tracking:campaign:updated", {
-            campaignId: campaign._id.toString(),
+            campaignId: updatedCampaign._id.toString(),
             userId: donorId.toString(),
-            title: campaign.title,
-            goal_amount: campaign.goal_amount,
-            current_amount: campaign.current_amount,
-            completed_donations_count: campaign.completed_donations_count,
-            status: campaign.status,
-            category: campaign.category,
+            title: updatedCampaign.title,
+            goal_amount: updatedCampaign.goal_amount,
+            current_amount: updatedCampaign.current_amount,
+            completed_donations_count: updatedCampaign.completed_donations_count,
+            status: updatedCampaign.status,
+            category: updatedCampaign.category,
         });
     } catch (eventError) {
         console.error('Error publishing donation created event:', eventError);
     }
     
-    return { donation, campaign };
+    return { donation, campaign: updatedCampaign };
 }
 
 export const getDonationsByCampaign = async (campaignId) => {
@@ -472,41 +483,52 @@ export const getDonationByOrderInvoice = async (orderInvoiceNumber) => {
 }
 
 export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepayData) => {
-    const donation = await Donation.findOne({ order_invoice_number: orderInvoiceNumber });
-    if (!donation) {
+    // ✅ FIX: Đọc donation trước để lấy oldPaymentStatus
+    const existingDonation = await Donation.findOne({ order_invoice_number: orderInvoiceNumber });
+    if (!existingDonation) {
         return null;
     }
 
-    if (donation.payment_status === 'completed') {
-        const campaign = await Campaign.findById(donation.campaign);
-        return { donation, campaign };
-    }
-    
-    if ((status === 'cancelled' || status === 'failed') && donation.payment_status === 'completed') {
-        const campaign = await Campaign.findById(donation.campaign);
-        return { donation, campaign };
+    const oldPaymentStatus = existingDonation.payment_status;
+
+    // Early return nếu đã completed và status mới cũng là completed (idempotency)
+    if (oldPaymentStatus === 'completed' && status === 'completed') {
+        const campaign = await Campaign.findById(existingDonation.campaign);
+        return { donation: existingDonation, campaign, alreadyProcessed: true };
     }
 
-    if (status === 'completed' && (donation.payment_status === 'cancelled' || donation.payment_status === 'failed')) {
+    // Early return cho các trường hợp không hợp lệ
+    if (oldPaymentStatus === 'completed' && (status === 'cancelled' || status === 'failed')) {
+        const campaign = await Campaign.findById(existingDonation.campaign);
+        return { donation: existingDonation, campaign };
     }
-    else if ((status === 'cancelled' || status === 'failed') && donation.payment_status === 'pending') {
-        if (sepayData?.transaction_id || donation.sepay_transaction_id) {
-            const campaign = await Campaign.findById(donation.campaign);
-            return { donation, campaign };
+
+    if ((status === 'cancelled' || status === 'failed') && oldPaymentStatus === 'pending') {
+        if (sepayData?.transaction_id || existingDonation.sepay_transaction_id) {
+            const campaign = await Campaign.findById(existingDonation.campaign);
+            return { donation: existingDonation, campaign };
         }
         
-        if (donation.paid_at) {
-            const campaign = await Campaign.findById(donation.campaign);
-            return { donation, campaign };
+        if (existingDonation.paid_at) {
+            const campaign = await Campaign.findById(existingDonation.campaign);
+            return { donation: existingDonation, campaign };
         }
     }
-    else if ((status === 'cancelled' || status === 'failed') && (donation.payment_status === 'cancelled' || donation.payment_status === 'failed')) {
-        const campaign = await Campaign.findById(donation.campaign);
-        return { donation, campaign };
+
+    if ((status === 'cancelled' || status === 'failed') && 
+        (oldPaymentStatus === 'cancelled' || oldPaymentStatus === 'failed')) {
+        const campaign = await Campaign.findById(existingDonation.campaign);
+        return { donation: existingDonation, campaign };
     }
-    
-    const oldPaymentStatus = donation.payment_status;
-    
+
+    if (status === 'completed' && (oldPaymentStatus === 'cancelled' || oldPaymentStatus === 'failed')) {
+        // Không cho phép completed nếu đã cancelled/failed
+        const campaign = await Campaign.findById(existingDonation.campaign);
+        return { donation: existingDonation, campaign };
+    }
+
+    // ✅ FIX: Sử dụng findOneAndUpdate với condition để đảm bảo idempotency (atomic check)
+    // Chỉ update nếu payment_status chưa phải là 'completed' (tránh duplicate processing)
     const updateData = {
         payment_status: status,
         sepay_response_data: sepayData
@@ -524,35 +546,91 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
         updateData.cancelled_at = new Date();
     }
 
-    Object.assign(donation, updateData);
-    await donation.save();
+    // ✅ FIX: Atomic update - chỉ update nếu payment_status chưa là 'completed' (khi status === 'completed')
+    // Điều này đảm bảo idempotency: nếu callback được gọi nhiều lần, chỉ xử lý 1 lần
+    const donation = await Donation.findOneAndUpdate(
+        { 
+            order_invoice_number: orderInvoiceNumber,
+            // Chỉ update nếu chưa completed (tránh duplicate processing)
+            ...(status === 'completed' ? { payment_status: { $ne: 'completed' } } : {})
+        },
+        updateData,
+        { new: true }
+    );
+
+    if (!donation) {
+        // Donation đã được xử lý bởi request khác (nếu status === 'completed')
+        if (status === 'completed') {
+            const alreadyProcessedDonation = await Donation.findOne({ order_invoice_number: orderInvoiceNumber });
+            if (alreadyProcessedDonation && alreadyProcessedDonation.payment_status === 'completed') {
+                const campaign = await Campaign.findById(alreadyProcessedDonation.campaign);
+                return { donation: alreadyProcessedDonation, campaign, alreadyProcessed: true };
+            }
+        }
+        return null;
+    }
     
     const campaign = await Campaign.findById(donation.campaign);
+    if (!campaign) {
+        return { donation };
+    }
     
-    if (status === 'completed' && oldPaymentStatus !== 'completed' && campaign) {
-        campaign.current_amount += donation.amount;
-        campaign.completed_donations_count += 1;
-        await campaign.save();
+    // ✅ FIX: Sử dụng MongoDB Transaction cho complex operations khi status === 'completed'
+    // Đảm bảo atomic: update donation + campaign + milestone
+    if (status === 'completed' && oldPaymentStatus !== 'completed') {
+        const session = await mongoose.startSession();
+        session.startTransaction();
         
         try {
-            await checkAndCreateMilestoneWithdrawalRequest(campaign);
-        } catch (milestoneError) {      
-            console.error('Error checking milestone withdrawal request:', milestoneError);
-        }
-        
-        try {
-            await trackingService.publishEvent("tracking:campaign:updated", {
-                campaignId: campaign._id.toString(),
-                userId: donation.donor.toString(),
-                title: campaign.title,
-                goal_amount: campaign.goal_amount,
-                current_amount: campaign.current_amount,
-                completed_donations_count: campaign.completed_donations_count,
-                status: campaign.status,
-                category: campaign.category,
-            });
-        } catch (campaignEventError) {
-            console.error('Error publishing campaign updated event:', campaignEventError);
+            // ✅ FIX: Sử dụng $inc operator để đảm bảo atomic update, tránh race condition
+            await Campaign.findByIdAndUpdate(
+                campaign._id,
+                { 
+                    $inc: { 
+                        current_amount: donation.amount,
+                        completed_donations_count: 1
+                    } 
+                },
+                { session }
+            );
+            
+            // Reload campaign để có giá trị mới nhất
+            const campaignWithLatestData = await Campaign.findById(campaign._id).session(session);
+            
+            // Check và tạo milestone withdrawal request trong transaction
+            try {
+                await checkAndCreateMilestoneWithdrawalRequest(campaignWithLatestData);
+            } catch (milestoneError) {      
+                console.error('Error checking milestone withdrawal request:', milestoneError);
+                // Không throw error, chỉ log - milestone có thể retry sau
+            }
+            
+            await session.commitTransaction();
+            
+            // Publish events sau khi transaction commit thành công
+            try {
+                await trackingService.publishEvent("tracking:campaign:updated", {
+                    campaignId: campaignWithLatestData._id.toString(),
+                    userId: donation.donor.toString(),
+                    title: campaignWithLatestData.title,
+                    goal_amount: campaignWithLatestData.goal_amount,
+                    current_amount: campaignWithLatestData.current_amount,
+                    completed_donations_count: campaignWithLatestData.completed_donations_count,
+                    status: campaignWithLatestData.status,
+                    category: campaignWithLatestData.category,
+                });
+            } catch (campaignEventError) {
+                console.error('Error publishing campaign updated event:', campaignEventError);
+            }
+            
+            // Update campaign reference để return đúng giá trị
+            Object.assign(campaign, campaignWithLatestData);
+        } catch (error) {
+            await session.abortTransaction();
+            console.error('Transaction failed in updateSepayDonationStatus:', error);
+            throw error;
+        } finally {
+            session.endSession();
         }
     }
     
@@ -563,7 +641,10 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
         await redisClient.del(`eligible_voters:${donation.campaign}`);
     }
     
-    if (status === 'completed' && campaign) {
+    // Reload campaign để có giá trị mới nhất (sau transaction)
+    const finalCampaign = await Campaign.findById(donation.campaign);
+    
+    if (status === 'completed' && finalCampaign) {
         try {
             const populatedDonation = await Donation.findById(donation._id)
                 .populate("donor", "username avatar_url fullname");
@@ -580,12 +661,11 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
                 is_anonymous: donation.is_anonymous,
                 donation: populatedDonation,
                 campaign: {
-                    _id: campaign._id,
-                    title: campaign.title,
-                    current_amount: campaign.current_amount,
-                    goal_amount: campaign.goal_amount,
-                    completed_donations_count: campaign.completed_donations_count
-                    
+                    _id: finalCampaign._id,
+                    title: finalCampaign.title,
+                    current_amount: finalCampaign.current_amount,
+                    goal_amount: finalCampaign.goal_amount,
+                    completed_donations_count: finalCampaign.completed_donations_count
                 }
             });
             
@@ -599,11 +679,11 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
                 is_anonymous: donation.is_anonymous,
                 donation: populatedDonation,
                 campaign: {
-                    _id: campaign._id,
-                    title: campaign.title,
-                    current_amount: campaign.current_amount,
-                    goal_amount: campaign.goal_amount,
-                    completed_donations_count: campaign.completed_donations_count
+                    _id: finalCampaign._id,
+                    title: finalCampaign.title,
+                    current_amount: finalCampaign.current_amount,
+                    goal_amount: finalCampaign.goal_amount,
+                    completed_donations_count: finalCampaign.completed_donations_count
                 }
             });
         } catch (eventError) {
@@ -674,5 +754,7 @@ export const updateSepayDonationStatus = async (orderInvoiceNumber, status, sepa
         }
     }
     
-    return { donation, campaign };
+    // Reload campaign để có giá trị mới nhất trước khi return
+    const finalCampaignForReturn = await Campaign.findById(donation.campaign);
+    return { donation, campaign: finalCampaignForReturn || campaign };
 }

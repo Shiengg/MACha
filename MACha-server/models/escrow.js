@@ -119,5 +119,24 @@ escrowSchema.index({ requested_by: 1, request_status: 1 });
 escrowSchema.index({ voting_end_date: 1, request_status: 1 });
 escrowSchema.index({ request_status: 1, createdAt: -1 });
 
+escrowSchema.index(
+    { campaign: 1, milestone_percentage: 1, auto_created: 1 },
+    { 
+        unique: true,
+        partialFilterExpression: {
+            auto_created: true,
+            request_status: { 
+                $in: [
+                    'pending_voting', 
+                    'voting_in_progress', 
+                    'voting_completed', 
+                    'admin_approved'
+                ] 
+            }
+        },
+        name: 'unique_milestone_withdrawal_request'
+    }
+);
+
 const Escrow = mongoose.model("Escrow", escrowSchema);
 export default Escrow;

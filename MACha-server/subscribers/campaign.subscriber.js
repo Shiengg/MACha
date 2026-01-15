@@ -1,4 +1,5 @@
 import { createSubcriber } from "../config/redis.js";
+import { invalidateCampaignCache } from "../services/campaign.service.js";
 
 export const initCampaignSubscriber = async (io) => {
     const sub = await createSubcriber();
@@ -41,15 +42,51 @@ export const initCampaignSubscriber = async (io) => {
         }
     });
 
-    await sub.subscribe("tracking:campaign:approved", (message) => {
+    await sub.subscribe("tracking:campaign:approved", async (message) => {
+        const requestId = `subscriber-${Date.now()}`;
         try {
             const event = JSON.parse(message);
-            console.log("✅ Campaign approved event received:", event.campaignId);
+            console.log(`[Campaign Subscriber] Campaign approved event received`, {
+                requestId,
+                campaignId: event.campaignId,
+                eventRequestId: event.requestId,
+                timestamp: event.timestamp || new Date().toISOString()
+            });
+
+            // Defensive cache invalidation - ensure cache is invalidated even if
+            // it was missed in the main approval flow
+            try {
+                await invalidateCampaignCache(
+                    event.campaignId, 
+                    event.category, 
+                    `${requestId}-defensive`,
+                    event.creatorId // Include creatorId for creator cache invalidation
+                );
+                console.log(`[Campaign Subscriber] Defensive cache invalidation completed`, {
+                    requestId,
+                    campaignId: event.campaignId,
+                    creatorId: event.creatorId
+                });
+            } catch (cacheError) {
+                // Log but don't fail - this is defensive
+                console.error(`[Campaign Subscriber] Defensive cache invalidation failed (non-critical)`, {
+                    requestId,
+                    campaignId: event.campaignId,
+                    error: cacheError.message
+                });
+            }
 
             io.emit("campaign:approved", event);
-            console.log("✅ Emitted campaign:approved to Socket.IO clients\n");
+            console.log(`[Campaign Subscriber] Emitted campaign:approved to Socket.IO clients`, {
+                requestId,
+                campaignId: event.campaignId
+            });
         } catch (error) {
-            console.error('❌ Error parsing campaign approved event:', error);
+            console.error(`[Campaign Subscriber] Error parsing campaign approved event`, {
+                requestId,
+                error: error.message,
+                stack: error.stack
+            });
         }
     });
 

@@ -482,10 +482,21 @@ export const getPendingCampaigns = async (req, res) => {
 };
 
 export const approveCampaign = async (req, res) => {
+    const requestId = `approve-ctrl-${req.params.id}-${Date.now()}`;
+    const adminId = req.user._id;
+    const campaignId = req.params.id;
+
     try {
+        console.log(`[Campaign Approval Controller] Starting approval`, {
+            requestId,
+            campaignId,
+            adminId
+        });
+
+        // Step 1: Approve campaign (DB update + cache invalidation)
         const result = await campaignService.approveCampaign(
-            req.params.id,
-            req.user._id
+            campaignId,
+            adminId
         );
 
         if (!result.success) {
@@ -501,17 +512,36 @@ export const approveCampaign = async (req, res) => {
             }
         }
 
+        // Step 2: Publish event AFTER DB is committed and cache is invalidated
+        // This ensures event consumers see the correct state
         try {
-            await trackingService.publishEvent("tracking:campaign:approved", {
+            const eventPayload = {
                 campaignId: result.campaign._id,
-                adminId: req.user._id,
+                adminId: adminId,
                 creatorId: result.campaign.creator,
                 title: result.campaign.title,
                 category: result.campaign.category,
-                approved_at: result.campaign.approved_at
+                approved_at: result.campaign.approved_at,
+                oldStatus: 'pending',
+                newStatus: 'active',
+                requestId: result.requestId || requestId,
+                timestamp: new Date().toISOString()
+            };
+
+            console.log(`[Campaign Approval Controller] Publishing event`, {
+                requestId,
+                campaignId,
+                eventPayload
             });
 
-            // Fetch creator data for email
+            await trackingService.publishEvent("tracking:campaign:approved", eventPayload);
+
+            console.log(`[Campaign Approval Controller] Event published successfully`, {
+                requestId,
+                campaignId
+            });
+
+            // Step 3: Push email job to queue
             const creator = await User.findById(result.campaign.creator).select('email username');
             const job = createJob(
                 JOB_TYPES.CAMPAIGN_APPROVED,
@@ -521,24 +551,51 @@ export const approveCampaign = async (req, res) => {
                     campaignTitle: result.campaign.title,
                     campaignId: result.campaign._id.toString(),
                     creatorId: result.campaign.creator.toString(),
-                    adminId: req.user._id.toString()
+                    adminId: adminId.toString()
                 },
                 {
-                    userId: req.user._id.toString(),
-                    source: JOB_SOURCE.ADMIN
+                    userId: adminId.toString(),
+                    source: JOB_SOURCE.ADMIN,
+                    requestId
                 }
             );
             await queueService.pushJob(job);
+
+            console.log(`[Campaign Approval Controller] Job pushed to queue`, {
+                requestId,
+                campaignId,
+                jobType: JOB_TYPES.CAMPAIGN_APPROVED
+            });
         } catch (eventError) {
-            console.error('Error publishing event or pushing job:', eventError);
+            // Log error but don't fail the request - DB is already updated
+            console.error(`[Campaign Approval Controller] Error publishing event or pushing job (non-critical)`, {
+                requestId,
+                campaignId,
+                error: eventError.message,
+                stack: eventError.stack
+            });
         }
+
+        console.log(`[Campaign Approval Controller] Approval completed successfully`, {
+            requestId,
+            campaignId,
+            wasAlreadyApproved: result.wasAlreadyApproved || false
+        });
 
         return res.status(HTTP_STATUS.OK).json({
             message: "Campaign approved successfully",
             campaign: result.campaign
         });
     } catch (error) {
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+        console.error(`[Campaign Approval Controller] Unexpected error`, {
+            requestId,
+            campaignId,
+            error: error.message,
+            stack: error.stack
+        });
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
+            message: error.message 
+        });
     }
 };
 

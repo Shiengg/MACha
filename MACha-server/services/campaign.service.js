@@ -8,42 +8,110 @@ import {
     splitSearchWords 
 } from "../utils/similarity.js";
 
-const invalidateCampaignCache = async (campaignId = null, category = null) => {
-    const keySet = 'campaigns:all:keys';
-    const keys = await redisClient.sMembers(keySet);
-    
-    // Clear all campaign-related cache keys
-    const cachesToInvalidate = [
-        redisClient.del('campaigns:pending'), // Clear pending campaigns cache
-        redisClient.del('campaigns:all:total'), // Clear total count cache
-        redisClient.del('campaigns:map'), // Invalidate map cache
-        redisClient.del('campaigns:map:statistics'), // Invalidate map statistics cache
-        redisClient.del(keySet), // Clear the key set itself
-    ];
-    
-    // Clear individual campaign cache if campaignId provided
-    if (campaignId) {
-        cachesToInvalidate.push(redisClient.del(`campaign:${campaignId}`));
+export const invalidateCampaignCache = async (campaignId = null, category = null, requestId = null, creatorId = null) => {
+    const logContext = {
+        requestId: requestId || `cache-inv-${Date.now()}`,
+        campaignId,
+        category,
+        creatorId,
+        timestamp: new Date().toISOString()
+    };
+
+    console.log(`[Cache Invalidation] Starting cache invalidation`, logContext);
+
+    try {
+        const keySet = 'campaigns:all:keys';
+        const keys = await redisClient.sMembers(keySet);
+        
+        const invalidatedKeys = [];
+        
+        // Clear all campaign-related cache keys
+        const cachesToInvalidate = [
+            redisClient.del('campaigns:pending'), // Clear pending campaigns cache
+            redisClient.del('campaigns:all:total'), // Clear total count cache
+            redisClient.del('campaigns:map'), // Invalidate map cache
+            redisClient.del('campaigns:map:statistics'), // Invalidate map statistics cache
+        ];
+        
+        invalidatedKeys.push(
+            'campaigns:pending',
+            'campaigns:all:total',
+            'campaigns:map',
+            'campaigns:map:statistics'
+        );
+        
+        // Clear individual campaign cache if campaignId provided
+        if (campaignId) {
+            const campaignKey = `campaign:${campaignId}`;
+            cachesToInvalidate.push(redisClient.del(campaignKey));
+            invalidatedKeys.push(campaignKey);
+        }
+        
+        // Clear all paginated campaign cache keys from key set
+        if (keys.length > 0) {
+            cachesToInvalidate.push(redisClient.del(...keys));
+            invalidatedKeys.push(...keys);
+        }
+        
+        // Also clear common cache keys that might be used by admin (with large limits)
+        // This ensures admin sees new/updated campaigns immediately
+        const commonLimits = [20, 50, 100, 500, 1000, 5000, 10000, 50000];
+        for (const limit of commonLimits) {
+            const pageKey = `campaigns:all:page:0:limit:${limit}`;
+            cachesToInvalidate.push(redisClient.del(pageKey));
+            invalidatedKeys.push(pageKey);
+        }
+        
+        // Clear category caches if category provided
+        if (category) {
+            const categoryKey = `campaigns:category:${category}`;
+            cachesToInvalidate.push(redisClient.del(categoryKey));
+            invalidatedKeys.push(categoryKey);
+        }
+        
+        // Clear creator-based cache keys if creatorId provided
+        // This is important when campaign status changes (pending -> active)
+        // because creator cache filters by status
+        if (creatorId) {
+            // Clear basic creator cache
+            const creatorKey = `campaigns:creator:${creatorId}`;
+            cachesToInvalidate.push(redisClient.del(creatorKey));
+            invalidatedKeys.push(creatorKey);
+            
+            // Note: Creator pagination caches have viewer-specific keys
+            // We can't easily invalidate all viewer combinations without SCAN
+            // But the basic creator cache invalidation will help
+            // For pagination caches, they'll be repopulated on next request with correct data
+        }
+        
+        // Clear the key set itself
+        cachesToInvalidate.push(redisClient.del(keySet));
+        invalidatedKeys.push(keySet);
+        
+        // Execute all deletions in parallel
+        const results = await Promise.all(cachesToInvalidate);
+        const totalDeleted = results.reduce((sum, count) => sum + count, 0);
+        
+        console.log(`[Cache Invalidation] Cache invalidated successfully`, {
+            ...logContext,
+            totalKeysInvalidated: invalidatedKeys.length,
+            totalDeleted,
+            sampleKeys: invalidatedKeys.slice(0, 10) // Log first 10 keys as sample
+        });
+        
+        return {
+            success: true,
+            keysInvalidated: invalidatedKeys.length,
+            totalDeleted
+        };
+    } catch (error) {
+        console.error(`[Cache Invalidation] Error during cache invalidation`, {
+            ...logContext,
+            error: error.message,
+            stack: error.stack
+        });
+        throw error;
     }
-    
-    // Clear all paginated campaign cache keys
-    if (keys.length > 0) {
-        cachesToInvalidate.push(redisClient.del(...keys));
-    }
-    
-    // Also clear common cache keys that might be used by admin (with large limits)
-    // This ensures admin sees new/updated campaigns immediately
-    const commonLimits = [20, 50, 100, 500, 1000, 5000, 10000, 50000];
-    for (const limit of commonLimits) {
-        cachesToInvalidate.push(redisClient.del(`campaigns:all:page:0:limit:${limit}`));
-    }
-    
-    // Clear category caches if category provided
-    if (category) {
-        cachesToInvalidate.push(redisClient.del(`campaigns:category:${category}`));
-    }
-    
-    await Promise.all(cachesToInvalidate);
 };
 
 export const getTotalCampaignsCount = async () => {
@@ -588,46 +656,105 @@ export const getPendingCampaigns = async () => {
 }
 
 export const approveCampaign = async (campaignId, adminId) => {
-    const campaign = await Campaign.findById(campaignId);
+    const requestId = `approve-${campaignId}-${Date.now()}`;
+    
+    console.log(`[Campaign Approval] Starting approval process`, {
+        requestId,
+        campaignId,
+        adminId,
+        timestamp: new Date().toISOString()
+    });
 
-    if (!campaign) {
+    // Step 1: Check current state (idempotency check)
+    const existingCampaign = await Campaign.findById(campaignId);
+    if (!existingCampaign) {
+        console.log(`[Campaign Approval] Campaign not found`, {
+            requestId,
+            campaignId
+        });
         return { success: false, error: 'NOT_FOUND' };
     }
 
-    if (campaign.status !== 'pending') {
-        return {
-            success: false,
-            error: 'INVALID_STATUS',
-            message: `Cannot approve campaign with status: ${campaign.status}. Only pending campaigns can be approved.`
+    // Idempotency: If already approved, return success
+    if (existingCampaign.status === 'active' && existingCampaign.approved_by) {
+        console.log(`[Campaign Approval] Campaign already approved (idempotency)`, {
+            requestId,
+            campaignId,
+            currentStatus: existingCampaign.status,
+            approvedBy: existingCampaign.approved_by,
+            approvedAt: existingCampaign.approved_at
+        });
+        return { 
+            success: true, 
+            campaign: existingCampaign,
+            wasAlreadyApproved: true
         };
     }
 
-    campaign.status = 'active';
-    campaign.approved_at = new Date();
-    campaign.approved_by = adminId;
-    await campaign.save();
+    if (existingCampaign.status !== 'pending') {
+        console.log(`[Campaign Approval] Invalid status for approval`, {
+            requestId,
+            campaignId,
+            currentStatus: existingCampaign.status
+        });
+        return {
+            success: false,
+            error: 'INVALID_STATUS',
+            message: `Cannot approve campaign with status: ${existingCampaign.status}. Only pending campaigns can be approved.`
+        };
+    }
 
-    // Invalidate all campaign cache keys
-    await invalidateCampaignCache(campaignId, campaign.category);
+    // Step 2: Update database (using save() to ensure transaction)
+    const oldStatus = existingCampaign.status;
+    const oldCategory = existingCampaign.category;
+    
+    existingCampaign.status = 'active';
+    existingCampaign.approved_at = new Date();
+    existingCampaign.approved_by = adminId;
+    
+    // Save to ensure transaction is committed
+    const campaign = await existingCampaign.save();
+    
+    console.log(`[Campaign Approval] Database updated successfully`, {
+        requestId,
+        campaignId,
+        oldStatus,
+        newStatus: campaign.status,
+        category: campaign.category,
+        approvedAt: campaign.approved_at
+    });
 
-    return { success: true, campaign };
+    // Step 3: Invalidate cache AFTER DB is committed
+    try {
+        await invalidateCampaignCache(
+            campaignId, 
+            campaign.category, 
+            requestId,
+            campaign.creator?.toString() || campaign.creator // Handle both populated and ObjectId
+        );
+        console.log(`[Campaign Approval] Cache invalidated successfully`, {
+            requestId,
+            campaignId,
+            category: campaign.category,
+            creatorId: campaign.creator?.toString() || campaign.creator
+        });
+    } catch (cacheError) {
+        // Log but don't fail - cache will be stale but DB is correct
+        console.error(`[Campaign Approval] Cache invalidation failed (non-critical)`, {
+            requestId,
+            campaignId,
+            error: cacheError.message
+        });
+    }
+
+    return { 
+        success: true, 
+        campaign,
+        requestId // Return for logging in controller
+    };
 }
 
 export const rejectCampaign = async (campaignId, adminId, reason) => {
-    const campaign = await Campaign.findById(campaignId);
-
-    if (!campaign) {
-        return { success: false, error: 'NOT_FOUND' };
-    }
-
-    if (campaign.status !== 'pending') {
-        return {
-            success: false,
-            error: 'INVALID_STATUS',
-            message: `Cannot reject campaign with status: ${campaign.status}. Only pending campaigns can be rejected.`
-        };
-    }
-
     if (!reason || reason.trim().length === 0) {
         return {
             success: false,
@@ -636,11 +763,34 @@ export const rejectCampaign = async (campaignId, adminId, reason) => {
         };
     }
 
-    campaign.status = 'rejected';
-    campaign.rejection_reason = reason;
-    campaign.rejected_at = new Date();
-    campaign.rejected_by = adminId;
-    await campaign.save();
+    // ✅ FIX: Sử dụng findOneAndUpdate với condition để đảm bảo atomic update, tránh race condition
+    // Chỉ update nếu status là 'pending' (atomic check)
+    const campaign = await Campaign.findOneAndUpdate(
+        { 
+            _id: campaignId,
+            status: 'pending' // Atomic check - chỉ reject nếu đang pending
+        },
+        { 
+            status: 'rejected',
+            rejection_reason: reason,
+            rejected_at: new Date(),
+            rejected_by: adminId
+        },
+        { new: true }
+    );
+
+    if (!campaign) {
+        // Campaign không tồn tại hoặc không ở trạng thái pending
+        const existingCampaign = await Campaign.findById(campaignId);
+        if (!existingCampaign) {
+            return { success: false, error: 'NOT_FOUND' };
+        }
+        return {
+            success: false,
+            error: 'INVALID_STATUS',
+            message: `Cannot reject campaign with status: ${existingCampaign.status}. Only pending campaigns can be rejected.`
+        };
+    }
 
     // Invalidate all campaign cache keys
     await invalidateCampaignCache(campaignId, campaign.category);
