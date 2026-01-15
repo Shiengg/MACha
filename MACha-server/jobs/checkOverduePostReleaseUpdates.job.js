@@ -4,23 +4,6 @@ import Campaign from '../models/campaign.js';
 import User from '../models/user.js';
 import * as mailerService from '../utils/mailer.js';
 
-/**
- * Background job: Kiểm tra các escrow đã released nhưng creator chưa cập nhật tiến độ
- * 
- * Logic:
- * - Query Escrow với điều kiện:
- *   - request_status = "released"
- *   - update_fulfilled_at == null (chưa có update hợp lệ)
- *   - update_required_by < now (đã quá hạn)
- *   - update_warning_email_sent_at == null (chưa gửi mail cảnh báo)
- * 
- * - Xử lý:
- *   - Gửi EMAIL CẢNH BÁO cho creator
- *   - Set update_warning_email_sent_at = now (idempotency - tránh gửi mail trùng)
- * 
- * Schedule: Chạy mỗi 6 giờ (0 */6 * * *)
- */
-
 const checkOverduePostReleaseUpdates = async () => {
     const now = new Date();
     
