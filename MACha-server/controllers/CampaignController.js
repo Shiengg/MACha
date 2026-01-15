@@ -13,6 +13,7 @@ export const getAllCampaigns = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 0;
         const limit = parseInt(req.query.limit) || 20;
+        const status = req.query.status || null; // Optional status filter
         const userId = req.user?._id;
         const userRole = req.user?.role;
         
@@ -20,7 +21,8 @@ export const getAllCampaigns = async (req, res) => {
         // nên skip recommendation service
         const isAdmin = userRole === 'admin';
         
-        if (page === 0 && userId && !isAdmin) {
+        // Only use recommendation service for first page, no status filter, and non-admin users
+        if (page === 0 && userId && !isAdmin && !status) {
             try {
                 const recommendationResult = await recommendationService.getRecommendedCampaigns(
                     userId.toString(),
@@ -43,8 +45,8 @@ export const getAllCampaigns = async (req, res) => {
             }
         }
         
-        // Admin, các trang sau, hoặc user chưa login: get bình thường (tất cả campaigns)
-        const result = await campaignService.getCampaigns(page, limit, userId);
+        // Admin, các trang sau, hoặc user chưa login: get với status filter
+        const result = await campaignService.getCampaigns(page, limit, userId, status);
         res.status(HTTP_STATUS.OK).json({ 
             campaigns: result.campaigns,
             total: result.total,

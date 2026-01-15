@@ -26,7 +26,7 @@ export default function StatusBadge({ status, className = '' }: StatusBadgeProps
     { text: string; bgColor: string; textColor: string }
   > = {
     pending: {
-      text: 'Đang chờ duyệt',
+      text: 'Chờ duyệt',
       bgColor: 'bg-yellow-100',
       textColor: 'text-yellow-800',
     },
@@ -46,12 +46,12 @@ export default function StatusBadge({ status, className = '' }: StatusBadgeProps
       textColor: 'text-green-800',
     },
     completed: {
-      text: 'Đã kết thúc',
-      bgColor: 'bg-gray-100',
-      textColor: 'text-gray-800',
+      text: 'Hoàn tất',
+      bgColor: 'bg-blue-100',
+      textColor: 'text-blue-800',
     },
     rejected: {
-      text: 'Bị từ chối',
+      text: 'Từ chối',
       bgColor: 'bg-red-100',
       textColor: 'text-red-800',
     },

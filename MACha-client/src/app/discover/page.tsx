@@ -6,6 +6,7 @@ import CampaignCard from "@/components/campaign/CampaignCard";
 import { campaignService, Campaign, CategoryWithCount } from "@/services/campaign.service";
 import { useSocket } from "@/contexts/SocketContext";
 import { Heart, Home, Leaf, AlertCircle, Users, PawPrint, Stethoscope, GraduationCap, Baby, UserCircle, Trees, ChevronLeft, ChevronRight } from 'lucide-react';
+import { DEFAULT_DISCOVER_STATUS, FILTER_STATUS_ALL, CAMPAIGN_STATUS } from "@/constants/campaign";
 
 const categoryConfig: Record<string, { label: string; icon: any }> = {
   'children': { label: 'Trẻ em', icon: Baby },
@@ -22,24 +23,19 @@ const categoryConfig: Record<string, { label: string; icon: any }> = {
   'other': { label: 'Khác', icon: Heart },
 };
 
-// Helper function to check if campaign is still valid (active and not expired)
-const isCampaignValid = (campaign: Campaign): boolean => {
-  // Must be active
-  if (campaign.status !== 'active') return false;
-  
-  // If no end_date, consider it as unlimited (still valid)
-  if (!campaign.end_date) return true;
-  
-  // Check if end_date is in the future
-  const endDate = new Date(campaign.end_date);
-  const now = new Date();
-  return endDate > now;
-};
+// Status filter options for Discover page
+const STATUS_FILTER_OPTIONS = [
+  { value: CAMPAIGN_STATUS.ACTIVE, label: 'Đang kêu gọi' },
+  { value: CAMPAIGN_STATUS.PENDING, label: 'Đang chờ duyệt' },
+  { value: CAMPAIGN_STATUS.COMPLETED, label: 'Hoàn tất' },
+  { value: FILTER_STATUS_ALL, label: 'Tất cả' }
+];
 
 function DiscoverContent() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [categories, setCategories] = useState<Array<{ id: string; label: string; icon: any; count: number }>>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>(DEFAULT_DISCOVER_STATUS);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1); // 1-based for UI
   const [totalPages, setTotalPages] = useState(1);
@@ -52,14 +48,15 @@ function DiscoverContent() {
       setLoading(true);
       
       if (selectedCategory === 'all') {
-        // For "all" category, use paginated API
+        // For "all" category, use paginated API with status filter
         const apiPage = page - 1;
-        const result = await campaignService.getAllCampaigns(apiPage, limit);
+        // Pass status filter to API (default to ACTIVE if not set, or null for ALL)
+        const statusFilter = selectedStatus === FILTER_STATUS_ALL ? null : selectedStatus;
+        const result = await campaignService.getAllCampaigns(apiPage, limit, statusFilter || undefined);
         
-        // Only show active campaigns that haven't expired
-        const validCampaigns = result.campaigns.filter(c => isCampaignValid(c));
-        
-        setCampaigns(validCampaigns);
+        // If status filter is active, campaigns are already filtered by backend
+        // No need to filter again on frontend
+        setCampaigns(result.campaigns);
         setTotal(result.total);
         setTotalPages(result.totalPages);
         setCurrentPage(page);
@@ -67,15 +64,18 @@ function DiscoverContent() {
         // For specific category, load all campaigns of that category
         const allCategoryCampaigns = await campaignService.getCampaignsByCategory(selectedCategory);
         
-        // Filter valid campaigns
-        const validCampaigns = allCategoryCampaigns.filter(c => isCampaignValid(c));
+        // Filter by status if not ALL
+        let filteredCampaigns = allCategoryCampaigns;
+        if (selectedStatus !== FILTER_STATUS_ALL) {
+          filteredCampaigns = allCategoryCampaigns.filter(c => c.status === selectedStatus);
+        }
         
         // Calculate pagination for client-side
-        const totalValid = validCampaigns.length;
+        const totalValid = filteredCampaigns.length;
         const totalPagesForCategory = Math.ceil(totalValid / limit);
         const startIndex = (page - 1) * limit;
         const endIndex = startIndex + limit;
-        const paginatedCampaigns = validCampaigns.slice(startIndex, endIndex);
+        const paginatedCampaigns = filteredCampaigns.slice(startIndex, endIndex);
         
         setCampaigns(paginatedCampaigns);
         setTotal(totalValid);
@@ -123,17 +123,17 @@ function DiscoverContent() {
     } finally {
       setLoading(false);
     }
-  }, [limit, selectedCategory]);
+  }, [limit, selectedCategory, selectedStatus]);
 
   useEffect(() => {
     loadData(1);
   }, [loadData]);
 
   useEffect(() => {
-    // Reset pagination when category changes
+    // Reset pagination when category or status changes
     setCurrentPage(1);
     loadData(1);
-  }, [selectedCategory, loadData]);
+  }, [selectedCategory, selectedStatus, loadData]);
 
   // Campaigns are already filtered by category in loadData, so no need to filter again
   const filteredCampaigns = campaigns;
@@ -169,10 +169,14 @@ function DiscoverContent() {
                   completed_donations_count: event.completed_donations_count !== undefined ? event.completed_donations_count : c.completed_donations_count,
                   end_date: event.end_date !== undefined ? event.end_date : c.end_date
                 };
+                // If status filter is active, remove campaigns that don't match
+                if (selectedStatus !== FILTER_STATUS_ALL && updatedCampaign.status !== selectedStatus) {
+                  return null; // Mark for removal
+                }
                 return updatedCampaign;
               }
               return c;
-            }).filter(c => isCampaignValid(c)); // Remove if no longer active or expired
+            }).filter(c => c !== null); // Remove null entries
           }
         });
       }
@@ -299,9 +303,31 @@ function DiscoverContent() {
       {/* Category Filter Section */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 mb-3 sm:mb-4 text-center">
-            Chiến dịch gây quỹ nổi bật
-          </h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">
+              Chiến dịch gây quỹ nổi bật
+            </h2>
+            
+            {/* Status Filter Dropdown */}
+            <div className="w-full sm:w-auto">
+              <label htmlFor="status-filter" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                Trạng thái:
+              </label>
+              <select
+                id="status-filter"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="w-full sm:w-48 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg text-sm sm:text-base font-medium text-gray-700 bg-white hover:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all cursor-pointer"
+              >
+                {STATUS_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
           {loading ? (
             <div className="flex items-center justify-center py-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
@@ -359,7 +385,12 @@ function DiscoverContent() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
               {filteredCampaigns.map((campaign) => (
-                <CampaignCard key={campaign._id} campaign={campaign} showCreator={true} />
+                <CampaignCard 
+                  key={campaign._id} 
+                  campaign={campaign} 
+                  showCreator={true}
+                  showStatusBadge={true}
+                />
               ))}
             </div>
             {totalPages > 1 && (
