@@ -15,7 +15,9 @@ export const formatWithdrawalStatus = (status: WithdrawalRequestStatus): string 
   const statusMap: Record<WithdrawalRequestStatus, string> = {
     pending_voting: 'Chờ vote',
     voting_in_progress: 'Đang vote',
+    voting_extended: 'Đã gia hạn vote',
     voting_completed: 'Đã hoàn thành vote',
+    rejected_by_community: 'Cộng đồng từ chối',
     admin_approved: 'Admin đã duyệt',
     admin_rejected: 'Admin từ chối',
     released: 'Đã giải ngân',
@@ -48,6 +50,16 @@ export const getStatusColor = (status: WithdrawalRequestStatus): {
       text: 'text-purple-700 dark:text-purple-400',
       bg: 'bg-purple-100 dark:bg-purple-900/30',
       border: 'border-purple-200 dark:border-purple-800',
+    },
+    voting_extended: {
+      text: 'text-yellow-700 dark:text-yellow-400',
+      bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+      border: 'border-yellow-200 dark:border-yellow-800',
+    },
+    rejected_by_community: {
+      text: 'text-red-700 dark:text-red-400',
+      bg: 'bg-red-100 dark:bg-red-900/30',
+      border: 'border-red-200 dark:border-red-800',
     },
     admin_approved: {
       text: 'text-green-700 dark:text-green-400',

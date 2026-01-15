@@ -25,6 +25,10 @@ import {
     getCampaignUpdates,
     deleteCampaignUpdate
 } from "../controllers/CampaignUpdateController.js";
+import {
+    createUpdateRequest,
+    getUpdateRequestsByCampaign
+} from "../controllers/CampaignUpdateRequestController.js";
 import { authMiddleware, optionalAuthMiddleware } from "../middlewares/authMiddleware.js";
 import { checkRole } from "../middlewares/checkRole.js";
 import { rateLimitByIP, rateLimitByUserId } from "../middlewares/rateLimitMiddleware.js";
@@ -61,6 +65,10 @@ campaignRoutes.delete('/updates/:updateId', authMiddleware, rateLimitByUserId(60
 // Withdrawal Requests routes
 campaignRoutes.get('/:campaignId/withdrawal-requests', rateLimitByIP(150, 60), getWithdrawalRequestsByCampaign);
 campaignRoutes.post('/:campaignId/withdrawal-requests', authMiddleware, rateLimitByUserId(30, 60), createWithdrawalRequest);
+
+// Campaign Update Request routes (Creator)
+campaignRoutes.post('/:id/update-request', authMiddleware, rateLimitByUserId(30, 60), createUpdateRequest);
+campaignRoutes.get('/:id/update-requests', authMiddleware, rateLimitByUserId(150, 60), getUpdateRequestsByCampaign);
 
 /**
  * @swagger

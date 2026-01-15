@@ -37,7 +37,12 @@ const notificationSchema = new mongoose.Schema({
             "withdrawal_released",
             "refund_processed",
             "escrow_threshold_reached",
-            "escrow_approved"
+            "escrow_approved",
+            "campaign_update_request",
+            "campaign_update_approved",
+            "campaign_update_rejected",
+            "voting_extended",
+            "campaign_cancelled"
         ],
         required: true,
         index: true

@@ -18,9 +18,11 @@ import WithdrawalRequestModal from '@/components/escrow/WithdrawalRequestModal';
 import VotingSection from '@/components/escrow/VotingSection';
 import CreatePostModal from '@/components/shared/CreatePostModal';
 import ReportModal from '@/components/shared/ReportModal';
+import CampaignUpdateRequestModal from '@/components/campaign/CampaignUpdateRequestModal';
 import { getReportsByItem } from '@/services/report.service';
+import { campaignUpdateRequestService } from '@/services/campaignUpdateRequest.service';
 import { FaFlag } from 'react-icons/fa';
-import { ArrowLeft, Share2, Users, Edit } from 'lucide-react';
+import { ArrowLeft, Share2, Users, Edit, FileEdit } from 'lucide-react';
 import Link from 'next/link';
 
 function CampaignDetails() {
@@ -62,6 +64,39 @@ function CampaignDetails() {
     const [isCompanion, setIsCompanion] = useState(false);
     const [isJoiningCompanion, setIsJoiningCompanion] = useState(false);
     const [companionId, setCompanionId] = useState<string | null>(null);
+    const [showUpdateRequestModal, setShowUpdateRequestModal] = useState(false);
+    const [pendingUpdateRequest, setPendingUpdateRequest] = useState<any>(null);
+
+    // Fetch pending update request for active campaigns
+    useEffect(() => {
+        const fetchPendingUpdateRequest = async () => {
+            if (!campaign || !user || campaign.status !== 'active') {
+                setPendingUpdateRequest(null);
+                return;
+            }
+
+            const isCreator = user && campaign.creator && 
+                (user._id === campaign.creator._id || user.id === campaign.creator._id);
+            
+            if (!isCreator) {
+                setPendingUpdateRequest(null);
+                return;
+            }
+
+            try {
+                const requests = await campaignUpdateRequestService.getUpdateRequestsByCampaign(campaignId);
+                const pending = requests.find(req => req.status === 'pending');
+                setPendingUpdateRequest(pending || null);
+            } catch (error) {
+                console.error('Error fetching pending update request:', error);
+                setPendingUpdateRequest(null);
+            }
+        };
+
+        if (campaignId && campaign && user) {
+            fetchPendingUpdateRequest();
+        }
+    }, [campaignId, campaign, user]);
 
     const handleDonate = () => {
         const url = companionId 
@@ -1163,6 +1198,28 @@ function CampaignDetails() {
                                         <Edit className="w-4 h-4 group-hover:scale-110 transition-transform" />
                                         <span className="text-sm font-medium hidden sm:inline">Chỉnh sửa</span>
                                     </Link>
+                                );
+                            })()}
+                            {/* Request Update Button - Only show for creator when campaign is ACTIVE */}
+                            {(() => {
+                                const isCreator = user && campaign && campaign.creator && 
+                                    (user._id === campaign.creator._id || user.id === campaign.creator._id);
+                                const canRequestUpdate = isCreator && campaign.status === 'active';
+                                
+                                if (!canRequestUpdate) return null;
+                                
+                                return (
+                                    <button
+                                        onClick={() => setShowUpdateRequestModal(true)}
+                                        disabled={!!pendingUpdateRequest}
+                                        className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/20 text-white transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title={pendingUpdateRequest ? "Đã có yêu cầu chỉnh sửa đang chờ duyệt" : "Yêu cầu chỉnh sửa campaign (cần admin duyệt)"}
+                                    >
+                                        <FileEdit className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                        <span className="text-sm font-medium hidden sm:inline">
+                                            {pendingUpdateRequest ? 'Đang chờ duyệt' : 'Yêu cầu chỉnh sửa'}
+                                        </span>
+                                    </button>
                                 );
                             })()}
                         </div>
@@ -2305,6 +2362,25 @@ function CampaignDetails() {
                         setHasReported(true);
                     }}
                 />
+
+                {campaign && (
+                    <CampaignUpdateRequestModal
+                        isOpen={showUpdateRequestModal}
+                        onClose={() => setShowUpdateRequestModal(false)}
+                        campaign={campaign}
+                        existingPendingRequest={pendingUpdateRequest}
+                        onSuccess={async () => {
+                            // Refresh pending request
+                            try {
+                                const requests = await campaignUpdateRequestService.getUpdateRequestsByCampaign(campaignId);
+                                const pending = requests.find(req => req.status === 'pending');
+                                setPendingUpdateRequest(pending || null);
+                            } catch (error) {
+                                console.error('Error refreshing pending request:', error);
+                            }
+                        }}
+                    />
+                )}
             </div>
         </ProtectedRoute>
     );

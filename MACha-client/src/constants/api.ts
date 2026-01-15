@@ -70,6 +70,8 @@ export const REJECT_CAMPAIGN_ROUTE = (id: string) => `${CAMPAIGN_ROUTE}/${id}/re
 export const CREATE_CAMPAIGN_UPDATE_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/updates`;
 export const GET_CAMPAIGN_UPDATES_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/updates`;
 export const DELETE_CAMPAIGN_UPDATE_ROUTE = (updateId: string) => `${CAMPAIGN_ROUTE}/updates/${updateId}`;
+export const CREATE_CAMPAIGN_UPDATE_REQUEST_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/update-request`;
+export const GET_CAMPAIGN_UPDATE_REQUESTS_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/update-requests`;
 
 export const KYC_ROUTE = "api/kyc";
 export const GET_PENDING_KYC_ROUTE = `${KYC_ROUTE}/pending`;
@@ -205,3 +207,7 @@ export const GET_ANONYMOUS_RECOMMENDATIONS_ROUTE = `${RECOMMENDATION_ROUTE}/anon
 
 export const ADMIN_ROUTE = "api/admin";
 export const ADMIN_DASHBOARD_ROUTE = `${ADMIN_ROUTE}/dashboard`;
+export const ADMIN_GET_CAMPAIGN_UPDATE_REQUESTS_ROUTE = `${ADMIN_ROUTE}/campaign-update-requests`;
+export const ADMIN_GET_CAMPAIGN_UPDATE_REQUEST_BY_ID_ROUTE = (requestId: string) => `${ADMIN_ROUTE}/campaign-update-requests/${requestId}`;
+export const ADMIN_APPROVE_CAMPAIGN_UPDATE_REQUEST_ROUTE = (requestId: string) => `${ADMIN_ROUTE}/campaign-update-requests/${requestId}/approve`;
+export const ADMIN_REJECT_CAMPAIGN_UPDATE_REQUEST_ROUTE = (requestId: string) => `${ADMIN_ROUTE}/campaign-update-requests/${requestId}/reject`;

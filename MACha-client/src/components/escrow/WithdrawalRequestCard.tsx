@@ -94,6 +94,18 @@ export default function WithdrawalRequestCard({
         bgColor: 'bg-purple-100 dark:bg-purple-900/30',
         icon: <CheckCircle2 className="w-4 h-4" />,
       },
+      voting_extended: {
+        label: 'Đã gia hạn vote',
+        color: 'text-yellow-700 dark:text-yellow-400',
+        bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
+        icon: <Clock className="w-4 h-4" />,
+      },
+      rejected_by_community: {
+        label: 'Cộng đồng từ chối',
+        color: 'text-red-700 dark:text-red-400',
+        bgColor: 'bg-red-100 dark:bg-red-900/30',
+        icon: <XCircle className="w-4 h-4" />,
+      },
       admin_approved: {
         label: 'Admin đã duyệt',
         color: 'text-green-700 dark:text-green-400',
