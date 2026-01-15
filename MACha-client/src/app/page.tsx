@@ -33,8 +33,14 @@ function HomeContent() {
   const isFetchingRef = useRef(false);
 
   useEffect(() => {
+    // SECURITY FIX: Redirect OWNER và ADMIN về dashboard của họ
+    if (user?.role === 'owner') {
+      router.push('/owner/dashboard');
+      return;
+    }
     if (user?.role === 'admin') {
       router.push('/admin/dashboard');
+      return;
     }
   }, [user, router]);
 

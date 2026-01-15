@@ -38,8 +38,8 @@ export default function UserHistoryPage() {
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to fetch user history',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể tải lịch sử người dùng',
       });
       router.push('/owner/users');
     } finally {
@@ -67,7 +67,7 @@ export default function UserHistoryPage() {
       case 'login':
         return (
           <div>
-            <div className="font-semibold text-gray-900">Account Created</div>
+            <div className="font-semibold text-gray-900">Tài khoản đã được tạo</div>
             <div className="text-sm text-gray-500">{item.details}</div>
           </div>
         );
@@ -75,23 +75,23 @@ export default function UserHistoryPage() {
         return (
           <div>
             <div className="font-semibold text-gray-900">
-              Donated {item.amount?.toLocaleString()} {item.currency} 
-              {item.campaign && ` to ${item.campaign.title}`}
+              Đã quyên góp {item.amount?.toLocaleString()} {item.currency} 
+              {item.campaign && ` cho ${item.campaign.title}`}
             </div>
             <div className="text-sm text-gray-500">
-              Method: {item.donation_method} | Status: {item.payment_status}
+              Phương thức: {item.donation_method} | Trạng thái: {item.payment_status}
             </div>
           </div>
         );
       case 'post':
         return (
           <div>
-            <div className="font-semibold text-gray-900">Created Post</div>
+            <div className="font-semibold text-gray-900">Đã tạo bài viết</div>
             <div className="text-sm text-gray-500">
               {item.content_preview}
-              {item.campaign && ` | Campaign: ${item.campaign.title}`}
-              {item.event && ` | Event: ${item.event.title}`}
-              {item.is_hidden && ' (Hidden)'}
+              {item.campaign && ` | Chiến dịch: ${item.campaign.title}`}
+              {item.event && ` | Sự kiện: ${item.event.title}`}
+              {item.is_hidden && ' (Đã ẩn)'}
             </div>
           </div>
         );
@@ -99,10 +99,10 @@ export default function UserHistoryPage() {
         return (
           <div>
             <div className="font-semibold text-gray-900">
-              Reported {item.reported_type} - {item.reported_reason}
+              Đã báo cáo {item.reported_type} - {item.reported_reason}
             </div>
             <div className="text-sm text-gray-500">
-              Status: {item.status} {item.resolution && `| Resolution: ${item.resolution}`}
+              Trạng thái: {item.status} {item.resolution && `| Giải quyết: ${item.resolution}`}
             </div>
           </div>
         );
@@ -120,7 +120,7 @@ export default function UserHistoryPage() {
           <div className="flex items-center justify-center h-screen">
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading...</p>
+              <p className="text-gray-500">Đang tải...</p>
             </div>
           </div>
         </OwnerContentWrapper>
@@ -140,11 +140,11 @@ export default function UserHistoryPage() {
               className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-700 mb-3 sm:mb-4 text-sm sm:text-base"
             >
               <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-              Back to Users
+              Quay lại Người dùng
             </Link>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">
-                User History: {user?.username}
+                Lịch sử người dùng: {user?.username}
               </h1>
               <p className="text-sm sm:text-base text-gray-600">{user?.email}</p>
             </div>
@@ -156,7 +156,7 @@ export default function UserHistoryPage() {
               <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Total Donations</div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Tổng quyên góp</div>
                     <div className="text-xl sm:text-2xl font-bold text-green-600">{statistics.total_donations}</div>
                   </div>
                   <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
@@ -165,7 +165,7 @@ export default function UserHistoryPage() {
               <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Total Posts</div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Tổng bài viết</div>
                     <div className="text-xl sm:text-2xl font-bold text-purple-600">{statistics.total_posts}</div>
                   </div>
                   <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
@@ -174,7 +174,7 @@ export default function UserHistoryPage() {
               <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Total Reports</div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Tổng báo cáo</div>
                     <div className="text-xl sm:text-2xl font-bold text-red-600">{statistics.total_reports}</div>
                   </div>
                   <Flag className="w-6 h-6 sm:w-8 sm:h-8 text-red-600" />
@@ -186,12 +186,12 @@ export default function UserHistoryPage() {
           {/* History List */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
             <div className="p-4 sm:p-6 border-b border-gray-200">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Activity History</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Lịch sử hoạt động</h2>
             </div>
             <div className="divide-y divide-gray-200">
               {history.length === 0 ? (
                 <div className="p-6 sm:p-8 text-center text-gray-500 text-sm sm:text-base">
-                  No history found for this user
+                  Không tìm thấy lịch sử cho người dùng này
                 </div>
               ) : (
                 history.map((item, index) => (
@@ -220,7 +220,7 @@ export default function UserHistoryPage() {
                   disabled={currentPage === 1}
                   className="px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
-                  Previous
+                  Trước
                 </button>
                 <span className="text-xs sm:text-sm text-gray-700">
                   Trang {currentPage} / {totalPages}
@@ -230,7 +230,7 @@ export default function UserHistoryPage() {
                   disabled={currentPage === totalPages}
                   className="px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
-                  Next
+                  Sau
                 </button>
               </div>
             )}

@@ -10,14 +10,16 @@ import {
     searchPostsByTitle
 } from "../controllers/PostController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { checkRole } from "../middlewares/checkRole.js";
 import { rateLimitByIP, rateLimitByUserId } from "../middlewares/rateLimitMiddleware.js";
 
 const postRoutes = Router();
 
 // Write operations – rate limit per user
-postRoutes.post('/', authMiddleware, rateLimitByUserId(120, 60), createPost);
-postRoutes.put('/:id', authMiddleware, rateLimitByUserId(120, 60), updatePost);
-postRoutes.delete('/:id', authMiddleware, rateLimitByUserId(60, 60), deletePost);
+// SECURITY FIX: Chỉ cho phép USER và ORGANIZATION tạo/sửa/xóa post, không cho OWNER và ADMIN
+postRoutes.post('/', authMiddleware, checkRole('user', 'organization'), rateLimitByUserId(120, 60), createPost);
+postRoutes.put('/:id', authMiddleware, checkRole('user', 'organization'), rateLimitByUserId(120, 60), updatePost);
+postRoutes.delete('/:id', authMiddleware, checkRole('user', 'organization'), rateLimitByUserId(60, 60), deletePost);
 
 // Authenticated feed
 postRoutes.get('/', authMiddleware, rateLimitByUserId(300, 60), getPosts);

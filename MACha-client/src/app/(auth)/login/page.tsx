@@ -112,6 +112,10 @@ function LoginPageContent() {
           html: `<div>
             <p class="mb-2">${message}</p>
             ${banReason ? `<p class="text-sm text-gray-600 mt-2"><strong>Lý do:</strong> ${banReason}</p>` : ''}
+            <p class="text-sm text-gray-600 mt-4">
+              <strong>Liên hệ hỗ trợ:</strong><br/>
+              Email: <a href="mailto:owner@gmail.com" class="text-blue-600 hover:underline">owner@gmail.com</a>
+            </p>
           </div>`,
           icon: 'error',
           confirmButtonText: 'OK',
@@ -134,9 +138,9 @@ function LoginPageContent() {
         {/* Left Side - Illustration */}
         <div className="lg:w-1/2 bg-white p-12 flex flex-col justify-center items-center">
           <h1 className="text-5xl font-bold text-gray-900 mb-8 leading-tight">
-            Join our charity<br />
-            fundraiser social<br />
-            network
+            Tham gia mạng xã hội<br />
+            gây quỹ từ thiện<br />
+            của chúng tôi
           </h1>
           <div className="w-full max-w-md">
             <Image
@@ -180,13 +184,13 @@ function LoginPageContent() {
               {/* Password Input */}
               <div className="mb-4">
                 <label htmlFor="password" className="block text-gray-900 font-medium mb-2">
-                  Password
+                  Mật khẩu
                 </label>
                 <input
                   id="password"
                   type="password"
                   {...register('password')}
-                  placeholder="Password"
+                  placeholder="Mật khẩu"
                   className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${errors.password
                     ? 'border-red-500 focus:border-red-500'
                     : 'border-gray-300 focus:border-blue-500'
@@ -242,6 +246,14 @@ function LoginPageContent() {
               <h3 className="text-3xl font-bold text-gray-900 mb-4 text-left">Đăng ký</h3>
               <p className="text-gray-600 mb-6 text-left">Không có tài khoản ? Đăng ký</p>
               <Link href="/register" className="block w-full border-2 border-blue-600 text-blue-600 font-semibold py-4 rounded-2xl hover:bg-blue-50 transition-colors text-center">Đăng ký</Link>
+            </div>
+
+            {/* Contact Section */}
+            <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+              <p className="text-sm text-gray-600 mb-2">Cần hỗ trợ?</p>
+              <p className="text-sm text-gray-700">
+                Liên hệ: <a href="mailto:owner@gmail.com" className="text-blue-600 hover:text-blue-700 hover:underline">owner@gmail.com</a>
+              </p>
             </div>
           </div>
         </div>

@@ -2,13 +2,13 @@ import { Router } from "express";
 import { createDonation, getDonationsByCampaign } from "../controllers/DonationController.js";
 import { initSepayPayment, sepayCallback, sepaySuccess, sepayError, sepayCancel } from "../controllers/SePayController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { checkRole } from "../middlewares/checkRole.js";
 import { rateLimitByIP, rateLimitByUserId } from "../middlewares/rateLimitMiddleware.js";
 
 const donationRoutes = Router();
 
-// Tạo donation & init payment: per user
-donationRoutes.post('/:campaignId/donate', authMiddleware, rateLimitByUserId(60, 60), createDonation);
-donationRoutes.post('/:campaignId/sepay/init', authMiddleware, rateLimitByUserId(60, 60), initSepayPayment);
+donationRoutes.post('/:campaignId/donate', authMiddleware, checkRole('user', 'organization'), rateLimitByUserId(60, 60), createDonation);
+donationRoutes.post('/:campaignId/sepay/init', authMiddleware, checkRole('user', 'organization'), rateLimitByUserId(60, 60), initSepayPayment);
 
 // Callback/success/error/cancel: giữ mở (do payment provider gọi), nhưng thêm IP limit nhẹ
 donationRoutes.post('/sepay/callback', rateLimitByIP(300, 60), sepayCallback);

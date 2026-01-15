@@ -97,8 +97,8 @@ export default function AdminUsers() {
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to fetch users',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể tải danh sách người dùng',
       });
     } finally {
       setLoading(false);
@@ -258,7 +258,7 @@ export default function AdminUsers() {
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                  placeholder="Search"
+                  placeholder="Tìm kiếm"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
@@ -272,7 +272,7 @@ export default function AdminUsers() {
                   className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors text-sm sm:text-base"
                 >
                   <SlidersHorizontal className="w-4 h-4 text-gray-600" />
-                  <span className="text-xs sm:text-sm font-bold">Filters</span>
+                  <span className="text-xs sm:text-sm font-bold">Bộ lọc</span>
                 </button>
                 
                 {/* Filters Dropdown */}

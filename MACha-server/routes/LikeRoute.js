@@ -1,13 +1,15 @@
 import { Router } from "express";
 import { likePost, unlikePost, getPostLikes } from "../controllers/LikeController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { checkRole } from "../middlewares/checkRole.js";
 import { rateLimitByIP, rateLimitByUserId } from "../middlewares/rateLimitMiddleware.js";
 
 const likeRoutes = Router();
 
 // Like/unlike: per user để tránh spam
-likeRoutes.post('/:postId/like', authMiddleware, rateLimitByUserId(200, 60), likePost);
-likeRoutes.post('/:postId/unlike', authMiddleware, rateLimitByUserId(200, 60), unlikePost);
+// SECURITY FIX: Chỉ cho phép USER và ORGANIZATION like/unlike, không cho OWNER và ADMIN
+likeRoutes.post('/:postId/like', authMiddleware, checkRole('user', 'organization'), rateLimitByUserId(200, 60), likePost);
+likeRoutes.post('/:postId/unlike', authMiddleware, checkRole('user', 'organization'), rateLimitByUserId(200, 60), unlikePost);
 
 // Get likes: public-ish, limit theo IP
 likeRoutes.get('/:postId/likes', rateLimitByIP(300, 60), getPostLikes);

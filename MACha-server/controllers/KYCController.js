@@ -1,6 +1,7 @@
 import { HTTP_STATUS } from "../utils/status.js";
 import * as kycService from "../services/kyc.service.js";
 import * as queueService from "../services/queue.service.js";
+import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
 
 export const submitKYC = async (req, res) => {
     try {
@@ -135,11 +136,18 @@ export const approveKYC = async (req, res) => {
         }
 
         try {
-            await queueService.pushJob({
-                type: "SEND_KYC_APPROVED",
-                email: result.user.email,
-                username: result.user.username,
-            })
+            const job = createJob(
+                JOB_TYPES.SEND_KYC_APPROVED,
+                {
+                    email: result.user.email,
+                    username: result.user.username,
+                },
+                {
+                    userId: userId.toString(),
+                    source: JOB_SOURCE.ADMIN
+                }
+            );
+            await queueService.pushJob(job);
         } catch (error) {
             console.error('Error publishing event or pushing job:', error);
         }

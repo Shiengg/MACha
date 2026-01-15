@@ -51,8 +51,8 @@ export default function OwnerAdminReports() {
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to fetch reports',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể tải danh sách báo cáo',
       });
     } finally {
       setLoading(false);
@@ -94,8 +94,8 @@ export default function OwnerAdminReports() {
 
       Swal.fire({
         icon: 'success',
-        title: 'Success',
-        text: `Report ${selectedAction === 'warn' ? 'resolved with warning' : selectedAction === 'remove' ? 'resolved - admin removed' : selectedAction === 'ban' ? 'resolved - admin banned' : 'resolved'}`,
+        title: 'Thành công',
+        text: `Báo cáo ${selectedAction === 'warn' ? 'đã được xử lý với cảnh báo' : selectedAction === 'remove' ? 'đã được xử lý - admin đã bị gỡ' : selectedAction === 'ban' ? 'đã được xử lý - admin đã bị cấm' : 'đã được xử lý'}`,
       });
 
       setShowActionModal(false);
@@ -106,8 +106,8 @@ export default function OwnerAdminReports() {
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to update report',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể cập nhật báo cáo',
       });
     }
   };
@@ -202,7 +202,7 @@ export default function OwnerAdminReports() {
           {loading ? (
             <div className="p-8 text-center">
               <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading...</p>
+              <p className="text-gray-500">Đang tải...</p>
             </div>
           ) : reports.length === 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 text-center">
@@ -321,7 +321,7 @@ export default function OwnerAdminReports() {
                   disabled={currentPage === 0}
                   className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm"
                 >
-                  Previous
+                  Trước
                 </button>
                 <span className="text-sm text-gray-600">
                   Trang {currentPage + 1} / {totalPages}
@@ -331,7 +331,7 @@ export default function OwnerAdminReports() {
                   disabled={currentPage >= totalPages - 1}
                   className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm"
                 >
-                  Next
+                  Sau
                 </button>
               </div>
             </div>

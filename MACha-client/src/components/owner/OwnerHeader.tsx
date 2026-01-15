@@ -7,7 +7,7 @@ import { useOwnerSidebar } from '@/contexts/OwnerSidebarContext';
 
 const getPageTitle = (pathname: string): string => {
   const routes: { [key: string]: string } = {
-    '/owner/dashboard': 'Dashboard',
+    '/owner/dashboard': 'Trang tổng quan',
     '/owner/admins': 'Quản lý Admin',
     '/owner/admin-reports': 'Báo cáo về Admin',
     '/owner/financial': 'Tài chính tổng quan',
@@ -22,7 +22,7 @@ const getPageTitle = (pathname: string): string => {
     return routes[pathname];
   }
 
-  return 'Owner';
+  return 'Owner Panel';
 };
 
 export default function OwnerHeader() {

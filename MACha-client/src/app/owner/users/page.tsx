@@ -71,8 +71,8 @@ export default function OwnerUsers() {
       if (users.length === 0) {
         Swal.fire({
           icon: 'error',
-          title: 'Error',
-          text: error?.response?.data?.message || 'Failed to fetch users',
+          title: 'Lỗi',
+          text: error?.response?.data?.message || 'Không thể tải danh sách người dùng',
         });
       } else {
         // If we have users, just log the error but don't show alert
@@ -114,8 +114,8 @@ export default function OwnerUsers() {
       await ownerService.banUser(selectedUser._id, banReason);
       Swal.fire({
         icon: 'success',
-        title: 'Success',
-        text: 'User banned successfully',
+        title: 'Thành công',
+        text: 'Đã khóa người dùng thành công',
       });
       setShowBanModal(false);
       setBanReason('');
@@ -124,8 +124,8 @@ export default function OwnerUsers() {
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to ban user',
+          title: 'Lỗi',
+          text: error?.response?.data?.message || 'Không thể khóa người dùng',
       });
     }
   };
@@ -134,13 +134,13 @@ export default function OwnerUsers() {
     setOpenMenuId(null);
     setMenuPosition(null);
     const result = await Swal.fire({
-      title: 'Unban User?',
-      text: 'Are you sure you want to unban this user?',
+      title: 'Mở khóa người dùng?',
+      text: 'Bạn có chắc chắn muốn mở khóa người dùng này không?',
       icon: 'question',
       showCancelButton: true,
       confirmButtonColor: '#10b981',
       cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, unban',
+      confirmButtonText: 'Có, mở khóa',
     });
 
     if (result.isConfirmed) {
@@ -148,15 +148,15 @@ export default function OwnerUsers() {
         await ownerService.unbanUser(userId);
         Swal.fire({
           icon: 'success',
-          title: 'Success',
-          text: 'User unbanned successfully',
+          title: 'Thành công',
+          text: 'Đã mở khóa người dùng thành công',
         });
         fetchUsers();
       } catch (error: any) {
         Swal.fire({
           icon: 'error',
-          title: 'Error',
-          text: error?.response?.data?.message || 'Failed to unban user',
+          title: 'Lỗi',
+          text: error?.response?.data?.message || 'Không thể mở khóa người dùng',
         });
       }
     }
@@ -166,13 +166,13 @@ export default function OwnerUsers() {
     setOpenMenuId(null);
     setMenuPosition(null);
     const result = await Swal.fire({
-      title: 'Reset KYC Status?',
-      text: 'This will reset the user\'s KYC status to unverified. Continue?',
+      title: 'Đặt lại trạng thái KYC?',
+      text: 'Hành động này sẽ đặt lại trạng thái KYC của người dùng về chưa xác thực. Tiếp tục?',
       icon: 'question',
       showCancelButton: true,
       confirmButtonColor: '#f59e0b',
       cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, reset',
+      confirmButtonText: 'Có, đặt lại',
     });
 
     if (result.isConfirmed) {
@@ -180,29 +180,29 @@ export default function OwnerUsers() {
         await ownerService.resetUserKYC(userId);
         Swal.fire({
           icon: 'success',
-          title: 'Success',
-          text: 'User KYC status reset successfully',
+          title: 'Thành công',
+          text: 'Đã đặt lại trạng thái KYC thành công',
         });
         fetchUsers();
       } catch (error: any) {
         Swal.fire({
           icon: 'error',
-          title: 'Error',
-          text: error?.response?.data?.message || 'Failed to reset KYC status',
+          title: 'Lỗi',
+          text: error?.response?.data?.message || 'Không thể đặt lại trạng thái KYC',
         });
       }
     }
   };
 
   const exportToCSV = () => {
-    const headers = ['Username', 'Email', 'Full Name', 'Role', 'KYC Status', 'Ban Status', 'Created At'];
+    const headers = ['Tên đăng nhập', 'Email', 'Họ tên', 'Vai trò', 'Trạng thái KYC', 'Trạng thái khóa', 'Ngày tạo'];
     const rows = users.map(user => [
       user.username,
       user.email,
       user.fullname || '',
       user.role,
       user.kyc_status,
-      user.is_banned ? 'Banned' : 'Active',
+      user.is_banned ? 'Đã khóa' : 'Hoạt động',
       new Date(user.createdAt).toLocaleDateString(),
     ]);
 
@@ -229,7 +229,7 @@ export default function OwnerUsers() {
           <div className="flex items-center justify-center h-screen">
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading...</p>
+              <p className="text-gray-500">Đang tải...</p>
             </div>
           </div>
         </OwnerContentWrapper>
@@ -246,7 +246,7 @@ export default function OwnerUsers() {
         <div className="p-4 sm:p-6 lg:p-8">
           <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Quản lý Users</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Quản lý người dùng</h1>
               <p className="text-sm sm:text-base text-gray-600">Quản lý tất cả người dùng trong hệ thống</p>
             </div>
             <button
@@ -254,8 +254,8 @@ export default function OwnerUsers() {
               className="px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 text-sm sm:text-base w-full sm:w-auto justify-center"
             >
               <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline">Export CSV</span>
-              <span className="sm:hidden">Export</span>
+              <span className="hidden sm:inline">Xuất CSV</span>
+              <span className="sm:hidden">Xuất</span>
             </button>
           </div>
 
@@ -263,11 +263,11 @@ export default function OwnerUsers() {
           <div className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200 shadow-sm mb-4 sm:mb-6">
             <div className="flex items-center gap-2 mb-3 sm:mb-4">
               <Filter className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-              <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Filters</h3>
+              <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Bộ lọc</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tìm kiếm</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
@@ -277,13 +277,13 @@ export default function OwnerUsers() {
                       setSearchQuery(e.target.value);
                       setCurrentPage(1);
                     }}
-                    placeholder="Search by username, email..."
+                    placeholder="Tìm theo tên đăng nhập, email..."
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò</label>
                 <select
                   value={roleFilter}
                   onChange={(e) => {
@@ -292,12 +292,12 @@ export default function OwnerUsers() {
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  <option value="">All Users</option>
-                  <option value="user">User</option>
+                  <option value="">Tất cả người dùng</option>
+                  <option value="user">Người dùng</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ban Status</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái khóa</label>
                 <select
                   value={banFilter}
                   onChange={(e) => {
@@ -306,13 +306,13 @@ export default function OwnerUsers() {
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  <option value="">All</option>
-                  <option value="active">Active</option>
-                  <option value="banned">Banned</option>
+                  <option value="">Tất cả</option>
+                  <option value="active">Hoạt động</option>
+                  <option value="banned">Đã khóa</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">KYC Status</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái KYC</label>
                 <select
                   value={kycFilter}
                   onChange={(e) => {
@@ -321,11 +321,11 @@ export default function OwnerUsers() {
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  <option value="">All</option>
-                  <option value="unverified">Unverified</option>
-                  <option value="pending">Pending</option>
-                  <option value="verified">Verified</option>
-                  <option value="rejected">Rejected</option>
+                  <option value="">Tất cả</option>
+                  <option value="unverified">Chưa xác thực</option>
+                  <option value="pending">Đang chờ</option>
+                  <option value="verified">Đã xác thực</option>
+                  <option value="rejected">Bị từ chối</option>
                 </select>
               </div>
             </div>
@@ -337,13 +337,13 @@ export default function OwnerUsers() {
               <table className="min-w-full divide-y divide-gray-200 min-w-[800px]">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Người dùng</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Email</th>
-                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">KYC Status</th>
-                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Created</th>
-                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vai trò</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Trạng thái KYC</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Ngày tạo</th>
+                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -390,11 +390,11 @@ export default function OwnerUsers() {
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             user.is_verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                           }`}>
-                            {user.is_verified ? 'Verified' : 'Unverified'}
+                            {user.is_verified ? 'Đã xác thực' : 'Chưa xác thực'}
                           </span>
                           {user.is_banned && (
                             <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                              Banned
+                              Đã khóa
                             </span>
                           )}
                         </div>
@@ -428,7 +428,7 @@ export default function OwnerUsers() {
                 disabled={currentPage === 1}
                 className="px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
-                Previous
+                Trước
               </button>
               <span className="text-xs sm:text-sm text-gray-700">
                 Trang {currentPage} / {totalPages}
@@ -438,7 +438,7 @@ export default function OwnerUsers() {
                 disabled={currentPage === totalPages}
                 className="px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
-                Next
+                Sau
               </button>
             </div>
           </div>
@@ -471,7 +471,7 @@ export default function OwnerUsers() {
                   }}
                 >
                   <Eye className="w-4 h-4" />
-                  View History
+                  Xem lịch sử
                 </Link>
                 {user.is_banned ? (
                   <button
@@ -479,7 +479,7 @@ export default function OwnerUsers() {
                     className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 flex items-center gap-2"
                   >
                     <Unlock className="w-4 h-4" />
-                    Unban
+                    Mở khóa
                   </button>
                 ) : (
                   <button
@@ -487,7 +487,7 @@ export default function OwnerUsers() {
                     className="w-full text-left px-4 py-2 text-sm text-orange-700 hover:bg-orange-50 flex items-center gap-2"
                   >
                     <Ban className="w-4 h-4" />
-                    Ban
+                    Khóa
                   </button>
                 )}
                 <button
@@ -495,7 +495,7 @@ export default function OwnerUsers() {
                   className="w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  Reset KYC
+                  Đặt lại KYC
                 </button>
               </>
             );
@@ -508,13 +508,13 @@ export default function OwnerUsers() {
       {showBanModal && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Ban User: {selectedUser.username}</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Khóa người dùng: {selectedUser.username}</h2>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Ban Reason</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Lý do khóa</label>
               <textarea
                 value={banReason}
                 onChange={(e) => setBanReason(e.target.value)}
-                placeholder="Enter ban reason..."
+                placeholder="Nhập lý do khóa..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 rows={4}
               />
@@ -524,7 +524,7 @@ export default function OwnerUsers() {
                 onClick={confirmBanUser}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
-                Ban User
+                Khóa người dùng
               </button>
               <button
                 onClick={() => {
@@ -534,7 +534,7 @@ export default function OwnerUsers() {
                 }}
                 className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >
-                Cancel
+                Hủy
               </button>
             </div>
           </div>

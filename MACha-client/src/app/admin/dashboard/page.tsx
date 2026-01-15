@@ -136,7 +136,7 @@ export default function AdminDashboard() {
                 <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 group-hover:scale-110 transition-transform flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="text-xs sm:text-sm font-semibold text-gray-900">Quản lý người dùng</div>
-                  <div className="text-xs text-gray-500 hidden sm:block">User management</div>
+                  <div className="text-xs text-gray-500 hidden sm:block">Quản lý người dùng</div>
                 </div>
               </div>
             </Link>
@@ -145,7 +145,7 @@ export default function AdminDashboard() {
                 <Megaphone className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 group-hover:scale-110 transition-transform flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="text-xs sm:text-sm font-semibold text-gray-900">Quản lý campaign</div>
-                  <div className="text-xs text-gray-500 hidden sm:block">Campaign management</div>
+                  <div className="text-xs text-gray-500 hidden sm:block">Quản lý chiến dịch</div>
                 </div>
               </div>
             </Link>
@@ -154,7 +154,7 @@ export default function AdminDashboard() {
                 <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 group-hover:scale-110 transition-transform flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="text-xs sm:text-sm font-semibold text-gray-900">Quản lý sự kiện</div>
-                  <div className="text-xs text-gray-500 hidden sm:block">Event management</div>
+                  <div className="text-xs text-gray-500 hidden sm:block">Quản lý sự kiện</div>
                 </div>
               </div>
             </Link>
@@ -163,7 +163,7 @@ export default function AdminDashboard() {
                 <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 group-hover:scale-110 transition-transform flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="text-xs sm:text-sm font-semibold text-gray-900">Duyệt người dùng</div>
-                  <div className="text-xs text-gray-500 hidden sm:block">KYC approval</div>
+                  <div className="text-xs text-gray-500 hidden sm:block">Duyệt KYC</div>
                 </div>
               </div>
             </Link>
@@ -172,7 +172,7 @@ export default function AdminDashboard() {
                 <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600 group-hover:scale-110 transition-transform flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="text-xs sm:text-sm font-semibold text-gray-900">Quản lý báo cáo</div>
-                  <div className="text-xs text-gray-500 hidden sm:block">Reports management</div>
+                  <div className="text-xs text-gray-500 hidden sm:block">Quản lý báo cáo</div>
                 </div>
               </div>
             </Link>

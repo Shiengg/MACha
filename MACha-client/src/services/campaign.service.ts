@@ -13,6 +13,7 @@ import {
   SEARCH_CAMPAIGNS_BY_TITLE_ROUTE,
   GET_ACTIVE_CATEGORIES_ROUTE,
   GET_CAMPAIGNS_BY_CREATOR_ROUTE,
+  GET_CAMPAIGNS_BY_CREATOR_PAGINATED_ROUTE,
   CREATE_CAMPAIGN_UPDATE_ROUTE,
   GET_CAMPAIGN_UPDATES_ROUTE,
   DELETE_CAMPAIGN_UPDATE_ROUTE,
@@ -117,14 +118,33 @@ export interface CreateCampaignPayload {
 }
 
 export interface UpdateCampaignPayload {
+  // Contact Information
+  contact_info?: {
+    fullname?: string;
+    phone?: string;
+    email?: string;
+    social_links?: {
+      facebook?: string;
+      instagram?: string;
+      twitter?: string;
+      website?: string;
+    };
+    address?: string;
+  };
+  // Campaign Information
   title?: string;
   description?: string;
   goal_amount?: number;
+  start_date?: string;
   end_date?: string;
   category?: string;
   banner_image?: string;
   gallery_images?: string[];
   proof_documents_url?: string;
+  milestones?: Milestone[];
+  expected_timeline?: TimelineItem[];
+  hashtag?: string;
+  location_name?: string;
 }
 
 export interface CategoryWithCount {
@@ -212,6 +232,23 @@ export const campaignService = {
       params: { creatorId },
     });
     return response.data.campaigns;
+  },
+
+  async getCampaignsByCreatorPaginated(
+    creatorId: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<{
+    campaigns: Campaign[];
+    total: number;
+    totalPages: number;
+    currentPage: number;
+    limit: number;
+  }> {
+    const response = await apiClient.get(GET_CAMPAIGNS_BY_CREATOR_PAGINATED_ROUTE, {
+      params: { creatorId, page, limit },
+    });
+    return response.data;
   },
 
   async updateCampaign(id: string, payload: UpdateCampaignPayload): Promise<Campaign> {

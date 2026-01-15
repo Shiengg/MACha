@@ -1,129 +1,43 @@
-import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
-import cors from 'cors';
-import cookieParser from 'cookie-parser';
-import compression from 'compression';
 import jwt from 'jsonwebtoken';
-import connectDB from './config/db.js';
-import { connectRedis, closeSubscriber, getConnectionInfo } from './config/redis.js';
-import { setupSwagger } from './docs/swagger.js';
-import * as routes from './routes/index.js';
+import app, { allowedOrigin } from './app.js';
+import { connectDB, disconnectDB } from './config/db.js';
+import { connectRedis, disconnectRedis, closeSubscriber, getConnectionInfo } from './config/redis.js';
+import { connectRabbitMQ, disconnectRabbitMQ } from './config/rabbitmq.js';
+import { initSubscribers } from './subscribers/initSubscriber.js';
+import User from './models/user.js';
+import * as onlineService from './services/online.service.js';
+import { updateWebSocketConnections } from './middlewares/metricsMiddleware.js';
+
+// Import jobs (side effects - chạy khi import)
 import './jobs/cleanupUnverifiedUsers.job.js';
 import './jobs/finalizeVotingPeriods.job.js';
 import './jobs/processExpiredCampaigns.job.js';
 import './jobs/processExpiredEvents.job.js';
 
-import { initSubscribers } from './subscribers/initSubscriber.js';
-import User from './models/user.js';
-import * as onlineService from './services/online.service.js';
-import { metricsMiddleware, register, updateWebSocketConnections } from './middlewares/metricsMiddleware.js';
-
-const app = express();
 dotenv.config();
 
-app.set('trust proxy', 1);
 
-connectDB().catch(err => {
-    console.error('❌ MongoDB connection failed:', err.message);
-});
-
-setupSwagger(app);
-
-connectRedis().catch(err => {
-    console.error('❌ Redis connection failed:', err.message);
-});
-
-// Determine allowed origin based on environment
-const allowedOrigin = process.env.NODE_ENV === 'development'
-    ? (process.env.ORIGIN_URL?.replace(/\/$/, '') || 'http://localhost:3000')
-    : (process.env.ORIGIN_PROD?.replace(/\/$/, '') || 'http://localhost:3000');
-
-app.use(cors({
-    origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps, curl, Postman, health checks)
-        if (!origin) {
-            return callback(null, true);
-        }
-        const normalizedOrigin = origin.replace(/\/$/, '');
-        
-        if (normalizedOrigin === allowedOrigin) {
-            return callback(null, true);
-        }
-
-        const mobileOrigins = [
-            'http://localhost',
-            'http://127.0.0.1',
-            'exp://localhost',
-            'exp://127.0.0.1',
-        ];
-        
-        const isMobileOrigin = mobileOrigins.some(mobileOrigin => 
-            normalizedOrigin.startsWith(mobileOrigin)
-        );
-        
-        if (isMobileOrigin) {
-            return callback(null, true);
-        }
-        
-        console.warn(`⚠️  CORS blocked origin: ${origin}, expected: ${allowedOrigin}`);
-        callback(new Error(`CORS: Origin ${origin} not allowed. Expected: ${allowedOrigin}`));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['Set-Cookie'], // Expose Set-Cookie header for debugging
-}));
-
-// Enable gzip compression for all responses
-app.use(compression({
-    level: 6, // Compression level (1-9), 6 is a good balance
-    filter: (req, res) => {
-        // Don't compress responses if this request header is present
-        if (req.headers['x-no-compression']) {
-            return false;
-        }
-        // Use compression filter function
-        return compression.filter(req, res);
+const initializeConnections = async () => {
+    try {
+        await connectDB();
+        await connectRedis();
+        await connectRabbitMQ();
+        console.log('✅ All connections initialized successfully');
+    } catch (err) {
+        console.error("Connection initialization failed:", err.message);
+        process.exit(1);
     }
-}));
+};
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(cookieParser());
+initializeConnections();
 
-// Metrics middleware - phải đặt trước routes để capture tất cả requests
-// Chỉ enable nếu METRICS_ENABLED=true trong .env
-if (process.env.METRICS_ENABLED === 'true') {
-    app.use(metricsMiddleware);
-    console.log('📊 Metrics enabled - Prometheus metrics available at /metrics');
-}
-
-app.use("/api/auth", routes.authRoutes);
-app.use("/api/users", routes.userRoutes);
-app.use("/api/kyc", routes.kycRoutes);
-app.use("/api/posts", routes.postRoutes);
-app.use("/api/comments", routes.commentRoutes);
-app.use("/api/likes", routes.likeRoutes);
-app.use("/api/campaigns", routes.campaignRoutes);
-app.use("/api/donations", routes.donationRoutes);
-app.use("/api/escrow", routes.escrowRoutes);
-app.use("/api/admin", routes.adminEscrowRoutes);
-app.use("/api/admin", routes.adminRoutes);
-app.use("/api/notifications", routes.notificationRoute);
-app.use("/api/hashtags", routes.hashtagRoutes);
-app.use("/api/conversations", routes.conversationRoutes);
-app.use("/api/messages", routes.messageRoutes);
-app.use("/api/reports", routes.reportRoutes);
-app.use("/api/search", routes.searchRoutes);
-app.use("/api/events", routes.eventRoutes);
-app.use("/api/owner", routes.ownerRoutes);
-app.use("/api/recovery", routes.recoveryRoutes);
-app.use("/api", routes.campaignCompanionRoutes);
-app.use("/api/recommendations", routes.recommendationRoutes);
 
 const server = http.createServer(app);
+
+
 const io = new Server(server, {
     cors: {
         origin: allowedOrigin,
@@ -133,6 +47,7 @@ const io = new Server(server, {
     pingInterval: 25000, // 25 giây - thời gian giữa các ping
     transports: ['websocket', 'polling'],
 });
+
 
 io.use(async (socket, next) => {
     try {
@@ -232,41 +147,12 @@ io.on('connection', async (socket) => {
     });
 });
 
-// Health check endpoint for Railway and monitoring
-app.get('/', (req, res) => {
-    res.status(200).json({
-        status: 'ok',
-        message: 'MACha API is running',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime()
-    });
-});
+// Export io để worker và các module khác có thể dùng
+export { io };
 
-// Dedicated health check endpoint
-app.get('/health', (req, res) => {
-    res.status(200).json({
-        status: 'ok',
-        timestamp: new Date().toISOString()
-    });
-});
-
-// Prometheus metrics endpoint
-// Chỉ expose nếu METRICS_ENABLED=true
-if (process.env.METRICS_ENABLED === 'true') {
-    const metricsPath = process.env.METRICS_PATH || '/metrics';
-    app.get(metricsPath, async (req, res) => {
-        try {
-            res.set('Content-Type', register.contentType);
-            const metrics = await register.metrics();
-            res.end(metrics);
-        } catch (error) {
-            console.error('❌ Error generating metrics:', error);
-            res.status(500).end('Error generating metrics');
-        }
-    });
-    console.log(`📊 Metrics endpoint available at ${metricsPath}`);
-}
-
+// ============================================
+// INIT SUBSCRIBERS
+// ============================================
 // Init subscribers (pass Socket.IO instance)
 initSubscribers(io).then(() => {
     // Log connection info after all subscribers are initialized
@@ -279,9 +165,9 @@ initSubscribers(io).then(() => {
     console.error('❌ Error initializing subscribers:', err);
 });
 
-// Export io để worker có thể dùng
-export { io };
-
+// ============================================
+// START SERVER
+// ============================================
 const PORT = process.env.PORT || 5000;
 
 // Add startup logging
@@ -309,21 +195,49 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log('====================================================');
 });
 
-// Graceful shutdown - cleanup Redis connections
-process.on('SIGTERM', async () => {
-    console.log('🛑 SIGTERM received, closing server...');
-    await closeSubscriber();
-    server.close(() => {
-        console.log('✅ Server closed');
-        process.exit(0);
-    });
-});
+// ============================================
+// GRACEFUL SHUTDOWN
+// ============================================
+let isShuttingDown = false;
 
-process.on('SIGINT', async () => {
-    console.log('🛑 SIGINT received, closing server...');
-    await closeSubscriber();
+const gracefulShutdown = async (signal) => {
+    if (isShuttingDown) {
+        console.log('⚠️  Shutdown already in progress...');
+        return;
+    }
+
+    isShuttingDown = true;
+    console.log(`\n🛑 ${signal} received, initiating graceful shutdown...`);
+
+    // 1. Stop accepting new requests
     server.close(() => {
-        console.log('✅ Server closed');
-        process.exit(0);
+        console.log('✅ HTTP server closed');
     });
-});
+
+    try {
+        // 2. Close Redis subscriber (for pub/sub)
+        console.log('🔌 Closing Redis subscriber...');
+        await closeSubscriber();
+
+        // 3. Close RabbitMQ connections (channels and connection)
+        console.log('🔌 Closing RabbitMQ connections...');
+        await disconnectRabbitMQ();
+
+        // 4. Close Redis main client
+        console.log('🔌 Closing Redis main client...');
+        await disconnectRedis();
+
+        // 5. Close MongoDB connections (last, most critical)
+        console.log('🔌 Closing MongoDB connections...');
+        await disconnectDB();
+
+        console.log('✅ Graceful shutdown completed');
+        process.exit(0);
+    } catch (error) {
+        console.error('❌ Error during shutdown:', error);
+        process.exit(1);
+    }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

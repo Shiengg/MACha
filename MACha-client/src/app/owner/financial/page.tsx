@@ -55,7 +55,7 @@ export default function OwnerFinancial() {
           <div className="flex items-center justify-center h-screen">
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading...</p>
+              <p className="text-gray-500">Đang tải...</p>
             </div>
           </div>
         </OwnerContentWrapper>
@@ -88,7 +88,7 @@ export default function OwnerFinancial() {
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                    {filter === 'day' ? 'Ngày' : filter === 'week' ? 'Tuần' : filter === 'month' ? 'Tháng' : 'Năm'}
                   </button>
                 ))}
               </div>
@@ -115,11 +115,11 @@ export default function OwnerFinancial() {
                 <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
                 <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
               </div>
-              <div className="text-gray-500 text-xs sm:text-sm mb-1">Total Donated</div>
+              <div className="text-gray-500 text-xs sm:text-sm mb-1">Tổng quyên góp</div>
               <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
                 {Math.floor(data.donations.total / 1000000)}M VND
               </div>
-              <div className="text-xs sm:text-sm text-gray-500 mt-1">{data.donations.count} donations</div>
+              <div className="text-xs sm:text-sm text-gray-500 mt-1">{data.donations.count} lượt quyên góp</div>
             </div>
 
             <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
@@ -127,22 +127,22 @@ export default function OwnerFinancial() {
                 <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-red-500" />
                 <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
               </div>
-              <div className="text-gray-500 text-xs sm:text-sm mb-1">Total Released</div>
+              <div className="text-gray-500 text-xs sm:text-sm mb-1">Tổng đã giải ngân</div>
               <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
                 {Math.floor(data.escrow.total_released / 1000000)}M VND
               </div>
-              <div className="text-xs sm:text-sm text-gray-500 mt-1">{data.escrow.released_count} releases</div>
+              <div className="text-xs sm:text-sm text-gray-500 mt-1">{data.escrow.released_count} lượt giải ngân</div>
             </div>
 
             <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-500" />
               </div>
-              <div className="text-gray-500 text-xs sm:text-sm mb-1">Total Pending</div>
+              <div className="text-gray-500 text-xs sm:text-sm mb-1">Tổng đang chờ</div>
               <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
                 {Math.floor(data.escrow.pending_amount / 1000000)}M VND
               </div>
-              <div className="text-xs sm:text-sm text-gray-500 mt-1">{data.escrow.pending_count} pending</div>
+              <div className="text-xs sm:text-sm text-gray-500 mt-1">{data.escrow.pending_count} đang chờ</div>
             </div>
 
             <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-sm">
@@ -154,7 +154,7 @@ export default function OwnerFinancial() {
                   <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
                 )}
               </div>
-              <div className="text-gray-500 text-xs sm:text-sm mb-1">Net Balance</div>
+              <div className="text-gray-500 text-xs sm:text-sm mb-1">Số dư ròng</div>
               <div className={`text-lg sm:text-xl lg:text-2xl font-bold ${data.net_flow >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                 {Math.floor(data.net_flow / 1000000)}M VND
               </div>
@@ -272,11 +272,11 @@ export default function OwnerFinancial() {
               <div className="absolute top-2 right-2 flex gap-4 text-xs">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-green-500 rounded"></div>
-                  <span className="text-gray-600">Donated</span>
+                  <span className="text-gray-600">Quyên góp</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-red-500 rounded"></div>
-                  <span className="text-gray-600">Released</span>
+                  <span className="text-gray-600">Giải ngân</span>
                 </div>
               </div>
             </div>
@@ -284,14 +284,14 @@ export default function OwnerFinancial() {
 
           <div className="grid grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Donations by Method</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quyên góp theo phương thức</h3>
               <div className="space-y-3">
                 {data.donations.by_method.map((method, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <span className="text-gray-700 capitalize">{method._id || 'Unknown'}</span>
                     <div className="text-right">
                       <div className="font-semibold text-gray-900">{method.total.toLocaleString('vi-VN')} VND</div>
-                      <div className="text-sm text-gray-500">{method.count} donations</div>
+                      <div className="text-sm text-gray-500">{method.count} lượt quyên góp</div>
                     </div>
                   </div>
                 ))}
@@ -299,7 +299,7 @@ export default function OwnerFinancial() {
             </div>
 
             <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Donations by Month</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quyên góp theo tháng</h3>
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {data.donations.by_month.map((month, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -308,7 +308,7 @@ export default function OwnerFinancial() {
                     </span>
                     <div className="text-right">
                       <div className="font-semibold text-gray-900">{month.total.toLocaleString('vi-VN')} VND</div>
-                      <div className="text-sm text-gray-500">{month.count} donations</div>
+                      <div className="text-sm text-gray-500">{month.count} lượt quyên góp</div>
                     </div>
                   </div>
                 ))}

@@ -101,6 +101,11 @@ const donationSchema = new mongoose.Schema({
     notes: {
         type: String,
         default: null
+    },
+    thank_you_mail_sent_at: {
+        type: Date,
+        default: null,
+        index: true
     }
 },
     {

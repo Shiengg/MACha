@@ -36,7 +36,7 @@ const option = {
             }
         }
     },
-    apis: ["./server.js",'./routes/*.js'],
+    apis: ["./app.js",'./routes/*.js'],
 };
 
 const swaggerDocs = swaggerJsDoc(option);

@@ -75,18 +75,25 @@ export default function AdminCampaignApproval() {
     try {
       setLoading(true);
       let data: Campaign[] = [];
+      
       // Khi lọc theo "pending" thì gọi API riêng cho admin để lấy danh sách chờ duyệt
       if (statusFilter === 'pending') {
         data = await getPendingCampaigns();
+      } else if (statusFilter === 'all') {
+        // Khi filter "Tất cả", fetch tất cả campaigns bao gồm cả pending
+        // Đảm bảo lấy được tất cả campaigns không bị giới hạn bởi pagination
+        data = await getAllCampaigns(50000); // Sử dụng limit lớn để lấy tất cả
       } else {
-        data = await getAllCampaigns();
+        // Các filter khác (active, rejected, completed, cancelled)
+        data = await getAllCampaigns(50000); // Cũng dùng limit lớn để đảm bảo lấy đủ
       }
+      
       setCampaigns(data);
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to fetch campaigns',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể tải danh sách chiến dịch',
       });
     } finally {
       setLoading(false);
@@ -215,20 +222,20 @@ export default function AdminCampaignApproval() {
     setOpenMenuId(null);
     setMenuPosition(null);
     const { value: reason } = await Swal.fire({
-      title: 'Reject Campaign',
+      title: 'Từ chối chiến dịch',
       input: 'textarea',
-      inputLabel: 'Reason for rejection',
-      inputPlaceholder: 'Enter reason...',
+      inputLabel: 'Lý do từ chối',
+      inputPlaceholder: 'Nhập lý do...',
       inputAttributes: {
-        'aria-label': 'Enter rejection reason',
+        'aria-label': 'Nhập lý do từ chối',
       },
       showCancelButton: true,
       confirmButtonColor: '#dc2626',
       cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Reject',
+      confirmButtonText: 'Từ chối',
       inputValidator: (value) => {
         if (!value) {
-          return 'You need to provide a reason!';
+          return 'Bạn cần cung cấp lý do!';
         }
       },
     });
@@ -236,10 +243,10 @@ export default function AdminCampaignApproval() {
     if (reason) {
       try {
         await rejectCampaign(id, reason);
-        Swal.fire('Rejected!', 'Campaign has been rejected', 'success');
+        Swal.fire('Đã từ chối!', 'Chiến dịch đã bị từ chối', 'success');
         fetchCampaigns();
       } catch (error: any) {
-        Swal.fire('Error', error?.response?.data?.message || 'Failed to reject campaign', 'error');
+        Swal.fire('Lỗi', error?.response?.data?.message || 'Không thể từ chối chiến dịch', 'error');
       }
     }
   };
@@ -364,7 +371,7 @@ export default function AdminCampaignApproval() {
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search"
+                  placeholder="Tìm kiếm"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
@@ -378,7 +385,7 @@ export default function AdminCampaignApproval() {
                   className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors text-sm sm:text-base"
                 >
                   <SlidersHorizontal className="w-4 h-4 text-gray-600" />
-                  <span className="text-xs sm:text-sm font-bold">Filters</span>
+                  <span className="text-xs sm:text-sm font-bold">Bộ lọc</span>
                 </button>
                 
                 {/* Filters Dropdown */}
@@ -517,7 +524,7 @@ export default function AdminCampaignApproval() {
                       : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
                   }`}
                 >
-                  Previous
+                  Trước
                 </button>
                 
                 {getPageNumbers().map((page, index) => (
@@ -549,7 +556,7 @@ export default function AdminCampaignApproval() {
                       : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
                   }`}
                 >
-                  Next
+                  Sau
                 </button>
               </div>
             </div>

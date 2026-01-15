@@ -34,10 +34,10 @@ export default function OwnerCampaignFinancials() {
 
   const handleExport = () => {
     const csvContent = [
-      ['Campaign Name', 'Creator', 'Goal Amount', 'Current Amount', 'Total Donated', 'Total Released', 'Pending', 'Remaining', 'Percentage Completed'].join(','),
+      ['Tên chiến dịch', 'Người tạo', 'Mục tiêu', 'Số tiền hiện tại', 'Tổng quyên góp', 'Tổng đã giải ngân', 'Đang chờ', 'Còn lại', 'Phần trăm hoàn thành'].join(','),
       ...campaigns.map(c => [
         c.campaign.title,
-        c.campaign.creator?.username || c.campaign.creator?.fullname || 'Unknown User',
+        c.campaign.creator?.username || c.campaign.creator?.fullname || 'Người dùng không xác định',
         c.campaign.goal_amount,
         c.campaign.current_amount,
         c.financials.total_donated,
@@ -83,15 +83,15 @@ export default function OwnerCampaignFinancials() {
               className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all text-sm sm:text-base w-full sm:w-auto justify-center"
             >
               <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline">Export Data</span>
-              <span className="sm:hidden">Export</span>
+              <span className="hidden sm:inline">Xuất dữ liệu</span>
+              <span className="sm:hidden">Xuất</span>
             </button>
           </div>
 
           <div className="mb-4">
             <input
               type="text"
-              placeholder="Search campaigns..."
+              placeholder="Tìm kiếm chiến dịch..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -101,7 +101,7 @@ export default function OwnerCampaignFinancials() {
           {loading ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading...</p>
+              <p className="text-gray-500">Đang tải...</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -124,11 +124,11 @@ export default function OwnerCampaignFinancials() {
                           </Link>
                         </div>
                         <p className="text-xs sm:text-sm text-gray-500">
-                          by {item.campaign.creator?.username || item.campaign.creator?.fullname || 'Unknown User'}
+                          bởi {item.campaign.creator?.username || item.campaign.creator?.fullname || 'Người dùng không xác định'}
                         </p>
                         <div className="mt-2">
                           <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
-                            <span className="text-gray-600">Progress</span>
+                            <span className="text-gray-600">Tiến độ</span>
                             <span className="font-semibold text-gray-900">{percentageCompleted.toFixed(1)}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
@@ -144,13 +144,13 @@ export default function OwnerCampaignFinancials() {
                         item.campaign.status === 'completed' ? 'bg-blue-100 text-blue-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
-                        {item.campaign.status}
+                        {item.campaign.status === 'active' ? 'Đang hoạt động' : item.campaign.status === 'completed' ? 'Hoàn thành' : item.campaign.status === 'pending' ? 'Chờ duyệt' : item.campaign.status === 'rejected' ? 'Từ chối' : item.campaign.status === 'cancelled' ? 'Đã hủy' : item.campaign.status}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                       <div className="p-3 sm:p-4 bg-blue-50 rounded-lg">
-                        <div className="text-xs sm:text-sm text-gray-600 mb-1">Goal Amount</div>
+                        <div className="text-xs sm:text-sm text-gray-600 mb-1">Mục tiêu</div>
                         <div className="text-sm sm:text-base lg:text-lg font-bold text-blue-600">
                           {Math.floor(item.campaign.goal_amount / 1000000)}M VND
                         </div>
@@ -158,38 +158,38 @@ export default function OwnerCampaignFinancials() {
                       </div>
 
                       <div className="p-3 sm:p-4 bg-green-50 rounded-lg">
-                        <div className="text-xs sm:text-sm text-gray-600 mb-1">Total Donated</div>
+                        <div className="text-xs sm:text-sm text-gray-600 mb-1">Tổng quyên góp</div>
                         <div className="text-sm sm:text-base lg:text-lg font-bold text-green-600">
                           {Math.floor(item.financials.total_donated / 1000000)}M VND
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">{item.financials.donation_count} donations</div>
+                        <div className="text-xs text-gray-500 mt-1">{item.financials.donation_count} lượt quyên góp</div>
                       </div>
 
                       <div className="p-3 sm:p-4 bg-red-50 rounded-lg">
-                        <div className="text-xs sm:text-sm text-gray-600 mb-1">Total Released</div>
+                        <div className="text-xs sm:text-sm text-gray-600 mb-1">Tổng đã giải ngân</div>
                         <div className="text-sm sm:text-base lg:text-lg font-bold text-red-600">
                           {Math.floor(item.financials.total_released / 1000000)}M VND
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">{item.financials.release_count} releases</div>
+                        <div className="text-xs text-gray-500 mt-1">{item.financials.release_count} lượt giải ngân</div>
                       </div>
 
                       <div className="p-3 sm:p-4 bg-yellow-50 rounded-lg">
-                        <div className="text-xs sm:text-sm text-gray-600 mb-1">Pending Releases</div>
+                        <div className="text-xs sm:text-sm text-gray-600 mb-1">Đang chờ giải ngân</div>
                         <div className="text-sm sm:text-base lg:text-lg font-bold text-yellow-600">
                           {Math.floor(item.financials.pending_releases / 1000000)}M VND
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">{item.financials.pending_release_count} pending</div>
+                        <div className="text-xs text-gray-500 mt-1">{item.financials.pending_release_count} đang chờ</div>
                       </div>
 
                       <div className="p-3 sm:p-4 bg-purple-50 rounded-lg col-span-2 sm:col-span-1">
-                        <div className="text-xs sm:text-sm text-gray-600 mb-1">Remaining</div>
+                        <div className="text-xs sm:text-sm text-gray-600 mb-1">Còn lại</div>
                         <div className={`text-sm sm:text-base lg:text-lg font-bold ${
                           item.financials.remaining >= 0 ? 'text-purple-600' : 'text-red-600'
                         }`}>
                           {Math.floor(item.financials.remaining / 1000000)}M VND
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
-                          {percentageCompleted.toFixed(1)}% completed
+                          {percentageCompleted.toFixed(1)}% hoàn thành
                         </div>
                       </div>
                     </div>
@@ -200,8 +200,8 @@ export default function OwnerCampaignFinancials() {
                         className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all text-sm sm:text-base"
                       >
                         <Eye className="w-4 h-4" />
-                        <span className="hidden sm:inline">View Details</span>
-                        <span className="sm:hidden">View</span>
+                        <span className="hidden sm:inline">Xem chi tiết</span>
+                        <span className="sm:hidden">Xem</span>
                       </Link>
                     </div>
                   </div>
@@ -214,7 +214,7 @@ export default function OwnerCampaignFinancials() {
                   disabled={currentPage === 1}
                   className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm"
                 >
-                  Previous
+                  Trước
                 </button>
                 <span className="text-sm text-gray-600">
                   Trang {currentPage} / {totalPages}
@@ -224,7 +224,7 @@ export default function OwnerCampaignFinancials() {
                   disabled={currentPage === totalPages}
                   className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm"
                 >
-                  Next
+                  Sau
                 </button>
               </div>
             </div>

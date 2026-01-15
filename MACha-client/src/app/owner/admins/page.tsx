@@ -75,8 +75,8 @@ export default function OwnerAdmins() {
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to fetch admins',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể tải danh sách admin',
       });
     } finally {
       setLoading(false);
@@ -87,8 +87,8 @@ export default function OwnerAdmins() {
     if (!createForm.username || !createForm.email || !createForm.password) {
       Swal.fire({
         icon: 'warning',
-        title: 'Warning',
-        text: 'Please fill in all required fields (username, email, password)',
+        title: 'Cảnh báo',
+        text: 'Vui lòng điền đầy đủ các trường bắt buộc (tên đăng nhập, email, mật khẩu)',
       });
       return;
     }
@@ -96,8 +96,8 @@ export default function OwnerAdmins() {
     if (createForm.password.length < 6) {
       Swal.fire({
         icon: 'warning',
-        title: 'Warning',
-        text: 'Password must be at least 6 characters',
+        title: 'Cảnh báo',
+        text: 'Mật khẩu phải có ít nhất 6 ký tự',
       });
       return;
     }
@@ -112,8 +112,8 @@ export default function OwnerAdmins() {
       });
       Swal.fire({
         icon: 'success',
-        title: 'Success',
-        text: 'Admin created successfully',
+        title: 'Thành công',
+        text: 'Đã tạo admin thành công',
       });
       setShowCreateModal(false);
       setCreateForm({ username: '', email: '', password: '', fullname: '', avatar: '' });
@@ -121,8 +121,8 @@ export default function OwnerAdmins() {
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to create admin',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể tạo admin',
       });
     }
   };
@@ -134,8 +134,8 @@ export default function OwnerAdmins() {
       await ownerService.updateAdmin(selectedAdmin._id, editForm);
       Swal.fire({
         icon: 'success',
-        title: 'Success',
-        text: 'Admin updated successfully',
+        title: 'Thành công',
+        text: 'Đã cập nhật admin thành công',
       });
       setShowEditModal(false);
       setSelectedAdmin(null);
@@ -143,21 +143,21 @@ export default function OwnerAdmins() {
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to update admin',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể cập nhật admin',
       });
     }
   };
 
   const handleDeleteAdmin = async (adminId: string) => {
     const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: "This will remove admin role from this user",
+      title: 'Bạn có chắc chắn?',
+      text: "Hành động này sẽ xóa quyền admin của người dùng này",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
       cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, remove it!'
+      confirmButtonText: 'Có, xóa quyền!'
     });
 
     if (result.isConfirmed) {
@@ -165,8 +165,8 @@ export default function OwnerAdmins() {
         await ownerService.deleteAdmin(adminId);
         Swal.fire({
           icon: 'success',
-          title: 'Success',
-          text: 'Admin removed successfully',
+        title: 'Thành công',
+        text: 'Đã xóa quyền admin thành công',
         });
         setOpenMenuId(null);
         setMenuPosition(null);
@@ -174,8 +174,8 @@ export default function OwnerAdmins() {
       } catch (error: any) {
         Swal.fire({
           icon: 'error',
-          title: 'Error',
-          text: error?.response?.data?.message || 'Failed to delete admin',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể xóa admin',
         });
       }
     }
@@ -188,8 +188,8 @@ export default function OwnerAdmins() {
       await ownerService.banAdmin(selectedAdmin._id, banReason);
       Swal.fire({
         icon: 'success',
-        title: 'Success',
-        text: 'Admin banned successfully',
+        title: 'Thành công',
+        text: 'Đã cấm admin thành công',
       });
       setShowBanModal(false);
       setSelectedAdmin(null);
@@ -198,8 +198,8 @@ export default function OwnerAdmins() {
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to ban admin',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể cấm admin',
       });
     }
   };
@@ -209,8 +209,8 @@ export default function OwnerAdmins() {
       await ownerService.unbanAdmin(adminId);
       Swal.fire({
         icon: 'success',
-        title: 'Success',
-        text: 'Admin unbanned successfully',
+        title: 'Thành công',
+        text: 'Đã bỏ cấm admin thành công',
       });
       setOpenMenuId(null);
       setMenuPosition(null);
@@ -218,8 +218,8 @@ export default function OwnerAdmins() {
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to unban admin',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể bỏ cấm admin',
       });
     }
   };
@@ -330,7 +330,7 @@ export default function OwnerAdmins() {
 
   const handleExport = () => {
     const csvContent = [
-      ['Username', 'Email', 'Fullname', 'Approvals', 'Rejections', 'Total Actions', 'Status', 'Created At'].join(','),
+      ['Tên đăng nhập', 'Email', 'Họ và tên', 'Duyệt', 'Từ chối', 'Tổng hành động', 'Trạng thái', 'Ngày tạo'].join(','),
       ...sortedAndFilteredAdmins.map(admin => [
         admin.username || '',
         admin.email || '',
@@ -338,7 +338,7 @@ export default function OwnerAdmins() {
         admin.stats?.approvals || 0,
         admin.stats?.rejections || 0,
         admin.stats?.total || 0,
-        admin.is_banned ? 'Banned' : (admin.is_verified ? 'Verified' : 'Unverified'),
+        admin.is_banned ? 'Đã cấm' : (admin.is_verified ? 'Đã xác thực' : 'Chưa xác thực'),
         new Date(admin.createdAt).toLocaleDateString('vi-VN')
       ].join(','))
     ].join('\n');
@@ -370,8 +370,8 @@ export default function OwnerAdmins() {
                 className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all text-sm sm:text-base flex-1 sm:flex-none justify-center"
               >
                 <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">Export CSV</span>
-                <span className="sm:hidden">Export</span>
+                <span className="hidden sm:inline">Xuất CSV</span>
+                <span className="sm:hidden">Xuất</span>
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
@@ -391,7 +391,7 @@ export default function OwnerAdmins() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Search admins..."
+                    placeholder="Tìm kiếm admin..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -403,10 +403,10 @@ export default function OwnerAdmins() {
                     onChange={(e) => setStatusFilter(e.target.value as any)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
-                    <option value="all">All Status</option>
-                    <option value="verified">Verified</option>
-                    <option value="unverified">Unverified</option>
-                    <option value="banned">Banned</option>
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="verified">Đã xác thực</option>
+                    <option value="unverified">Chưa xác thực</option>
+                    <option value="banned">Đã cấm</option>
                   </select>
                 </div>
               </div>
@@ -415,7 +415,7 @@ export default function OwnerAdmins() {
             {loading ? (
               <div className="p-8 text-center">
                 <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-gray-500">Loading...</p>
+                <p className="text-gray-500">Đang tải...</p>
               </div>
             ) : (
               <>
@@ -441,13 +441,13 @@ export default function OwnerAdmins() {
                             {getSortIcon('email')}
                           </div>
                         </th>
-                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Stats</th>
+                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Thống kê</th>
                         <th 
                           className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                           onClick={() => handleSort('is_verified')}
                         >
                           <div className="flex items-center gap-2">
-                            Status
+                            Trạng thái
                             {getSortIcon('is_verified')}
                           </div>
                         </th>
@@ -456,11 +456,11 @@ export default function OwnerAdmins() {
                           onClick={() => handleSort('createdAt')}
                         >
                           <div className="flex items-center gap-2">
-                            Created
+                            Ngày tạo
                             {getSortIcon('createdAt')}
                           </div>
                         </th>
-                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Hành động</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -489,11 +489,11 @@ export default function OwnerAdmins() {
                             <div className="text-xs sm:text-sm text-gray-900">
                               {admin.stats ? (
                                 <>
-                                  <div>Approvals: {admin.stats.approvals}</div>
-                                  <div>Rejections: {admin.stats.rejections}</div>
+                                  <div>Duyệt: {admin.stats.approvals}</div>
+                                  <div>Từ chối: {admin.stats.rejections}</div>
                                 </>
                               ) : (
-                                <span className="text-gray-400">No data</span>
+                                <span className="text-gray-400">Không có dữ liệu</span>
                               )}
                             </div>
                           </td>
@@ -502,11 +502,11 @@ export default function OwnerAdmins() {
                               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                 admin.is_verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                               }`}>
-                                {admin.is_verified ? 'Verified' : 'Unverified'}
+                                {admin.is_verified ? 'Đã xác thực' : 'Chưa xác thực'}
                               </span>
                               {admin.is_banned && (
                                 <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                  Banned
+                                  Đã cấm
                                 </span>
                               )}
                             </div>
@@ -539,7 +539,7 @@ export default function OwnerAdmins() {
                     disabled={currentPage === 1}
                     className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm"
                   >
-                    Previous
+                    Trước
                   </button>
                   <span className="text-gray-600 text-sm">
                     Trang {currentPage} / {totalPages}
@@ -549,7 +549,7 @@ export default function OwnerAdmins() {
                     disabled={currentPage === totalPages}
                     className="px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm"
                   >
-                    Next
+                    Sau
                   </button>
                 </div>
               </>
@@ -565,13 +565,13 @@ export default function OwnerAdmins() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Username <span className="text-red-500">*</span>
+                  Tên đăng nhập <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={createForm.username}
                   onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
-                  placeholder="Enter username"
+                  placeholder="Nhập tên đăng nhập"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   required
                 />
@@ -584,7 +584,7 @@ export default function OwnerAdmins() {
                   type="email"
                   value={createForm.email}
                   onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                  placeholder="Enter email"
+                  placeholder="Nhập email"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   required
                 />
@@ -597,29 +597,29 @@ export default function OwnerAdmins() {
                   type="password"
                   value={createForm.password}
                   onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                  placeholder="Enter password (min 6 characters)"
+                  placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+                <p className="text-xs text-gray-500 mt-1">Tối thiểu 6 ký tự</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Họ và tên</label>
                 <input
                   type="text"
                   value={createForm.fullname}
                   onChange={(e) => setCreateForm({ ...createForm, fullname: e.target.value })}
-                  placeholder="Enter full name (optional)"
+                  placeholder="Nhập họ và tên (tùy chọn)"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Avatar URL</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">URL ảnh đại diện</label>
                 <input
                   type="text"
                   value={createForm.avatar}
                   onChange={(e) => setCreateForm({ ...createForm, avatar: e.target.value })}
-                  placeholder="Enter avatar URL (optional)"
+                  placeholder="Nhập URL ảnh đại diện (tùy chọn)"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
@@ -629,7 +629,7 @@ export default function OwnerAdmins() {
                 onClick={handleCreateAdmin}
                 className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
               >
-                Create Admin
+                Tạo Admin
               </button>
               <button
                 onClick={() => {
@@ -638,7 +638,7 @@ export default function OwnerAdmins() {
                 }}
                 className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >
-                Cancel
+                Hủy
               </button>
             </div>
           </div>
@@ -648,10 +648,10 @@ export default function OwnerAdmins() {
       {showEditModal && selectedAdmin && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Edit Admin</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Chỉnh sửa Admin</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Họ và tên</label>
                 <input
                   type="text"
                   value={editForm.fullname}
@@ -660,7 +660,7 @@ export default function OwnerAdmins() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Avatar URL</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">URL ảnh đại diện</label>
                 <input
                   type="text"
                   value={editForm.avatar}
@@ -674,7 +674,7 @@ export default function OwnerAdmins() {
                 onClick={handleUpdateAdmin}
                 className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
               >
-                Update
+                Cập nhật
               </button>
               <button
                 onClick={() => {
@@ -683,7 +683,7 @@ export default function OwnerAdmins() {
                 }}
                 className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >
-                Cancel
+                Hủy
               </button>
             </div>
           </div>
@@ -693,13 +693,13 @@ export default function OwnerAdmins() {
       {showBanModal && selectedAdmin && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Ban Admin</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Cấm Admin</h2>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Ban Reason</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Lý do cấm</label>
               <textarea
                 value={banReason}
                 onChange={(e) => setBanReason(e.target.value)}
-                placeholder="Enter ban reason..."
+                placeholder="Nhập lý do cấm..."
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
@@ -709,7 +709,7 @@ export default function OwnerAdmins() {
                 onClick={handleBanAdmin}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
-                Ban Admin
+                Cấm Admin
               </button>
               <button
                 onClick={() => {
@@ -719,7 +719,7 @@ export default function OwnerAdmins() {
                 }}
                 className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >
-                Cancel
+                Hủy
               </button>
             </div>
           </div>
@@ -748,14 +748,14 @@ export default function OwnerAdmins() {
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                 >
                   <Eye className="w-4 h-4" />
-                  View Details
+                  Xem chi tiết
                 </button>
                 <button
                   onClick={() => openEditModal(admin)}
                   className="w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2"
                 >
                   <Edit className="w-4 h-4" />
-                  Edit
+                  Chỉnh sửa
                 </button>
                 {admin.is_banned ? (
                   <button
@@ -763,7 +763,7 @@ export default function OwnerAdmins() {
                     className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 flex items-center gap-2"
                   >
                     <Unlock className="w-4 h-4" />
-                    Unban
+                    Bỏ cấm
                   </button>
                 ) : (
                   <button
@@ -771,7 +771,7 @@ export default function OwnerAdmins() {
                     className="w-full text-left px-4 py-2 text-sm text-orange-700 hover:bg-orange-50 flex items-center gap-2"
                   >
                     <Ban className="w-4 h-4" />
-                    Ban
+                    Cấm
                   </button>
                 )}
                 <button

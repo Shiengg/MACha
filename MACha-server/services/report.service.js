@@ -8,6 +8,7 @@ import { redisClient } from "../config/redis.js";
 import * as queueService from "./queue.service.js";
 import * as postService from "./post.service.js";
 import * as trackingService from "./tracking.service.js";
+import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
 
 const invalidateEventCaches = async (eventId, category = null, status = null) => {
     const keys = [
@@ -83,12 +84,19 @@ const removeReportedItem = async (reportedType, reportedId, resolutionDetails, a
             }
             
             try {
-                await queueService.pushJob({
-                    type: "POST_REMOVED",
-                    postId: reportedId,
-                    adminId: adminId,
-                    resolutionDetails: resolutionDetails
-                });
+                const job = createJob(
+                    JOB_TYPES.POST_REMOVED,
+                    {
+                        postId: reportedId.toString(),
+                        adminId: adminId ? adminId.toString() : null,
+                        resolutionDetails: resolutionDetails
+                    },
+                    {
+                        userId: adminId ? adminId.toString() : null,
+                        source: JOB_SOURCE.ADMIN
+                    }
+                );
+                await queueService.pushJob(job);
             } catch (error) {
                 console.error('Error pushing POST_REMOVED job:', error);
             }
@@ -126,12 +134,24 @@ const removeReportedItem = async (reportedType, reportedId, resolutionDetails, a
             }
             
             try {
-                await queueService.pushJob({
-                    type: "CAMPAIGN_REMOVED",
-                    campaignId: reportedId,
-                    adminId: adminId,
-                    resolutionDetails: resolutionDetails
-                });
+                // Fetch creator data for email
+                const creator = await Campaign.findById(reportedId).populate('creator', 'email username').select('creator title');
+                const job = createJob(
+                    JOB_TYPES.CAMPAIGN_REMOVED,
+                    {
+                        email: creator?.creator?.email || '',
+                        username: creator?.creator?.username || '',
+                        campaignTitle: creator?.title || '',
+                        campaignId: reportedId.toString(),
+                        adminId: adminId ? adminId.toString() : null,
+                        resolutionDetails: resolutionDetails
+                    },
+                    {
+                        userId: adminId ? adminId.toString() : null,
+                        source: JOB_SOURCE.ADMIN
+                    }
+                );
+                await queueService.pushJob(job);
             } catch (error) {
                 console.error('Error pushing CAMPAIGN_REMOVED job:', error);
             }
@@ -192,12 +212,19 @@ const removeReportedItem = async (reportedType, reportedId, resolutionDetails, a
             }
             
             try {
-                await queueService.pushJob({
-                    type: "EVENT_REMOVED",
-                    eventId: reportedId,
-                    adminId: adminId,
-                    resolutionDetails: resolutionDetails
-                });
+                const job = createJob(
+                    JOB_TYPES.EVENT_REMOVED,
+                    {
+                        eventId: reportedId.toString(),
+                        adminId: adminId ? adminId.toString() : null,
+                        resolutionDetails: resolutionDetails
+                    },
+                    {
+                        userId: adminId ? adminId.toString() : null,
+                        source: JOB_SOURCE.ADMIN
+                    }
+                );
+                await queueService.pushJob(job);
             } catch (error) {
                 console.error('Error pushing EVENT_REMOVED job:', error);
             }
@@ -251,12 +278,19 @@ const warnUser = async (reportedType, reportedId, adminId, resolutionDetails) =>
         }
 
         try {
-            await queueService.pushJob({
-                type: "USER_WARNED",
-                userId: userId,
-                adminId: adminId,
-                resolutionDetails: resolutionDetails
-            });
+            const job = createJob(
+                JOB_TYPES.USER_WARNED,
+                {
+                    userId: userId.toString(),
+                    adminId: adminId ? adminId.toString() : null,
+                    resolutionDetails: resolutionDetails
+                },
+                {
+                    userId: adminId ? adminId.toString() : null,
+                    source: JOB_SOURCE.ADMIN
+                }
+            );
+            await queueService.pushJob(job);
         } catch (error) {
             console.error('Error pushing USER_WARNED job:', error);
         }

@@ -3,6 +3,7 @@ import * as userService from "../services/user.service.js";
 import * as searchService from "../services/search.service.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
+import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
 
 export const getAllUsers = async (req, res) => {
     try {
@@ -64,11 +65,18 @@ export const followUser = async (req, res) => {
                 followerId: currentUserId,
                 targetUserId: targetUserId
             });
-            await queueService.pushJob({
-                type: "USER_FOLLOWED",
-                followerId: currentUserId,
-                targetUserId: targetUserId
-            });
+            const job = createJob(
+                JOB_TYPES.USER_FOLLOWED,
+                {
+                    followerId: currentUserId.toString(),
+                    targetUserId: targetUserId
+                },
+                {
+                    userId: currentUserId.toString(),
+                    source: JOB_SOURCE.API
+                }
+            );
+            await queueService.pushJob(job);
         } catch (error) {
             console.error('Error publishing event or pushing job:', error);
         }

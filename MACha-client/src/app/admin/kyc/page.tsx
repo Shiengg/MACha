@@ -432,7 +432,7 @@ export default function AdminKYCApproval() {
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search"
+                  placeholder="Tìm kiếm"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
@@ -446,7 +446,7 @@ export default function AdminKYCApproval() {
                   className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors text-sm sm:text-base"
                 >
                   <SlidersHorizontal className="w-4 h-4 text-gray-600" />
-                  <span className="text-xs sm:text-sm font-bold">Filters</span>
+                  <span className="text-xs sm:text-sm font-bold">Bộ lọc</span>
                 </button>
                 
                 {/* Filters Dropdown */}
@@ -599,7 +599,7 @@ export default function AdminKYCApproval() {
                       : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
                   }`}
                 >
-                  Previous
+                  Trước
                 </button>
                 
                 {getPageNumbers().map((page, index) => (
@@ -631,7 +631,7 @@ export default function AdminKYCApproval() {
                       : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
                   }`}
                 >
-                  Next
+                  Sau
                 </button>
               </div>
             </div>
@@ -669,7 +669,7 @@ export default function AdminKYCApproval() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin người dùng</h3>
                   <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <div>
-                      <p className="text-gray-600 text-sm mb-1">Username</p>
+                      <p className="text-gray-600 text-sm mb-1">Tên đăng nhập</p>
                       <p className="text-gray-900 font-medium">{selectedKYC.user.username}</p>
                     </div>
                     <div>

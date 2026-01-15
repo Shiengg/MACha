@@ -5,6 +5,7 @@ import EventUpdate from "../models/eventUpdate.js";
 import { redisClient } from "../config/redis.js";
 import { publishEvent } from "./tracking.service.js";
 import * as queueService from "./queue.service.js";
+import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
 import { geocodeLocation } from "./geocoding.service.js";
 
 const invalidateEventCaches = async (eventId, category = null, status = null) => {
@@ -593,13 +594,20 @@ export const createEventUpdate = async (eventId, userId, payload) => {
     await redisClient.del(`events:updates:${eventId}`);
     
     try {
-        await queueService.pushJob({
-            type: "EVENT_UPDATE_CREATED",
-            eventId: eventId.toString(),
-            userId: userId.toString(),
-            updateContent: payload.content || 'Có cập nhật mới về sự kiện',
-            eventTitle: event.title
-        });
+        const job = createJob(
+            JOB_TYPES.EVENT_UPDATE_CREATED,
+            {
+                eventId: eventId.toString(),
+                userId: userId.toString(),
+                updateContent: payload.content || 'Có cập nhật mới về sự kiện',
+                eventTitle: event.title
+            },
+            {
+                userId: userId.toString(),
+                source: JOB_SOURCE.API
+            }
+        );
+        await queueService.pushJob(job);
     } catch (queueError) {
         console.error('Error queueing event update notification job:', queueError);
     }

@@ -79,8 +79,8 @@ export default function AdminReports() {
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to fetch reports',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể tải danh sách báo cáo',
       });
     } finally {
       setLoading(false);
@@ -100,8 +100,8 @@ export default function AdminReports() {
     } catch (error: any) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: error?.response?.data?.message || 'Failed to fetch item details',
+        title: 'Lỗi',
+        text: error?.response?.data?.message || 'Không thể tải chi tiết item',
       });
     } finally {
       setLoadingItemDetails(false);
@@ -125,7 +125,7 @@ export default function AdminReports() {
             setShowItemDetailsModal(false);
           }
         } catch (error: any) {
-          Swal.fire('Error', error?.response?.data?.message || 'Failed to batch update reports', 'error');
+          Swal.fire('Lỗi', error?.response?.data?.message || 'Không thể cập nhật hàng loạt báo cáo', 'error');
         } finally {
           setProcessingItemKey(null);
         }
@@ -163,7 +163,7 @@ export default function AdminReports() {
             setShowItemDetailsModal(false);
           }
         } catch (error: any) {
-          Swal.fire('Error', error?.response?.data?.message || 'Failed to batch update reports', 'error');
+          Swal.fire('Lỗi', error?.response?.data?.message || 'Không thể cập nhật hàng loạt báo cáo', 'error');
         } finally {
           setProcessingItemKey(null);
         }
@@ -184,13 +184,13 @@ export default function AdminReports() {
           await updateReportStatus(reportId, {
             status,
           });
-          Swal.fire('Success!', 'Report status updated successfully', 'success');
+          Swal.fire('Thành công!', 'Đã cập nhật trạng thái báo cáo thành công', 'success');
           if (selectedItem) {
             handleViewItemDetails(selectedItem);
           }
           fetchGroupedReports();
         } catch (error: any) {
-          Swal.fire('Error', error?.response?.data?.message || 'Failed to update report status', 'error');
+          Swal.fire('Lỗi', error?.response?.data?.message || 'Không thể cập nhật trạng thái báo cáo', 'error');
         } finally {
           setProcessingReportId(null);
         }
@@ -222,13 +222,13 @@ export default function AdminReports() {
             status,
             resolution: 'no_action',
           });
-          Swal.fire('Success!', 'Report status updated successfully', 'success');
+          Swal.fire('Thành công!', 'Đã cập nhật trạng thái báo cáo thành công', 'success');
           if (selectedItem) {
             handleViewItemDetails(selectedItem);
           }
           fetchGroupedReports();
         } catch (error: any) {
-          Swal.fire('Error', error?.response?.data?.message || 'Failed to update report status', 'error');
+          Swal.fire('Lỗi', error?.response?.data?.message || 'Không thể cập nhật trạng thái báo cáo', 'error');
         } finally {
           setProcessingReportId(null);
         }
@@ -363,7 +363,7 @@ export default function AdminReports() {
       setSelectedResolution('no_action');
       setResolutionDetails('');
     } catch (error: any) {
-      Swal.fire('Error', error?.response?.data?.message || 'Failed to update reports', 'error');
+      Swal.fire('Lỗi', error?.response?.data?.message || 'Không thể cập nhật báo cáo', 'error');
     } finally {
       setIsProcessingResolution(false);
     }
@@ -392,7 +392,7 @@ export default function AdminReports() {
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search"
+                  placeholder="Tìm kiếm"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
@@ -405,7 +405,7 @@ export default function AdminReports() {
                   className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-white text-gray-900 rounded-lg border border-gray-400 hover:bg-gray-50 transition-colors text-sm sm:text-base"
                 >
                   <SlidersHorizontal className="w-4 h-4 text-gray-600" />
-                  <span className="text-xs sm:text-sm font-bold">Filters</span>
+                  <span className="text-xs sm:text-sm font-bold">Bộ lọc</span>
                 </button>
                 
                 {showFilters && (
@@ -592,7 +592,7 @@ export default function AdminReports() {
                       : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
                   }`}
                 >
-                  Previous
+                  Trước
                 </button>
                 
                 {getPageNumbers().map((page, index) => (
@@ -624,7 +624,7 @@ export default function AdminReports() {
                       : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-400'
                   }`}
                 >
-                  Next
+                  Sau
                 </button>
               </div>
             </div>
@@ -655,7 +655,7 @@ export default function AdminReports() {
                 </div>
               ) : reportedItem ? (
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-4">Item được báo cáo:</h3>
+                  <h3 className="font-semibold text-gray-900 mb-4">Nội dung bị báo cáo:</h3>
                   {selectedItem?.reported_type === 'post' && reportedItem.content_text ? (
                     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                       <PostCard 

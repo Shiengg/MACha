@@ -4,6 +4,7 @@ import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
 import * as authService from "../services/auth.service.js";
 import * as trackingService from "../services/tracking.service.js";
 import * as queueService from "../services/queue.service.js";
+import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
 import User, { ONBOARDING_CATEGORIES } from "../models/user.js";
 import { redisClient } from "../config/redis.js";
 
@@ -58,13 +59,20 @@ export const signup = async (req, res) => {
         const { otp, expiresIn } = await authService.createOtp(user.id);
 
         try {
-            await queueService.pushJob({
-                type: "SEND_OTP_SIGNUP",
-                email: user.email,
-                username: user.username,
-                otp: otp,
-                expiresIn: expiresIn
-            });
+            const job = createJob(
+                JOB_TYPES.SEND_OTP_SIGNUP,
+                {
+                    email: user.email,
+                    username: user.username,
+                    otp: otp,
+                    expiresIn: expiresIn
+                },
+                {
+                    userId: user.id.toString(),
+                    source: JOB_SOURCE.API
+                }
+            );
+            await queueService.pushJob(job);
         } catch (error) {
             console.error('Error publishing event or pushing job:', error);
         }
@@ -373,13 +381,20 @@ export const sendOtp = async (req, res) => {
         const userId = req.user._id;
         const { otp, expiresIn } = await authService.createOtp(userId);
         try {
-            await queueService.pushJob({
-                type: "SEND_OTP",
-                email: req.user.email,
-                username: req.user.username,
-                otp: otp,
-                expiresIn: expiresIn
-            });
+            const job = createJob(
+                JOB_TYPES.SEND_OTP,
+                {
+                    email: req.user.email,
+                    username: req.user.username,
+                    otp: otp,
+                    expiresIn: expiresIn
+                },
+                {
+                    userId: userId.toString(),
+                    source: JOB_SOURCE.API
+                }
+            );
+            await queueService.pushJob(job);
         } catch (error) {
             console.error('Error publishing event or pushing job:', error);
         }
@@ -462,12 +477,19 @@ export const forgotPassword = async (req, res) => {
         }
         const newPassword = await authService.forgotPassword(email);
         try {
-            await queueService.pushJob({
-                type: "SEND_FORGOT_PASSWORD",
-                email: email,
-                username: user.username,
-                newPassword: newPassword
-            });
+            const job = createJob(
+                JOB_TYPES.SEND_FORGOT_PASSWORD,
+                {
+                    email: email,
+                    username: user.username,
+                    newPassword: newPassword
+                },
+                {
+                    userId: user._id.toString(),
+                    source: JOB_SOURCE.API
+                }
+            );
+            await queueService.pushJob(job);
         } catch (error) {
             console.error('Error publishing event or pushing job:', error);
         }

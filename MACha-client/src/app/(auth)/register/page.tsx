@@ -189,13 +189,13 @@ function SignupPageContent() {
                             {/* Username Input */}
                             <div className="mb-6">
                                 <label htmlFor="username" className="block text-gray-900 font-medium mb-2">
-                                    Username
+                                    Tên đăng nhập
                                 </label>
                                 <input
                                     id="username"
                                     type="text"
                                     {...register('username')}
-                                    placeholder="Username"
+                                    placeholder="Tên đăng nhập"
                                     className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${errors.username
                                         ? 'border-red-500 focus:border-red-500'
                                         : 'border-gray-300 focus:border-blue-500'
@@ -231,13 +231,13 @@ function SignupPageContent() {
                             {/* Password Input */}
                             <div className="mb-6">
                                 <label htmlFor="password" className="block text-gray-900 font-medium mb-2">
-                                    Password
+                                    Mật khẩu
                                 </label>
                                 <input
                                     id="password"
                                     type="password"
                                     {...register('password')}
-                                    placeholder="Password"
+                                    placeholder="Mật khẩu"
                                     className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${errors.password
                                         ? 'border-red-500 focus:border-red-500'
                                         : 'border-gray-300 focus:border-blue-500'
@@ -252,13 +252,13 @@ function SignupPageContent() {
                             {/* Confirm Password Input */}
                             <div className="mb-8">
                                 <label htmlFor="confirmPassword" className="block text-gray-900 font-medium mb-2">
-                                    Confirm Password
+                                    Xác nhận mật khẩu
                                 </label>
                                 <input
                                     id="confirmPassword"
                                     type="password"
                                     {...register('confirmPassword')}
-                                    placeholder="Confirm Password"
+                                    placeholder="Xác nhận mật khẩu"
                                     className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${errors.confirmPassword
                                         ? 'border-red-500 focus:border-red-500'
                                         : 'border-gray-300 focus:border-blue-500'
@@ -328,13 +328,13 @@ function SignupPageContent() {
 
                                 <div className="mb-6">
                                     <label htmlFor="org_username" className="block text-gray-900 font-medium mb-2">
-                                        Username
+                                        Tên đăng nhập
                                     </label>
                                     <input
                                         id="org_username"
                                         type="text"
                                         {...orgForm.register('username')}
-                                        placeholder="Username"
+                                        placeholder="Tên đăng nhập"
                                         className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${
                                             orgForm.formState.errors.username
                                                 ? 'border-red-500 focus:border-red-500'
@@ -374,13 +374,13 @@ function SignupPageContent() {
 
                                 <div className="mb-6">
                                     <label htmlFor="org_password" className="block text-gray-900 font-medium mb-2">
-                                        Password
+                                        Mật khẩu
                                     </label>
                                     <input
                                         id="org_password"
                                         type="password"
                                         {...orgForm.register('password')}
-                                        placeholder="Password"
+                                        placeholder="Mật khẩu"
                                         className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${
                                             orgForm.formState.errors.password
                                                 ? 'border-red-500 focus:border-red-500'
@@ -397,13 +397,13 @@ function SignupPageContent() {
 
                                 <div className="mb-8">
                                     <label htmlFor="org_confirm_password" className="block text-gray-900 font-medium mb-2">
-                                        Confirm Password
+                                        Xác nhận mật khẩu
                                     </label>
                                     <input
                                         id="org_confirm_password"
                                         type="password"
                                         {...orgForm.register('confirm_password')}
-                                        placeholder="Confirm Password"
+                                        placeholder="Xác nhận mật khẩu"
                                         className={`w-full px-6 py-4 border-2 rounded-full focus:outline-none transition-colors text-gray-900 ${
                                             orgForm.formState.errors.confirm_password
                                                 ? 'border-red-500 focus:border-red-500'
@@ -449,16 +449,24 @@ function SignupPageContent() {
                                 </button>
                             </form>
                         )}
+
+                        {/* Contact Section */}
+                        <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+                            <p className="text-sm text-gray-600 mb-2">Cần hỗ trợ?</p>
+                            <p className="text-sm text-gray-700">
+                                Liên hệ: <a href="mailto:owner@gmail.com" className="text-blue-600 hover:text-blue-700 hover:underline">owner@gmail.com</a>
+                            </p>
+                        </div>
                     </div>
                 </div>
 
                 {/* Right Side - Illustration */}
                 <div className="lg:w-1/2 bg-white p-12 flex flex-col justify-center items-center">
                     <h1 className="text-5xl font-bold text-gray-900 mb-4 leading-tight text-center">
-                        Connect communities raise transparent funds
+                        Kết nối cộng đồng, gây quỹ minh bạch
                     </h1>
                     <p className="text-gray-600 text-lg mb-8 text-center max-w-md">
-                        Join our platform for social fundraising and contribute to meaningful cause.
+                        Tham gia nền tảng gây quỹ xã hội của chúng tôi và đóng góp cho những mục đích ý nghĩa.
                     </p>
                     <div className="w-full max-w-md">
                         <Image

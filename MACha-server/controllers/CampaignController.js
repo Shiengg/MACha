@@ -5,15 +5,22 @@ import * as queueService from "../services/queue.service.js";
 import * as userService from "../services/user.service.js";
 import * as recommendationService from "../services/recommendation.service.js";
 import * as searchService from "../services/search.service.js";
+import { createJob, JOB_TYPES, JOB_SOURCE } from "../schemas/job.schema.js";
 import { HTTP_STATUS, HTTP_STATUS_TEXT } from "../utils/status.js";
+import User from "../models/user.js";
 
 export const getAllCampaigns = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 0;
         const limit = parseInt(req.query.limit) || 20;
         const userId = req.user?._id;
+        const userRole = req.user?.role;
         
-        if (page === 0 && userId) {
+        // Admin và các role khác cần thấy tất cả campaigns (bao gồm pending)
+        // nên skip recommendation service
+        const isAdmin = userRole === 'admin';
+        
+        if (page === 0 && userId && !isAdmin) {
             try {
                 const recommendationResult = await recommendationService.getRecommendedCampaigns(
                     userId.toString(),
@@ -36,7 +43,7 @@ export const getAllCampaigns = async (req, res) => {
             }
         }
         
-        // Các trang sau hoặc user chưa login: get bình thường
+        // Admin, các trang sau, hoặc user chưa login: get bình thường (tất cả campaigns)
         const result = await campaignService.getCampaigns(page, limit, userId);
         res.status(HTTP_STATUS.OK).json({ 
             campaigns: result.campaigns,
@@ -134,6 +141,58 @@ export const getCampaignsByCreator = async (req, res) => {
         });
     } catch (error) {
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message })
+    }
+}
+
+/**
+ * Get campaigns by creator with pagination
+ * Supports permission-based filtering (owner sees all, public sees only active/completed/approved/voting)
+ * 
+ * Query params:
+ * - creatorId (required): User ID of campaign creator
+ * - page (optional, default: 1): Page number
+ * - limit (optional, default: 10): Items per page (max: 50)
+ */
+export const getCampaignsByCreatorPagination = async (req, res) => {
+    try {
+        const creatorId = req.query.creatorId || req.params.userId;
+        const viewerId = req.user?._id || null; // Current logged-in user (null if anonymous)
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        
+        // Validate creatorId
+        if (!creatorId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: "creatorId is required" 
+            });
+        }
+        
+        // Validate pagination params
+        if (page < 1) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: "page must be >= 1" 
+            });
+        }
+        
+        if (limit < 1 || limit > 50) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: "limit must be between 1 and 50" 
+            });
+        }
+        
+        const result = await campaignService.getCampaignsByCreatorWithPagination(
+            creatorId,
+            viewerId,
+            page,
+            limit
+        );
+        
+        res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        console.error('[Campaign Controller] Error getting campaigns by creator:', error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
+            message: error.message || 'Internal server error' 
+        });
     }
 }
 
@@ -247,11 +306,18 @@ export const createCampaign = async (req, res) => {
                 proof_documents_url: campaign.proof_documents_url,
                 category: campaign.category,
             });
-            await queueService.pushJob({
-                type: "CAMPAIGN_CREATED",
-                campaignId: campaign._id,
-                userId: req.user._id
-            });
+            const job = createJob(
+                JOB_TYPES.CAMPAIGN_CREATED,
+                {
+                    campaignId: campaign._id.toString(),
+                    userId: req.user._id.toString()
+                },
+                {
+                    userId: req.user._id.toString(),
+                    source: JOB_SOURCE.API
+                }
+            );
+            await queueService.pushJob(job);
         } catch (eventError) {
             console.error('Error publishing event or pushing job:', eventError);
         }
@@ -263,11 +329,23 @@ export const createCampaign = async (req, res) => {
 }
 
 export const updateCampaign = async (req, res) => {
+    const requestId = `update-ctrl-${req.params.id}-${Date.now()}`;
+    const campaignId = req.params.id;
+    const userId = req.user._id;
+
     try {
+        console.log(`[Campaign Update Controller] Starting update`, {
+            requestId,
+            campaignId,
+            userId,
+            payloadFields: Object.keys(req.body)
+        });
+
         const result = await campaignService.updateCampaign(
-            req.params.id,
-            req.user._id,
-            req.body
+            campaignId,
+            userId,
+            req.body,
+            requestId
         );
 
         if (!result.success) {
@@ -292,26 +370,94 @@ export const updateCampaign = async (req, res) => {
                     message: result.message
                 });
             }
+            if (result.error === 'CANNOT_CHANGE_STATUS_WHEN_PENDING') {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    message: result.message
+                });
+            }
+            if (result.error === 'STATUS_CHANGED_DURING_UPDATE' || result.error === 'CONCURRENT_UPDATE') {
+                return res.status(HTTP_STATUS.CONFLICT).json({
+                    message: result.message,
+                    currentStatus: result.currentStatus
+                });
+            }
+            if (result.error === 'UPDATE_FAILED') {
+                return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+                    message: "Failed to update campaign. Please try again."
+                });
+            }
+
+            // Fallback for unknown errors
+            console.error(`[Campaign Update Controller] Unknown error`, {
+                requestId,
+                campaignId,
+                error: result.error
+            });
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: result.message || "Failed to update campaign"
+            });
         }
 
-        // Publish tracking event
+        // Publish tracking event AFTER DB is committed and cache is invalidated
         try {
-            await trackingService.publishEvent("tracking:campaign:updated", {
+            const eventPayload = {
                 campaignId: result.campaign._id,
-                userId: req.user._id,
+                userId: userId,
                 title: result.campaign.title,
                 goal_amount: result.campaign.goal_amount,
                 current_amount: result.campaign.current_amount,
                 status: result.campaign.status,
                 category: result.campaign.category,
+                requestId: result.requestId || requestId,
+                timestamp: new Date().toISOString(),
+                // Add flag to indicate if this was a PENDING campaign update
+                wasPending: result.campaign.status === 'pending' || req.body.status === 'pending'
+            };
+
+            // Publish specific event for PENDING updates
+            if (result.campaign.status === 'pending') {
+                await trackingService.publishEvent("tracking:campaign:updated:when:pending", {
+                    ...eventPayload,
+                    updatedFields: Object.keys(req.body)
+                });
+            }
+
+            // Also publish general update event
+            await trackingService.publishEvent("tracking:campaign:updated", eventPayload);
+
+            console.log(`[Campaign Update Controller] Event published successfully`, {
+                requestId,
+                campaignId,
+                status: result.campaign.status
             });
         } catch (error) {
-            console.error('Error publishing event:', error);
+            // Log but don't fail - event publishing is non-critical
+            console.error(`[Campaign Update Controller] Error publishing event (non-critical)`, {
+                requestId,
+                campaignId,
+                error: error.message
+            });
         }
 
-        return res.status(HTTP_STATUS.OK).json({ campaign: result.campaign });
+        console.log(`[Campaign Update Controller] Update completed successfully`, {
+            requestId,
+            campaignId,
+            status: result.campaign.status
+        });
+
+        return res.status(HTTP_STATUS.OK).json({ 
+            campaign: result.campaign 
+        });
     } catch (error) {
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+        console.error(`[Campaign Update Controller] Unexpected error`, {
+            requestId,
+            campaignId,
+            error: error.message,
+            stack: error.stack
+        });
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
+            message: error.message 
+        });
     }
 };
 
@@ -416,10 +562,21 @@ export const getPendingCampaigns = async (req, res) => {
 };
 
 export const approveCampaign = async (req, res) => {
+    const requestId = `approve-ctrl-${req.params.id}-${Date.now()}`;
+    const adminId = req.user._id;
+    const campaignId = req.params.id;
+
     try {
+        console.log(`[Campaign Approval Controller] Starting approval`, {
+            requestId,
+            campaignId,
+            adminId
+        });
+
+        // Step 1: Approve campaign (DB update + cache invalidation)
         const result = await campaignService.approveCampaign(
-            req.params.id,
-            req.user._id
+            campaignId,
+            adminId
         );
 
         if (!result.success) {
@@ -435,32 +592,90 @@ export const approveCampaign = async (req, res) => {
             }
         }
 
+        // Step 2: Publish event AFTER DB is committed and cache is invalidated
+        // This ensures event consumers see the correct state
         try {
-            await trackingService.publishEvent("tracking:campaign:approved", {
+            const eventPayload = {
                 campaignId: result.campaign._id,
-                adminId: req.user._id,
+                adminId: adminId,
                 creatorId: result.campaign.creator,
                 title: result.campaign.title,
                 category: result.campaign.category,
-                approved_at: result.campaign.approved_at
+                approved_at: result.campaign.approved_at,
+                oldStatus: 'pending',
+                newStatus: 'active',
+                requestId: result.requestId || requestId,
+                timestamp: new Date().toISOString()
+            };
+
+            console.log(`[Campaign Approval Controller] Publishing event`, {
+                requestId,
+                campaignId,
+                eventPayload
             });
 
-            await queueService.pushJob({
-                type: "CAMPAIGN_APPROVED",
-                campaignId: result.campaign._id,
-                creatorId: result.campaign.creator,
-                adminId: req.user._id
+            await trackingService.publishEvent("tracking:campaign:approved", eventPayload);
+
+            console.log(`[Campaign Approval Controller] Event published successfully`, {
+                requestId,
+                campaignId
+            });
+
+            // Step 3: Push email job to queue
+            const creator = await User.findById(result.campaign.creator).select('email username');
+            const job = createJob(
+                JOB_TYPES.CAMPAIGN_APPROVED,
+                {
+                    email: creator?.email || '',
+                    username: creator?.username || '',
+                    campaignTitle: result.campaign.title,
+                    campaignId: result.campaign._id.toString(),
+                    creatorId: result.campaign.creator.toString(),
+                    adminId: adminId.toString()
+                },
+                {
+                    userId: adminId.toString(),
+                    source: JOB_SOURCE.ADMIN,
+                    requestId
+                }
+            );
+            await queueService.pushJob(job);
+
+            console.log(`[Campaign Approval Controller] Job pushed to queue`, {
+                requestId,
+                campaignId,
+                jobType: JOB_TYPES.CAMPAIGN_APPROVED
             });
         } catch (eventError) {
-            console.error('Error publishing event or pushing job:', eventError);
+            // Log error but don't fail the request - DB is already updated
+            console.error(`[Campaign Approval Controller] Error publishing event or pushing job (non-critical)`, {
+                requestId,
+                campaignId,
+                error: eventError.message,
+                stack: eventError.stack
+            });
         }
+
+        console.log(`[Campaign Approval Controller] Approval completed successfully`, {
+            requestId,
+            campaignId,
+            wasAlreadyApproved: result.wasAlreadyApproved || false
+        });
 
         return res.status(HTTP_STATUS.OK).json({
             message: "Campaign approved successfully",
             campaign: result.campaign
         });
     } catch (error) {
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+        console.error(`[Campaign Approval Controller] Unexpected error`, {
+            requestId,
+            campaignId,
+            error: error.message,
+            stack: error.stack
+        });
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
+            message: error.message 
+        });
     }
 };
 
@@ -503,13 +718,25 @@ export const rejectCampaign = async (req, res) => {
                 rejected_at: result.campaign.rejected_at
             });
 
-            await queueService.pushJob({
-                type: "CAMPAIGN_REJECTED",
-                campaignId: result.campaign._id,
-                creatorId: result.campaign.creator,
-                adminId: req.user._id,
-                reason: reason
-            });
+            // Fetch creator data for email
+            const creator = await User.findById(result.campaign.creator).select('email username');
+            const job = createJob(
+                JOB_TYPES.CAMPAIGN_REJECTED,
+                {
+                    email: creator?.email || '',
+                    username: creator?.username || '',
+                    campaignTitle: result.campaign.title,
+                    campaignId: result.campaign._id.toString(),
+                    creatorId: result.campaign.creator.toString(),
+                    adminId: req.user._id.toString(),
+                    reason: reason
+                },
+                {
+                    userId: req.user._id.toString(),
+                    source: JOB_SOURCE.ADMIN
+                }
+            );
+            await queueService.pushJob(job);
         } catch (eventError) {
             console.error('Error publishing event or pushing job:', eventError);
         }

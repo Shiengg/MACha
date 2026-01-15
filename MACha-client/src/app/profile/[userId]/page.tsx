@@ -37,6 +37,13 @@ function ProfileContent() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [companionCampaignsLoading, setCompanionCampaignsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Pagination state for campaigns
+  const [campaignsPage, setCampaignsPage] = useState(1);
+  const [campaignsLimit] = useState(10);
+  const [campaignsTotal, setCampaignsTotal] = useState(0);
+  const [campaignsTotalPages, setCampaignsTotalPages] = useState(1);
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
 
   // So sánh ID: API trả về _id, nhưng AuthContext có thể có id hoặc _id
   // So sánh cả userId từ URL params và user._id từ API response
@@ -60,8 +67,12 @@ function ProfileContent() {
         const userData = await getUserById(userId);
         setUser(userData);
 
-        const userCampaigns = await campaignService.getCampaignsByCreator(userId);
-        setCampaigns(userCampaigns);
+        // Fetch campaigns with pagination
+        const campaignsResult = await campaignService.getCampaignsByCreatorPaginated(userId, 1, campaignsLimit);
+        setCampaigns(campaignsResult.campaigns);
+        setCampaignsTotal(campaignsResult.total);
+        setCampaignsTotalPages(campaignsResult.totalPages);
+        setCampaignsPage(1);
 
         // Fetch companion campaigns for any user profile
         try {
@@ -91,8 +102,40 @@ function ProfileContent() {
       setCampaigns([]);
       setError(null);
       setActiveTab('campaigns'); // Reset về tab mặc định
+      setCampaignsPage(1);
+      setCampaignsTotal(0);
+      setCampaignsTotalPages(1);
     };
   }, [userId, currentUser?.id, authLoading]); // ✅ Listen vào currentUser.id thay vì currentUser object
+
+  // Fetch campaigns when page changes
+  useEffect(() => {
+    const fetchCampaigns = async () => {
+      if (!userId || authLoading || activeTab !== 'campaigns') return;
+
+      try {
+        setCampaignsLoading(true);
+        const result = await campaignService.getCampaignsByCreatorPaginated(
+          userId,
+          campaignsPage,
+          campaignsLimit
+        );
+        setCampaigns(result.campaigns);
+        setCampaignsTotal(result.total);
+        setCampaignsTotalPages(result.totalPages);
+        
+        // Scroll to top when page changes
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        console.error('Error loading campaigns:', err);
+        setError('Không thể tải danh sách chiến dịch. Vui lòng thử lại sau.');
+      } finally {
+        setCampaignsLoading(false);
+      }
+    };
+
+    fetchCampaigns();
+  }, [userId, campaignsPage, campaignsLimit, authLoading, activeTab]);
 
   const isFollowing =
     !!currentUser &&
@@ -440,9 +483,9 @@ function ProfileContent() {
                         <button
                           onClick={() => {
                             if (user.role === 'organization') {
-                              router.push('/kyc/organization');
-                            } else {
                               router.push('/kyc');
+                            } else {
+                              router.push('/kyc-vnpt');
                             }
                           }}
                           className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-full border border-emerald-500 text-emerald-600 text-sm font-medium bg-white hover:bg-emerald-50 shadow-sm transition-colors w-full sm:w-auto"
@@ -534,7 +577,7 @@ function ProfileContent() {
             {/* Stats */}
             <div className="flex flex-wrap items-center gap-6 md:gap-10 mt-4 pt-4 border-t border-gray-100 px-6 pb-4">
               <div className="flex flex-col">
-                <span className="text-base font-semibold text-gray-900">{campaigns.length}</span>
+                <span className="text-base font-semibold text-gray-900">{campaignsTotal}</span>
                 <span className="text-xs text-gray-500 mt-0.5">Chiến dịch</span>
               </div>
               <div className="h-8 w-px bg-gray-200 hidden sm:block" />
@@ -626,7 +669,17 @@ function ProfileContent() {
         <div className="mt-6">
           {activeTab === 'campaigns' && (
             <div className="space-y-4">
-              {campaigns.length === 0 ? (
+              {campaignsLoading ? (
+                <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+                  <div className="flex items-center justify-center">
+                    <svg className="animate-spin h-8 w-8 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                  <p className="text-gray-500 mt-4 text-sm">Đang tải chiến dịch...</p>
+                </div>
+              ) : campaigns.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-10 text-center">
                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -654,11 +707,129 @@ function ProfileContent() {
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {campaigns.map((campaign) => (
-                    <CampaignCard key={campaign._id} campaign={campaign} showCreator={false} />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {campaigns.map((campaign) => (
+                      <CampaignCard 
+                        key={campaign._id} 
+                        campaign={campaign} 
+                        showCreator={false}
+                        showStatusBadge={true}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Pagination */}
+                  {campaignsTotalPages > 1 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-gray-200">
+                      <div className="text-sm text-gray-600">
+                        Hiển thị {(campaignsPage - 1) * campaignsLimit + 1} - {Math.min(campaignsPage * campaignsLimit, campaignsTotal)} / {campaignsTotal} chiến dịch
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setCampaignsPage(prev => Math.max(1, prev - 1))}
+                          disabled={campaignsPage === 1 || campaignsLoading}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                            campaignsPage === 1 || campaignsLoading
+                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                          }`}
+                        >
+                          Trước
+                        </button>
+                        
+                        <div className="flex items-center gap-1">
+                          {/* Generate page numbers with ellipsis */}
+                          {(() => {
+                            const pages: (number | string)[] = [];
+                            const maxVisible = 5;
+                            
+                            if (campaignsTotalPages <= maxVisible) {
+                              // Show all pages if total <= maxVisible
+                              for (let i = 1; i <= campaignsTotalPages; i++) {
+                                pages.push(i);
+                              }
+                            } else {
+                              // Always show first page
+                              pages.push(1);
+                              
+                              if (campaignsPage > 3) {
+                                pages.push('...');
+                              }
+                              
+                              // Calculate start and end of visible range
+                              let start = Math.max(2, campaignsPage - 1);
+                              let end = Math.min(campaignsTotalPages - 1, campaignsPage + 1);
+                              
+                              // Adjust if near start
+                              if (campaignsPage <= 3) {
+                                start = 2;
+                                end = Math.min(4, campaignsTotalPages - 1);
+                              }
+                              
+                              // Adjust if near end
+                              if (campaignsPage >= campaignsTotalPages - 2) {
+                                start = Math.max(2, campaignsTotalPages - 3);
+                                end = campaignsTotalPages - 1;
+                              }
+                              
+                              for (let i = start; i <= end; i++) {
+                                pages.push(i);
+                              }
+                              
+                              if (campaignsPage < campaignsTotalPages - 2) {
+                                pages.push('...');
+                              }
+                              
+                              // Always show last page
+                              if (campaignsTotalPages > 1) {
+                                pages.push(campaignsTotalPages);
+                              }
+                            }
+                            
+                            return pages.map((pageNum, index) => {
+                              if (pageNum === '...') {
+                                return (
+                                  <span key={`ellipsis-${index}`} className="px-2 text-gray-400 text-sm">
+                                    ...
+                                  </span>
+                                );
+                              }
+                              
+                              return (
+                                <button
+                                  key={pageNum}
+                                  onClick={() => setCampaignsPage(pageNum as number)}
+                                  disabled={campaignsLoading}
+                                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                    campaignsPage === pageNum
+                                      ? 'bg-emerald-500 text-white'
+                                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                                  } ${campaignsLoading ? 'cursor-not-allowed opacity-50' : ''}`}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            });
+                          })()}
+                        </div>
+                        
+                        <button
+                          onClick={() => setCampaignsPage(prev => Math.min(campaignsTotalPages, prev + 1))}
+                          disabled={campaignsPage === campaignsTotalPages || campaignsLoading}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                            campaignsPage === campaignsTotalPages || campaignsLoading
+                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                          }`}
+                        >
+                          Sau
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

@@ -20,7 +20,7 @@ import CreatePostModal from '@/components/shared/CreatePostModal';
 import ReportModal from '@/components/shared/ReportModal';
 import { getReportsByItem } from '@/services/report.service';
 import { FaFlag } from 'react-icons/fa';
-import { ArrowLeft, Share2, Users } from 'lucide-react';
+import { ArrowLeft, Share2, Users, Edit } from 'lucide-react';
 import Link from 'next/link';
 
 function CampaignDetails() {
@@ -39,7 +39,7 @@ function CampaignDetails() {
     const [activeTab, setActiveTab] = useState<'story' | 'updates' | 'supporters' | 'withdrawals'>('story');
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const itemsPerPage = 10; // <----- Phân trang chỗ này này
     const { user } = useAuth();
     const [showStickyBar, setShowStickyBar] = useState(false);
     const donateCardRef = useRef<HTMLDivElement>(null);
@@ -834,7 +834,7 @@ function CampaignDetails() {
                                     <div className="relative">
                                         <img
                                             src={imagePreview}
-                                            alt="Preview"
+                                            alt="Xem trước"
                                             className="max-w-full h-auto rounded-lg max-h-64 object-contain"
                                         />
                                         <button
@@ -1064,6 +1064,14 @@ function CampaignDetails() {
 
                                 {/* Donate Button */}
                                 {(() => {
+                                    // Check if user is the creator - hide donate button for creator
+                                    const isCreator = user && campaign && campaign.creator && 
+                                        (user._id === campaign.creator._id || user.id === campaign.creator._id);
+                                    
+                                    if (isCreator) {
+                                        return null; // Don't show donate button for creator
+                                    }
+                                    
                                     // Check if campaign has ended
                                     if (campaign.end_date && daysLeft === 0) {
                                         return (
@@ -1134,12 +1142,55 @@ function CampaignDetails() {
                                 <span className="text-sm font-medium">Quay lại Tài chính Campaign</span>
                             </Link>
                         )}
-                        <h1 className="text-4xl md:text-5xl font-bold text-white mb-3 drop-shadow-lg break-words">
-                            {campaign.title}
-                        </h1>
-                        <p className="text-white/80 text-sm mb-3">
-                            Tổ chức bởi <span className="text-orange-300 font-bold">{campaign.contact_info?.fullname || campaign.creator?.fullname}</span>
-                        </p>
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                            <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-lg break-words flex-1">
+                                {campaign.title}
+                            </h1>
+                            {/* Edit Button - Only show for creator when campaign is PENDING */}
+                            {(() => {
+                                const isCreator = user && campaign && campaign.creator && 
+                                    (user._id === campaign.creator._id || user.id === campaign.creator._id);
+                                const canEdit = isCreator && campaign.status === 'pending';
+                                
+                                if (!canEdit) return null;
+                                
+                                return (
+                                    <Link
+                                        href={`/campaigns/${campaignId}/edit`}
+                                        className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/20 text-white transition-all group"
+                                        title="Chỉnh sửa chiến dịch (chỉ có thể chỉnh sửa khi đang chờ duyệt)"
+                                    >
+                                        <Edit className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                        <span className="text-sm font-medium hidden sm:inline">Chỉnh sửa</span>
+                                    </Link>
+                                );
+                            })()}
+                        </div>
+                        <div className="flex items-center gap-3 mb-3 flex-wrap">
+                            <p className="text-white/80 text-sm">
+                                Tổ chức bởi <span className="text-orange-300 font-bold">{campaign.contact_info?.fullname || campaign.creator?.fullname}</span>
+                            </p>
+                            {/* PENDING Badge - Only show for creator when campaign is PENDING */}
+                            {(() => {
+                                const isCreator = user && campaign && campaign.creator && 
+                                    (user._id === campaign.creator._id || user.id === campaign.creator._id);
+                                
+                                if (isCreator && campaign.status === 'pending') {
+                                    return (
+                                        <span 
+                                            className="inline-flex items-center gap-1.5 bg-yellow-500/20 backdrop-blur-sm px-3 py-1 rounded-full border border-yellow-400/30 text-yellow-200 text-xs font-medium"
+                                            title="Chiến dịch đang chờ admin duyệt. Bạn có thể chỉnh sửa chiến dịch."
+                                        >
+                                            <svg className="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                            </svg>
+                                            Đang chờ duyệt
+                                        </span>
+                                    );
+                                }
+                                return null;
+                            })()}
+                        </div>
                         {campaign.category && (
                             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20">
                                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1519,7 +1570,7 @@ function CampaignDetails() {
                                                         <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
                                                         </svg>
-                                                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Hashtag</h3>
+                                                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Thẻ bắt đầu bằng #</h3>
                                                     </div>
                                                         <span className="text-blue-600 dark:text-blue-400 font-semibold group-hover:text-blue-700 dark:group-hover:text-blue-300">
                                                             #{campaign.hashtag.name}
@@ -1534,7 +1585,7 @@ function CampaignDetails() {
                                                         <div key={index} className="relative aspect-video rounded-xl overflow-hidden">
                                                             <img 
                                                                 src={img} 
-                                                                alt={`Gallery ${index + 1}`}
+                                                                alt={`Ảnh ${index + 1}`}
                                                                 className="w-full h-full object-cover hover:scale-105 transition duration-300"
                                                             />
                                                         </div>
@@ -1547,7 +1598,7 @@ function CampaignDetails() {
                                                 <div className="relative aspect-video rounded-xl overflow-hidden">
                                                     <img 
                                                         src={campaign.banner_image} 
-                                                        alt="Campaign banner"
+                                                        alt="Ảnh bìa chiến dịch"
                                                         className="w-full h-full object-cover"
                                                     />
                                                 </div>
@@ -1610,10 +1661,10 @@ function CampaignDetails() {
                                                                 </div>
                                                                 <div className="flex-1">
                                                                     <h3 className="text-lg font-bold text-orange-900 dark:text-orange-300 mb-2">
-                                                                        Campaign đã đạt milestone! 🎉
+                                                                        Chiến dịch đã đạt mốc quan trọng! 🎉
                                                                     </h3>
                                                                     <p className="text-orange-700 dark:text-orange-400 mb-4">
-                                                                        Withdrawal request đã được tạo tự động khi campaign đạt các mốc mục tiêu:
+                                                                        Yêu cầu rút tiền đã được tạo tự động khi chiến dịch đạt các mốc mục tiêu:
                                                                     </p>
                                                                     <div className="space-y-2 mb-4">
                                                                         {autoCreatedRequests.map((request) => (
@@ -1989,6 +2040,10 @@ function CampaignDetails() {
                                 {/* Action Buttons */}
                                 <div className="space-y-3">
                                     {(() => {
+                                        // Check if user is the creator - hide donate button for creator
+                                        const isCreator = user && campaign && campaign.creator && 
+                                            (user._id === campaign.creator._id || user.id === campaign.creator._id);
+                                        
                                         // Check if campaign has ended
                                         if (campaign.end_date && daysLeft === 0) {
                                             return (
@@ -2007,18 +2062,24 @@ function CampaignDetails() {
                                         const isCreatorOrganization = campaign.creator && typeof campaign.creator === 'object' && campaign.creator.role === 'organization';
                                         const canJoinCompanion = user && user.role === 'user' && isCreatorOrganization && !isCompanion;
                                         
+                                        // SECURITY FIX: Ẩn nút donate nếu user là admin, owner, hoặc creator
+                                        const canDonate = user && (user.role === 'user' || user.role === 'organization') && !isCreator;
+                                        
                                         if (allowedStatuses.includes(campaign.status)) {
                                             return (
                                                 <>
-                                                    <button 
-                                                        onClick={handleDonate} 
-                                                        className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
-                                                        {isCompanion ? 'Ủng hộ qua bạn' : 'Ủng hộ ngay'}
-                                                    </button>
+                                                    {/* Only show donate button if user is not the creator and is USER or ORGANIZATION (not ADMIN or OWNER) */}
+                                                    {canDonate && (
+                                                        <button 
+                                                            onClick={handleDonate} 
+                                                            className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            {isCompanion ? 'Ủng hộ qua bạn' : 'Ủng hộ ngay'}
+                                                        </button>
+                                                    )}
                                                     {canJoinCompanion && (
                                                         <button 
                                                             onClick={handleJoinCompanion}
