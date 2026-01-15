@@ -112,6 +112,10 @@ const eventSchema = new mongoose.Schema({
     cancellation_reason: {
         type: String,
         default: null,
+    },
+    notification_sent_at: {
+        type: Date,
+        default: null,
     }
 },
     {

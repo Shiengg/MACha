@@ -40,6 +40,9 @@ export const handleNotificationJob = async (job) => {
         case JOB_TYPES.EVENT_REMOVED:
             return await handleEventRemoved(payload);
             
+        case JOB_TYPES.EVENT_STARTED:
+            return await handleEventStarted(payload);
+            
         case JOB_TYPES.CAMPAIGN_CREATED:
             // Empty handler - skip
             return { success: true, skipped: true };
@@ -459,5 +462,36 @@ const handleEventRemoved = async (payload) => {
     );
     
     return { success: true, count: notifications.length };
+};
+
+// EVENT_STARTED handler
+const handleEventStarted = async (payload) => {
+    const { eventId, eventTitle, userId } = payload;
+    
+    if (!eventId || !userId) {
+        throw new Error("eventId and userId are required");
+    }
+    
+    console.log(`[Notification Handler] Processing EVENT_STARTED for user ${userId}, event ${eventId}`);
+    
+    // Create notification for the user who joined the event
+    const notification = await notificationService.createNotification({
+        receiver: userId,
+        sender: null, // System notification
+        type: 'event_started',
+        event: eventId,
+        message: `Sự kiện "${eventTitle || 'có tên'}" đã bắt đầu!`,
+        content: `Sự kiện "${eventTitle || 'có tên'}" mà bạn đã tham gia đã bắt đầu. Hãy tham gia ngay!`,
+        is_read: false
+    });
+    
+    console.log(`[Notification Handler] ✅ EVENT_STARTED notification created successfully:`, {
+        notificationId: notification._id.toString(),
+        userId,
+        eventId,
+        eventTitle
+    });
+    
+    return { success: true, count: 1 };
 };
 

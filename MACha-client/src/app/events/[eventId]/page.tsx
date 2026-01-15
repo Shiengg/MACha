@@ -339,7 +339,19 @@ function EventDetails() {
     return null;
   }
 
-  const isPast = new Date(event.start_date) < new Date();
+  // Check if event has ended (not just started)
+  const now = new Date();
+  const startDate = new Date(event.start_date);
+  const endDate = event.end_date ? new Date(event.end_date) : null;
+  
+  // Event has ended if:
+  // - Has end_date and end_date < now, OR
+  // - No end_date but start_date < now (event already started and no end date means it's ongoing/past)
+  // For join button: Allow joining if event hasn't ended yet
+  const hasEnded = endDate 
+    ? endDate < now 
+    : startDate < now; // If no end_date, consider it ended once start_date passes
+  
   const totalAttendees = (event.rsvpStats?.going.count || 0) + (event.rsvpStats?.going.guests || 0);
   const isCreator = user && event.creator && (user._id === event.creator._id || user.id === event.creator._id);
 
@@ -519,7 +531,7 @@ function EventDetails() {
               </div>
             </div>
 
-            {user && !isPast && event.status === 'published' && (
+            {user && !hasEnded && event.status === 'published' && (
               <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                 <div className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-3">Bạn có tham gia không?</div>
                 {rsvp ? (

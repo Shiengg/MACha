@@ -61,6 +61,7 @@ export const pushJob = async (job) => {
         case JOB_TYPES.USER_WARNED:
         case JOB_TYPES.EVENT_UPDATE_CREATED:
         case JOB_TYPES.EVENT_REMOVED:
+        case JOB_TYPES.EVENT_STARTED:
         case JOB_TYPES.CAMPAIGN_CREATED:
             targetQueue = QUEUE_NAMES.NOTIFICATION_CREATE;
             break;

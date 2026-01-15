@@ -24,6 +24,7 @@ const notificationSchema = new mongoose.Schema({
             "campaign_rejected",
             "event_invite",
             "event_update",
+            "event_started",
             "event_reminder",
             "event_rsvp_change",
             "post_removed",
