@@ -287,7 +287,7 @@ export default function DonatePage() {
                 {loading ? (
                   'Đang chuyển đến SePay...'
                 ) : isValidAmount ? (
-                  `Ủng hộ ₫${formatVNDForDisplay(numericAmount)}`
+                  `Ủng hộ ${formatVNDForDisplay(numericAmount)} ₫`
                 ) : (
                   'Nhập số tiền để tiếp tục'
                 )}
