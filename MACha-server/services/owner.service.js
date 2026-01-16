@@ -1303,3 +1303,239 @@ export const getUserHistory = async (userId, page = 1, limit = 20) => {
     };
 };
 
+/**
+ * Get all donations in the system for OWNER
+ * Supports filtering by campaign, creator, donor, date range, and payment status
+ */
+export const getOwnerDonations = async (filters = {}, page = 1, limit = 20) => {
+    const skip = (page - 1) * limit;
+    
+    // Build query
+    const query = {};
+    
+    // Filter by campaign (by ID or title search)
+    if (filters.campaignId) {
+        if (mongoose.Types.ObjectId.isValid(filters.campaignId)) {
+            query.campaign = filters.campaignId;
+        }
+    } else if (filters.campaignSearch) {
+        // Search campaigns by title and get their IDs
+        const campaignQuery = {
+            $or: [
+                { title: { $regex: filters.campaignSearch, $options: 'i' } }
+            ]
+        };
+        
+        // If campaignSearch is a valid ObjectId, also search by _id
+        if (mongoose.Types.ObjectId.isValid(filters.campaignSearch)) {
+            campaignQuery.$or.push({ _id: filters.campaignSearch });
+        }
+        
+        const matchingCampaigns = await Campaign.find(campaignQuery).select('_id');
+        
+        const campaignIds = matchingCampaigns.map(c => c._id);
+        if (campaignIds.length > 0) {
+            query.campaign = { $in: campaignIds };
+        } else {
+            // No matching campaigns, return empty result
+            return {
+                donations: [],
+                pagination: {
+                    page,
+                    limit,
+                    total: 0,
+                    pages: 0
+                }
+            };
+        }
+    }
+    
+    // Filter by campaign creator
+    if (filters.creatorId) {
+        if (mongoose.Types.ObjectId.isValid(filters.creatorId)) {
+            // Get campaigns created by this user
+            const creatorCampaigns = await Campaign.find({ creator: filters.creatorId }).select('_id');
+            const creatorCampaignIds = creatorCampaigns.map(c => c._id);
+            
+            if (creatorCampaignIds.length > 0) {
+                if (query.campaign) {
+                    // Intersect with existing campaign filter
+                    let existingIds = [];
+                    if (query.campaign.$in) {
+                        // Already an array from $in
+                        existingIds = query.campaign.$in;
+                    } else if (typeof query.campaign === 'string' || query.campaign instanceof mongoose.Types.ObjectId) {
+                        // Single campaign ID
+                        existingIds = [query.campaign];
+                    } else {
+                        // Something else, use empty array
+                        existingIds = [];
+                    }
+                    
+                    // Filter to keep only IDs that exist in both arrays
+                    const intersectedIds = existingIds.filter(existingId => {
+                        const existingStr = existingId.toString();
+                        return creatorCampaignIds.some(cid => cid.toString() === existingStr);
+                    });
+                    
+                    if (intersectedIds.length > 0) {
+                        query.campaign = { $in: intersectedIds };
+                    } else {
+                        // No intersection, return empty result
+                        return {
+                            donations: [],
+                            pagination: {
+                                page,
+                                limit,
+                                total: 0,
+                                pages: 0
+                            }
+                        };
+                    }
+                } else {
+                    query.campaign = { $in: creatorCampaignIds };
+                }
+            } else {
+                // No campaigns from this creator, return empty result
+                return {
+                    donations: [],
+                    pagination: {
+                        page,
+                        limit,
+                        total: 0,
+                        pages: 0
+                    }
+                };
+            }
+        }
+    }
+    
+    // Filter by donor (by ID, username, or email)
+    if (filters.donorId) {
+        if (mongoose.Types.ObjectId.isValid(filters.donorId)) {
+            query.donor = filters.donorId;
+        }
+    } else if (filters.donorSearch) {
+        // Search users by username or email and get their IDs
+        const donorQuery = {
+            $or: [
+                { username: { $regex: filters.donorSearch, $options: 'i' } },
+                { email: { $regex: filters.donorSearch, $options: 'i' } }
+            ]
+        };
+        
+        // If donorSearch is a valid ObjectId, also search by _id
+        if (mongoose.Types.ObjectId.isValid(filters.donorSearch)) {
+            donorQuery.$or.push({ _id: filters.donorSearch });
+        }
+        
+        const matchingDonors = await User.find(donorQuery).select('_id');
+        
+        const donorIds = matchingDonors.map(u => u._id);
+        if (donorIds.length > 0) {
+            query.donor = { $in: donorIds };
+        } else {
+            // No matching donors, return empty result
+            return {
+                donations: [],
+                pagination: {
+                    page,
+                    limit,
+                    total: 0,
+                    pages: 0
+                }
+            };
+        }
+    }
+    
+    // Filter by date range
+    if (filters.fromDate || filters.toDate) {
+        query.createdAt = {};
+        if (filters.fromDate) {
+            query.createdAt.$gte = new Date(filters.fromDate);
+        }
+        if (filters.toDate) {
+            // Include the entire end date
+            const toDate = new Date(filters.toDate);
+            toDate.setHours(23, 59, 59, 999);
+            query.createdAt.$lte = toDate;
+        }
+    }
+    
+    // Filter by payment status
+    if (filters.paymentStatus) {
+        const validStatuses = ["pending", "completed", "failed", "cancelled", "refunded", "partially_refunded"];
+        if (validStatuses.includes(filters.paymentStatus)) {
+            query.payment_status = filters.paymentStatus;
+        }
+    }
+    
+    // Execute query with pagination
+    const [donations, total] = await Promise.all([
+        Donation.find(query)
+            .populate({
+                path: 'campaign',
+                select: '_id title creator',
+                populate: {
+                    path: 'creator',
+                    select: '_id username email fullname'
+                }
+            })
+            .populate({
+                path: 'donor',
+                select: '_id username email fullname'
+            })
+            .sort({ createdAt: -1 }) // Default sort by createdAt DESC
+            .skip(skip)
+            .limit(limit)
+            .lean(),
+        Donation.countDocuments(query)
+    ]);
+    
+    // Format donations for response
+    const formattedDonations = donations.map(donation => ({
+        _id: donation._id,
+        campaign: {
+            _id: donation.campaign._id,
+            title: donation.campaign.title,
+            creator: donation.campaign.creator
+        },
+        donor: {
+            _id: donation.donor._id,
+            username: donation.donor.username,
+            email: donation.donor.email,
+            fullname: donation.donor.fullname
+        },
+        amount: donation.amount,
+        currency: donation.currency || 'VND',
+        payment_status: donation.payment_status,
+        donation_method: donation.donation_method,
+        sepay_payment_method: donation.sepay_payment_method || null,
+        payment_method: donation.donation_method === 'sepay' 
+            ? (donation.sepay_payment_method || 'sepay')
+            : donation.donation_method,
+        // Proof information
+        has_proof: donation.has_proof || false,
+        proof_images: donation.proof_images || [],
+        proof_status: donation.proof_status || 'missing',
+        proof_uploaded_at: donation.proof_uploaded_at || null,
+        // Additional fields
+        order_invoice_number: donation.order_invoice_number || null,
+        sepay_transaction_id: donation.sepay_transaction_id || null,
+        notes: donation.notes || null,
+        is_anonymous: donation.is_anonymous || false,
+        createdAt: donation.createdAt,
+        updatedAt: donation.updatedAt
+    }));
+    
+    return {
+        donations: formattedDonations,
+        pagination: {
+            page,
+            limit,
+            total,
+            pages: Math.ceil(total / limit)
+        }
+    };
+};
+

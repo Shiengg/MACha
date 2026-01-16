@@ -290,6 +290,43 @@ export const getApprovalHistory = async (req, res) => {
     }
 };
 
+export const getOwnerDonations = async (req, res) => {
+    try {
+        const filters = {
+            campaignId: req.query.campaignId || null,
+            campaignSearch: req.query.campaignSearch || null,
+            creatorId: req.query.creatorId || null,
+            donorId: req.query.donorId || null,
+            donorSearch: req.query.donorSearch || null,
+            fromDate: req.query.fromDate || null,
+            toDate: req.query.toDate || null,
+            paymentStatus: req.query.paymentStatus || null
+        };
+        
+        // Remove null/undefined values from filters
+        Object.keys(filters).forEach(key => {
+            if (filters[key] === null || filters[key] === undefined || filters[key] === '') {
+                delete filters[key];
+            }
+        });
+        
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+
+        // Validate limit (prevent too large requests)
+        if (limit > 100) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                message: "Limit cannot exceed 100"
+            });
+        }
+
+        const result = await ownerService.getOwnerDonations(filters, page, limit);
+        return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    }
+};
+
 export const banAdmin = async (req, res) => {
     try {
         const adminId = req.params.id;

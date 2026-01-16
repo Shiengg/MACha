@@ -83,6 +83,13 @@ OwnerRoutes.get(
 );
 
 OwnerRoutes.get(
+    "/donations",
+    authMiddleware,
+    checkOwner,
+    ownerController.getOwnerDonations
+);
+
+OwnerRoutes.get(
     "/approval-history",
     authMiddleware,
     checkOwner,
