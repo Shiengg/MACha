@@ -167,19 +167,11 @@ export default function DonatePage() {
           {/* Current Amount Card - SỐ TIỀN HIỆN TẠI */}
           <div className="bg-gray-100 rounded-xl p-6 sm:p-8">
             <p className="text-center text-sm text-gray-500 mb-4">SỐ TIỀN HIỆN TẠI</p>
-            <div className="flex items-center justify-center gap-2 mb-4">
+            <div className="flex items-center justify-center gap-2">
               <span className="text-3xl sm:text-4xl font-bold text-teal-700">
                 {numericAmount > 0 ? formatVNDForDisplay(numericAmount) : '0'}
               </span>
               <span className="text-3xl sm:text-4xl font-bold text-teal-700">₫</span>
-            </div>
-            <div className="flex justify-center">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-100 rounded-lg">
-                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-sm font-medium text-green-700">Giao dịch miễn phí</span>
-              </div>
             </div>
           </div>
 
