@@ -47,6 +47,10 @@ const getNotificationIcon = (type) => {
       return 'check-circle';
     case 'campaign_rejected':
       return 'close-circle';
+    case 'escrow_threshold_reached':
+      return 'alert-circle';
+    case 'escrow_approved':
+      return 'check-circle';
     default:
       return 'bell';
   }
@@ -66,6 +70,10 @@ const getNotificationIconColor = (type) => {
       return '#10B981';
     case 'campaign_rejected':
       return '#EF4444';
+    case 'escrow_threshold_reached':
+      return '#F59E0B';
+    case 'escrow_approved':
+      return '#10B981';
     default:
       return '#6B7280';
   }
@@ -116,7 +124,8 @@ export default function NotificationScreen() {
       setNotifications((prev) => {
         const exists = prev.some((n) => n._id === notification._id);
         if (exists) return prev;
-        return [notification, ...prev];
+        // Add notification to the beginning and ensure it's marked as unread
+        return [{ ...notification, is_read: false }, ...prev];
       });
     };
 

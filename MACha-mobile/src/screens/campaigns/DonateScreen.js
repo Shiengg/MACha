@@ -23,6 +23,10 @@ import { donationService } from '../../services/donation.service';
 import { campaignCompanionService } from '../../services/campaignCompanion.service';
 import { cacheService } from '../../services/cache.service';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
+import UploadProofModal from '../../components/donation/UploadProofModal';
+
+// Maximum donation amount: 10 billion VND
+const MAX_AMOUNT = 10000000000;
 
 export default function DonateScreen() {
   const route = useRoute();
@@ -38,6 +42,9 @@ export default function DonateScreen() {
   const [orderInvoiceNumber, setOrderInvoiceNumber] = useState(null);
   const [companionId, setCompanionId] = useState(companion_id || null);
   const [companionName, setCompanionName] = useState(null);
+  const [showWarning, setShowWarning] = useState(false);
+  const [showProofModal, setShowProofModal] = useState(false);
+  const [latestDonationId, setLatestDonationId] = useState(null);
   const webViewRef = useRef(null);
   const isProcessingRef = useRef(false); // Flag to prevent multiple alerts
 
@@ -99,10 +106,18 @@ export default function DonateScreen() {
   };
 
   const handleAmountChange = (text) => {
-    const formatted = formatAmount(text);
-    setAmount(formatted);
-    if (error) {
-      setError(null);
+    const numericValue = text.replace(/\D/g, '');
+    const numValue = numericValue ? Number(numericValue) : 0;
+    
+    if (numValue > MAX_AMOUNT) {
+      setAmount(formatAmount(String(MAX_AMOUNT)));
+      setError(`Số tiền tối đa là ${formatDisplayAmount(String(MAX_AMOUNT))} VND`);
+    } else {
+      const formatted = formatAmount(numericValue);
+      setAmount(formatted);
+      if (error) {
+        setError(null);
+      }
     }
   };
 
@@ -112,6 +127,11 @@ export default function DonateScreen() {
     const value = Number(amount);
     if (!value || value <= 0) {
       setError('Vui lòng nhập số tiền hợp lệ');
+      return;
+    }
+    
+    if (value > MAX_AMOUNT) {
+      setError(`Số tiền tối đa là ${formatDisplayAmount(String(MAX_AMOUNT))} VND`);
       return;
     }
 
@@ -300,19 +320,36 @@ export default function DonateScreen() {
               )}
             </View>
 
-            {/* Warning Block - Cảnh báo về minh chứng chuyển khoản */}
-            <View style={styles.warningContainer}>
-              <MaterialCommunityIcons name="alert" size={scale(20)} color="#F59E0B" />
-              <View style={styles.warningContent}>
-                <Text style={styles.warningTitle}>
-                  ⚠️ Cảnh báo quan trọng về giao dịch
+            {/* Warning Block - Collapsible */}
+            <View style={styles.warningSection}>
+              <TouchableOpacity
+                onPress={() => setShowWarning(!showWarning)}
+                style={styles.warningToggle}
+              >
+                <MaterialCommunityIcons
+                  name={showWarning ? 'chevron-up' : 'chevron-down'}
+                  size={scale(20)}
+                  color="#F59E0B"
+                />
+                <Text style={styles.warningToggleText}>
+                  {showWarning ? 'Ẩn' : 'Hiện'} lưu ý quan trọng
                 </Text>
-                <Text style={styles.warningText}>
-                  Vui lòng chụp lại màn hình giao dịch chuyển khoản thành công sau khi hoàn tất donate.
-                  Đây là bằng chứng quan trọng để hệ thống và đội ngũ hỗ trợ xác minh giao dịch
-                  trong trường hợp phát sinh tranh chấp, khiếu nại hoặc sai lệch dữ liệu thanh toán.
-                </Text>
-              </View>
+              </TouchableOpacity>
+              {showWarning && (
+                <View style={styles.warningContainer}>
+                  <MaterialCommunityIcons name="alert" size={scale(20)} color="#F59E0B" />
+                  <View style={styles.warningContent}>
+                    <Text style={styles.warningTitle}>
+                      ⚠️ Cảnh báo quan trọng về giao dịch
+                    </Text>
+                    <Text style={styles.warningText}>
+                      Vui lòng chụp lại màn hình giao dịch chuyển khoản thành công sau khi hoàn tất donate.
+                      Đây là bằng chứng quan trọng để hệ thống và đội ngũ hỗ trợ xác minh giao dịch
+                      trong trường hợp phát sinh tranh chấp, khiếu nại hoặc sai lệch dữ liệu thanh toán.
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
 
             {/* Form */}
@@ -521,6 +558,10 @@ export default function DonateScreen() {
                             console.error('Error refreshing user data:', error);
                           }
                           
+                          // Set donation ID and show proof upload modal
+                          setLatestDonationId(donation._id);
+                          setShowProofModal(true);
+                          
                           Alert.alert(
                             'Thành công',
                             'Thanh toán đã được xử lý thành công. Cảm ơn bạn đã ủng hộ!',
@@ -529,7 +570,7 @@ export default function DonateScreen() {
                                 text: 'OK',
                                 onPress: () => {
                                   isProcessingRef.current = false;
-                                  navigation.goBack();
+                                  // Don't navigate back yet, wait for proof upload
                                 },
                               },
                             ]
@@ -787,6 +828,10 @@ export default function DonateScreen() {
                           console.error('Error refreshing user data:', error);
                         }
                         
+                        // Set donation ID and show proof upload modal
+                        setLatestDonationId(donation._id);
+                        setShowProofModal(true);
+                        
                         Alert.alert(
                           'Thành công',
                           'Thanh toán đã được xử lý thành công. Cảm ơn bạn đã ủng hộ!',
@@ -795,7 +840,7 @@ export default function DonateScreen() {
                               text: 'OK',
                               onPress: () => {
                                 isProcessingRef.current = false;
-                                navigation.goBack();
+                                // Don't navigate back yet, wait for proof upload
                               },
                             },
                           ]
@@ -984,6 +1029,22 @@ export default function DonateScreen() {
           />
         </SafeAreaView>
       </Modal>
+
+      {/* Proof Upload Modal */}
+      <UploadProofModal
+        visible={showProofModal}
+        onClose={() => {
+          setShowProofModal(false);
+          setLatestDonationId(null);
+          navigation.goBack();
+        }}
+        donationId={latestDonationId}
+        onSuccess={() => {
+          // Clear caches after successful upload
+          cacheService.delete(`donations:${campaignId}`);
+          cacheService.delete(`campaign:${campaignId}`);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -1063,6 +1124,25 @@ const styles = StyleSheet.create({
     color: '#2563EB',
     textAlign: 'center',
   },
+  warningSection: {
+    marginTop: verticalScale(16),
+    marginBottom: verticalScale(8),
+  },
+  warningToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: moderateScale(8),
+    paddingHorizontal: moderateScale(12),
+    backgroundColor: '#FEF3C7',
+    borderRadius: moderateScale(8),
+    marginBottom: moderateScale(8),
+  },
+  warningToggleText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: '#92400E',
+    marginLeft: moderateScale(8),
+  },
   warningContainer: {
     flexDirection: 'row',
     backgroundColor: '#FEF3C7',
@@ -1070,8 +1150,6 @@ const styles = StyleSheet.create({
     borderLeftColor: '#F59E0B',
     padding: moderateScale(12),
     borderRadius: moderateScale(8),
-    marginTop: verticalScale(16),
-    marginBottom: verticalScale(8),
   },
   warningContent: {
     flex: 1,
