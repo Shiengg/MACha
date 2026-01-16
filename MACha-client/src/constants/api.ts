@@ -188,6 +188,7 @@ export const OWNER_UNBAN_ADMIN_ROUTE = (adminId: string) => `${OWNER_ROUTE}/admi
 export const OWNER_FINANCIAL_OVERVIEW_ROUTE = `${OWNER_ROUTE}/financial-overview`;
 export const OWNER_CAMPAIGN_FINANCIALS_ROUTE = `${OWNER_ROUTE}/financial/campaigns`;
 export const OWNER_ADMIN_ACTIVITIES_ROUTE = `${OWNER_ROUTE}/admin-activities`;
+export const OWNER_DONATIONS_ROUTE = `${OWNER_ROUTE}/donations`;
 export const OWNER_APPROVAL_HISTORY_ROUTE = `${OWNER_ROUTE}/approval-history`;
 export const OWNER_GET_ALL_USERS_ROUTE = `${OWNER_ROUTE}/users`;
 export const OWNER_BAN_USER_ROUTE = (userId: string) => `${OWNER_ROUTE}/users/${userId}/ban`;

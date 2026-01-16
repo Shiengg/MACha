@@ -11,6 +11,7 @@ import {
   OWNER_FINANCIAL_OVERVIEW_ROUTE,
   OWNER_CAMPAIGN_FINANCIALS_ROUTE,
   OWNER_ADMIN_ACTIVITIES_ROUTE,
+  OWNER_DONATIONS_ROUTE,
   OWNER_APPROVAL_HISTORY_ROUTE,
   OWNER_GET_ALL_USERS_ROUTE,
   OWNER_BAN_USER_ROUTE,
@@ -288,6 +289,67 @@ export interface GetApprovalHistoryResponse {
   };
 }
 
+export interface OwnerDonation {
+  _id: string;
+  campaign: {
+    _id: string;
+    title: string;
+    creator: {
+      _id: string;
+      username: string;
+      email: string;
+      fullname?: string;
+    };
+  };
+  donor: {
+    _id: string;
+    username: string;
+    email: string;
+    fullname?: string;
+  };
+  amount: number;
+  currency: string;
+  payment_status: 'pending' | 'completed' | 'failed' | 'cancelled' | 'refunded' | 'partially_refunded';
+  donation_method: 'bank_transfer' | 'cash' | 'sepay';
+  sepay_payment_method?: string | null;
+  payment_method: string;
+  // Proof information
+  has_proof?: boolean;
+  proof_images?: string[];
+  proof_status?: 'pending' | 'uploaded' | 'missing';
+  proof_uploaded_at?: string | null;
+  // Additional fields
+  order_invoice_number?: string | null;
+  sepay_transaction_id?: string | null;
+  notes?: string | null;
+  is_anonymous?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetOwnerDonationsFilters {
+  campaignId?: string;
+  campaignSearch?: string;
+  creatorId?: string;
+  donorId?: string;
+  donorSearch?: string;
+  fromDate?: string;
+  toDate?: string;
+  paymentStatus?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface GetOwnerDonationsResponse {
+  donations: OwnerDonation[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
 // User Management Interfaces
 export interface User {
   _id: string;
@@ -458,6 +520,37 @@ export const ownerService = {
     if (adminId) params.adminId = adminId;
     
     const response = await apiClient.get(OWNER_ADMIN_ACTIVITIES_ROUTE, {
+      params,
+      withCredentials: true,
+    });
+    return response.data;
+  },
+
+  async getOwnerDonations(filters: GetOwnerDonationsFilters = {}): Promise<GetOwnerDonationsResponse> {
+    const { 
+      campaignId, 
+      campaignSearch, 
+      creatorId, 
+      donorId, 
+      donorSearch, 
+      fromDate, 
+      toDate, 
+      paymentStatus,
+      page = 1, 
+      limit = 20 
+    } = filters;
+    
+    const params: any = { page, limit };
+    if (campaignId) params.campaignId = campaignId;
+    if (campaignSearch) params.campaignSearch = campaignSearch;
+    if (creatorId) params.creatorId = creatorId;
+    if (donorId) params.donorId = donorId;
+    if (donorSearch) params.donorSearch = donorSearch;
+    if (fromDate) params.fromDate = fromDate;
+    if (toDate) params.toDate = toDate;
+    if (paymentStatus) params.paymentStatus = paymentStatus;
+    
+    const response = await apiClient.get(OWNER_DONATIONS_ROUTE, {
       params,
       withCredentials: true,
     });
