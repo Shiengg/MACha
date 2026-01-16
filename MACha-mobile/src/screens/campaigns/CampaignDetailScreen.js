@@ -748,7 +748,8 @@ export default function CampaignDetailScreen() {
   const isCreator = user && campaign.creator && (user._id === campaign.creator._id || user.id === campaign.creator._id);
   const isPast = campaign.end_date && daysLeft === 0;
   const allowedStatuses = [CAMPAIGN_STATUS.ACTIVE, CAMPAIGN_STATUS.VOTING, CAMPAIGN_STATUS.APPROVED];
-  const canDonate = allowedStatuses.includes(campaign.status) && !isPast;
+  // ✅ YÊU CẦU 1: Ẩn nút donate khi status = "voting" hoặc "cancelled"
+  const canDonate = allowedStatuses.includes(campaign.status) && !isPast && campaign.status !== 'voting' && campaign.status !== 'cancelled';
 
   // Render tabs content
   const renderTabContent = () => {
@@ -2239,6 +2240,27 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(14),
     fontWeight: '500',
     color: '#2563EB',
+  },
+  statusMessageContainer: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 2,
+    borderColor: '#FCA5A5',
+    borderRadius: scale(8),
+    padding: scale(16),
+    margin: scale(16),
+    alignItems: 'center',
+    gap: scale(8),
+  },
+  statusMessageTitle: {
+    fontSize: moderateScale(16),
+    fontWeight: 'bold',
+    color: '#991B1B',
+    textAlign: 'center',
+  },
+  statusMessageText: {
+    fontSize: moderateScale(14),
+    color: '#7F1D1D',
+    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,

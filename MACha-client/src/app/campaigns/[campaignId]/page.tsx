@@ -2169,7 +2169,36 @@ function CampaignDetails() {
                                         const canJoinCompanion = user && user.role === 'user' && isCreatorOrganization && !isCompanion;
                                         
                                         // SECURITY FIX: Ẩn nút donate nếu user là admin, owner, hoặc creator
-                                        const canDonate = user && (user.role === 'user' || user.role === 'organization') && !isCreator;
+                                        // ✅ YÊU CẦU 1: Ẩn nút donate khi status = "voting" (chỉ thay đổi behavior, KHÔNG xoá logic donate cũ)
+                                        const canDonate = user && (user.role === 'user' || user.role === 'organization') && !isCreator && campaign.status !== 'voting' && campaign.status !== 'cancelled';
+                                        
+                                        // ✅ YÊU CẦU 5: Hiển thị trạng thái cancelled
+                                        if (campaign.status === 'cancelled') {
+                                            return (
+                                                <div className="w-full py-4 px-4 bg-red-50 border-2 border-red-300 rounded-xl flex flex-col items-center justify-center gap-2">
+                                                    <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                    <p className="text-red-700 font-semibold text-center">Chiến dịch đã bị hủy</p>
+                                                    {campaign.cancellation_reason && (
+                                                        <p className="text-red-600 text-sm text-center mt-1">{campaign.cancellation_reason}</p>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+                                        
+                                        // ✅ YÊU CẦU 1: Hiển thị thông báo khi status = "voting"
+                                        if (campaign.status === 'voting') {
+                                            return (
+                                                <div className="w-full py-4 px-4 bg-yellow-50 border-2 border-yellow-300 rounded-xl flex flex-col items-center justify-center gap-2">
+                                                    <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <p className="text-yellow-700 font-semibold text-center">Chiến dịch đang trong giai đoạn bình chọn</p>
+                                                    <p className="text-yellow-600 text-sm text-center">Không thể nhận donation mới trong giai đoạn này</p>
+                                                </div>
+                                            );
+                                        }
                                         
                                         if (allowedStatuses.includes(campaign.status)) {
                                             return (

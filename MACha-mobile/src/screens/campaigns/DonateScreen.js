@@ -21,6 +21,7 @@ import { INIT_SEPAY_PAYMENT_ROUTE } from '../../constants/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { donationService } from '../../services/donation.service';
 import { campaignCompanionService } from '../../services/campaignCompanion.service';
+import { campaignService } from '../../services/campaign.service';
 import { cacheService } from '../../services/cache.service';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 import UploadProofModal from '../../components/donation/UploadProofModal';
@@ -45,6 +46,8 @@ export default function DonateScreen() {
   const [showWarning, setShowWarning] = useState(false);
   const [showProofModal, setShowProofModal] = useState(false);
   const [latestDonationId, setLatestDonationId] = useState(null);
+  const [campaign, setCampaign] = useState(null);
+  const [campaignLoading, setCampaignLoading] = useState(true);
   const webViewRef = useRef(null);
   const isProcessingRef = useRef(false); // Flag to prevent multiple alerts
 
@@ -58,6 +61,50 @@ export default function DonateScreen() {
       ]);
     }
   }, [user, navigation]);
+
+  // ✅ YÊU CẦU 1: Fetch campaign để check status
+  useEffect(() => {
+    const fetchCampaign = async () => {
+      if (!campaignId) return;
+      
+      try {
+        setCampaignLoading(true);
+        const response = await campaignService.getCampaignById(campaignId);
+        const campaignData = response;
+        setCampaign(campaignData);
+        
+        // ✅ YÊU CẦU 1: Redirect nếu campaign status = "voting" hoặc "cancelled"
+        if (campaignData.status === 'voting' || campaignData.status === 'cancelled') {
+          Alert.alert(
+            campaignData.status === 'cancelled' ? 'Chiến dịch đã bị hủy' : 'Chiến dịch đang trong giai đoạn bình chọn',
+            campaignData.status === 'cancelled' 
+              ? (campaignData.cancellation_reason || 'Chiến dịch này đã bị hủy')
+              : 'Không thể nhận donation mới trong giai đoạn này',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.goBack(),
+              },
+            ]
+          );
+        }
+      } catch (err) {
+        console.error('Error fetching campaign:', err);
+        Alert.alert('Lỗi', 'Không thể tải thông tin chiến dịch', [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack(),
+          },
+        ]);
+      } finally {
+        setCampaignLoading(false);
+      }
+    };
+    
+    if (campaignId) {
+      fetchCampaign();
+    }
+  }, [campaignId, navigation]);
 
   useEffect(() => {
     const checkCompanion = async () => {
@@ -281,6 +328,47 @@ export default function DonateScreen() {
       setLoading(false);
     }
   };
+
+  // ✅ YÊU CẦU 1: Show loading or redirect if campaign status is invalid
+  if (campaignLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#F97E2C" />
+          <Text style={styles.loadingText}>Đang tải thông tin chiến dịch...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (campaign && (campaign.status === 'voting' || campaign.status === 'cancelled')) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.statusContainer}>
+          <MaterialCommunityIcons 
+            name={campaign.status === 'cancelled' ? 'close-circle' : 'check-circle'} 
+            size={scale(64)} 
+            color={campaign.status === 'cancelled' ? '#EF4444' : '#F59E0B'} 
+          />
+          <Text style={styles.statusTitle}>
+            {campaign.status === 'cancelled' ? 'Chiến dịch đã bị hủy' : 'Chiến dịch đang trong giai đoạn bình chọn'}
+          </Text>
+          {campaign.status === 'cancelled' && campaign.cancellation_reason && (
+            <Text style={styles.statusText}>{campaign.cancellation_reason}</Text>
+          )}
+          {campaign.status === 'voting' && (
+            <Text style={styles.statusText}>Không thể nhận donation mới trong giai đoạn này</Text>
+          )}
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Text style={styles.backButtonText}>Quay lại chiến dịch</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -1050,6 +1138,34 @@ export default function DonateScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: scale(16),
+  },
+  loadingText: {
+    fontSize: moderateScale(16),
+    color: '#6B7280',
+  },
+  statusContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: scale(20),
+    gap: scale(16),
+  },
+  statusTitle: {
+    fontSize: moderateScale(20),
+    fontWeight: 'bold',
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  statusText: {
+    fontSize: moderateScale(14),
+    color: '#6B7280',
+    textAlign: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
