@@ -5,23 +5,23 @@ export interface Notification {
   _id: string;
   type: string;
   message: string;
-  sender: {
+  sender?: {
     _id: string;
     username: string;
     avatar?: string;
-  };
+  } | null;
   post?: {
     _id: string;
     content_text: string;
-  };
+  } | null;
   campaign?: {
     _id: string;
     title: string;
-  };
+  } | null;
   event?: {
     _id: string;
     title: string;
-  };
+  } | null;
   is_read: boolean;
   createdAt: string;
 }
