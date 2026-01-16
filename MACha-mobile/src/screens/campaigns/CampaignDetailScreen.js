@@ -23,10 +23,12 @@ import { escrowService } from '../../services/escrow.service';
 import { reportService } from '../../services/report.service';
 import { cloudinaryService } from '../../services/cloudinary.service';
 import { campaignCompanionService } from '../../services/campaignCompanion.service';
+import { campaignUpdateRequestService } from '../../services/campaignUpdateRequest.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { scale, verticalScale, moderateScale } from '../../utils/responsive';
 import EscrowProgressBar from '../../components/escrow/EscrowProgressBar';
+import { CAMPAIGN_STATUS } from '../../constants/campaign';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -84,6 +86,9 @@ export default function CampaignDetailScreen() {
   const [isJoiningCompanion, setIsJoiningCompanion] = useState(false);
   const [companionId, setCompanionId] = useState(null);
 
+  // Pending update request state
+  const [pendingUpdateRequest, setPendingUpdateRequest] = useState(null);
+
   const fetchCampaign = async () => {
     try {
       setLoading(true);
@@ -129,6 +134,37 @@ export default function CampaignDetailScreen() {
       fetchUpdates();
     }
   }, [campaignId]);
+
+  // Fetch pending update request for active campaigns (creator only)
+  useEffect(() => {
+    const fetchPendingUpdateRequest = async () => {
+      if (!campaign || !user || campaign.status !== CAMPAIGN_STATUS.ACTIVE) {
+        setPendingUpdateRequest(null);
+        return;
+      }
+
+      const isCreator = user && campaign.creator && 
+        (user._id === campaign.creator._id || user.id === campaign.creator._id);
+      
+      if (!isCreator) {
+        setPendingUpdateRequest(null);
+        return;
+      }
+
+      try {
+        const requests = await campaignUpdateRequestService.getUpdateRequestsByCampaign(campaignId);
+        const pending = requests.find(req => req.status === 'pending');
+        setPendingUpdateRequest(pending || null);
+      } catch (error) {
+        console.error('Error fetching pending update request:', error);
+        setPendingUpdateRequest(null);
+      }
+    };
+
+    if (campaignId && campaign && user) {
+      fetchPendingUpdateRequest();
+    }
+  }, [campaignId, campaign, user]);
 
   // Check companion status
   useEffect(() => {
@@ -286,14 +322,48 @@ export default function CampaignDetailScreen() {
       }
     };
 
+    const handleDonationUpdated = (event) => {
+      if (event.campaignId === campaignId && event.donation) {
+        const updatedDonation = event.donation;
+        
+        setDonations(prev => {
+          const index = prev.findIndex(d => d._id === updatedDonation._id);
+          
+          // Only show completed and non-anonymous donations
+          if (updatedDonation.payment_status === 'completed' && !updatedDonation.is_anonymous) {
+            if (index === -1) {
+              return [updatedDonation, ...prev];
+            } else {
+              return prev.map(d => d._id === updatedDonation._id ? updatedDonation : d);
+            }
+          } else {
+            if (index !== -1) {
+              return prev.filter(d => d._id !== updatedDonation._id);
+            }
+          }
+          return prev;
+        });
+        
+        // Update campaign current amount
+        if (event.campaign && campaign) {
+          setCampaign(prev => prev ? {
+            ...prev,
+            current_amount: event.campaign.current_amount
+          } : null);
+        }
+      }
+    };
+
     socket.on('donation:created', handleDonationCreated);
     socket.on('donation:status_changed', handleDonationStatusChanged);
+    socket.on('donation:updated', handleDonationUpdated);
     socket.on('campaign:update:created', handleCampaignUpdateCreated);
     socket.on('campaign:update:deleted', handleCampaignUpdateDeleted);
 
     return () => {
       socket.off('donation:created', handleDonationCreated);
       socket.off('donation:status_changed', handleDonationStatusChanged);
+      socket.off('donation:updated', handleDonationUpdated);
       socket.off('campaign:update:created', handleCampaignUpdateCreated);
       socket.off('campaign:update:deleted', handleCampaignUpdateDeleted);
       socket.emit('leave-room', campaignRoom);
@@ -677,7 +747,7 @@ export default function CampaignDetailScreen() {
   const daysLeft = campaign.end_date ? calculateDaysLeft(campaign.end_date) : null;
   const isCreator = user && campaign.creator && (user._id === campaign.creator._id || user.id === campaign.creator._id);
   const isPast = campaign.end_date && daysLeft === 0;
-  const allowedStatuses = ['active', 'voting', 'approved'];
+  const allowedStatuses = [CAMPAIGN_STATUS.ACTIVE, CAMPAIGN_STATUS.VOTING, CAMPAIGN_STATUS.APPROVED];
   const canDonate = allowedStatuses.includes(campaign.status) && !isPast;
 
   // Render tabs content
@@ -793,6 +863,24 @@ export default function CampaignDetailScreen() {
 
     return (
       <View style={styles.tabContent}>
+        {/* Pending Update Request Banner - Only show for creator when campaign is active */}
+        {isCreator && campaign.status === CAMPAIGN_STATUS.ACTIVE && pendingUpdateRequest && (
+          <View style={styles.pendingRequestBanner}>
+            <MaterialCommunityIcons name="clock-alert-outline" size={moderateScale(20)} color="#F59E0B" />
+            <View style={styles.pendingRequestContent}>
+              <Text style={styles.pendingRequestTitle}>
+                Đã có yêu cầu chỉnh sửa đang chờ duyệt
+              </Text>
+              <Text style={styles.pendingRequestText}>
+                Bạn đã gửi yêu cầu chỉnh sửa campaign. Vui lòng đợi admin xử lý yêu cầu hiện tại trước khi gửi yêu cầu mới.
+              </Text>
+              <Text style={styles.pendingRequestDate}>
+                Gửi lúc: {formatDateTime(pendingUpdateRequest.createdAt)}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {isCreator && (
           <View style={styles.updateFormContainer}>
             {!showUpdateForm ? (
@@ -1270,6 +1358,7 @@ export default function CampaignDetailScreen() {
         onClose={() => setShowWithdrawalModal(false)}
         onSubmit={handleCreateWithdrawalRequest}
         availableAmount={availableAmount}
+        existingPendingRequests={withdrawalRequests}
       />
 
       {/* Report Modal */}
@@ -1287,7 +1376,7 @@ export default function CampaignDetailScreen() {
 }
 
 // Withdrawal Request Modal Component
-function WithdrawalRequestModal({ visible, onClose, onSubmit, availableAmount }) {
+function WithdrawalRequestModal({ visible, onClose, onSubmit, availableAmount, existingPendingRequests = [] }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1297,6 +1386,20 @@ function WithdrawalRequestModal({ visible, onClose, onSubmit, availableAmount })
   };
 
   const handleSubmit = async () => {
+    // Check for existing pending requests
+    const pendingStatuses = ['pending_voting', 'voting_in_progress', 'voting_completed', 'admin_approved'];
+    const hasPending = existingPendingRequests.some((req) =>
+      pendingStatuses.includes(req.request_status)
+    );
+
+    if (hasPending) {
+      Alert.alert(
+        'Lỗi',
+        'Đã có yêu cầu rút tiền đang chờ xử lý. Vui lòng đợi yêu cầu hiện tại được xử lý trước khi tạo yêu cầu mới.'
+      );
+      return;
+    }
+
     const amountValue = parseFloat(amount.replace(/[^\d.]/g, ''));
     if (!amount || amountValue <= 0) {
       Alert.alert('Lỗi', 'Số tiền phải lớn hơn 0');
@@ -2253,6 +2356,36 @@ const styles = StyleSheet.create({
   reportReasonButtonTextActive: {
     color: '#92400E',
     fontWeight: '600',
+  },
+  pendingRequestBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#FEF3C7',
+    borderLeftWidth: 4,
+    borderLeftColor: '#F59E0B',
+    padding: moderateScale(12),
+    borderRadius: moderateScale(8),
+    marginBottom: scale(16),
+  },
+  pendingRequestContent: {
+    flex: 1,
+    marginLeft: moderateScale(8),
+  },
+  pendingRequestTitle: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: moderateScale(4),
+  },
+  pendingRequestText: {
+    fontSize: moderateScale(12),
+    color: '#78350F',
+    lineHeight: moderateScale(18),
+    marginBottom: moderateScale(4),
+  },
+  pendingRequestDate: {
+    fontSize: moderateScale(11),
+    color: '#A16207',
+    marginTop: moderateScale(4),
   },
 });
 

@@ -23,10 +23,13 @@ export const GET_ACTIVE_CATEGORIES_ROUTE = `${CAMPAIGN_ROUTE}/categories/active`
 export const CREATE_CAMPAIGN_UPDATE_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/updates`;
 export const GET_CAMPAIGN_UPDATES_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/updates`;
 export const DELETE_CAMPAIGN_UPDATE_ROUTE = (updateId: string) => `${CAMPAIGN_ROUTE}/updates/${updateId}`;
+export const CREATE_CAMPAIGN_UPDATE_REQUEST_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/update-request`;
+export const GET_CAMPAIGN_UPDATE_REQUESTS_ROUTE = (campaignId: string) => `${CAMPAIGN_ROUTE}/${campaignId}/update-requests`;
 
 export const DONATION_ROUTE = "api/donations";
 export const GET_DONATIONS_BY_CAMPAIGN_ROUTE = (campaignId: string) => `${DONATION_ROUTE}/${campaignId}/donations`;
 export const INIT_SEPAY_PAYMENT_ROUTE = (campaignId: string) => `${DONATION_ROUTE}/${campaignId}/sepay/init`;
+export const UPLOAD_DONATION_PROOF_ROUTE = (donationId: string) => `${DONATION_ROUTE}/${donationId}/proof`;
 
 export const CAMPAIGN_COMPANION_ROUTE = "api";
 export const JOIN_CAMPAIGN_COMPANION_ROUTE = (campaignId: string) => `${CAMPAIGN_COMPANION_ROUTE}/campaigns/${campaignId}/companion/join`;

@@ -75,7 +75,10 @@ export default function Header() {
 
     const handleNewNotification = (notification) => {
       console.log('🔔 New notification received in Header:', notification);
-      setUnreadCount((prev) => prev + 1);
+      // Increment unread count only if notification is not read
+      if (!notification.is_read) {
+        setUnreadCount((prev) => prev + 1);
+      }
     };
 
     socket.on('new-notification', handleNewNotification);
