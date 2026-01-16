@@ -470,6 +470,18 @@ const checkAndCreateMilestoneWithdrawalRequest = async (campaign, isExpired = fa
     
     console.log(`[Milestone] Tạo withdrawal request tự động cho campaign ${campaign._id} khi đạt ${achievedMilestonePercentage}% mục tiêu`);
     
+    // ✅ YÊU CẦU 1: Chuyển campaign.status → "voting" khi đạt milestone ESCROW
+    // Chỉ chuyển nếu campaign đang ở trạng thái "active" (không override các trạng thái khác)
+    if (campaign.status === "active") {
+        campaign.status = "voting";
+        await campaign.save();
+        console.log(`[Milestone] Campaign ${campaign._id} status changed from "active" to "voting" after reaching milestone ${achievedMilestonePercentage}%`);
+        
+        // Invalidate cache
+        await redisClient.del(`campaign:${campaign._id}`);
+        await redisClient.del('campaigns');
+    }
+    
     // Emit event ESCROW_THRESHOLD_REACHED để gửi notification cho tất cả donors
     await emitEscrowThresholdReachedNotification(withdrawalRequest, campaign, achievedMilestonePercentage);
     
@@ -482,6 +494,11 @@ export const createDonation = async (campaignId, donorId, donationData) => {
     const campaign = await Campaign.findById(campaignId);
     if (!campaign) {
         return null;
+    }
+
+    // ✅ YÊU CẦU 1: Campaign KHÔNG nhận donation mới khi status = "voting"
+    if (campaign.status === "voting") {
+        throw new Error("Campaign đang trong giai đoạn bình chọn, không thể nhận donation mới");
     }
 
     let companion = null;
@@ -620,6 +637,11 @@ export const createSepayDonation = async (campaignId, donorId, donationData) => 
     const campaign = await Campaign.findById(campaignId);
     if (!campaign) {
         return null;
+    }
+
+    // ✅ YÊU CẦU 1: Campaign KHÔNG nhận donation mới khi status = "voting"
+    if (campaign.status === "voting") {
+        throw new Error("Campaign đang trong giai đoạn bình chọn, không thể nhận donation mới");
     }
 
     let companion = null;

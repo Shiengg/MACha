@@ -46,7 +46,7 @@ export interface Campaign {
   current_amount: number;
   start_date: string;
   end_date?: string;
-  status: 'pending' | 'active' | 'rejected' | 'completed' | 'cancelled';
+  status: 'pending' | 'active' | 'voting' | 'rejected' | 'completed' | 'cancelled' | 'approved';
   category: string;
   banner_image: string;
   gallery_images?: string[];

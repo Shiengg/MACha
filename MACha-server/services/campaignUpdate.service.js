@@ -70,6 +70,36 @@ export const createCampaignUpdate = async (campaignId, userId, updateData) => {
                 }
             }
         }
+
+        // ✅ YÊU CẦU 3: Chuyển campaign.status từ "voting" → "active" khi creator update hợp lệ
+        // Kiểm tra xem có escrow nào khác đang pending update không
+        // Nếu tất cả escrow đã fulfilled, chuyển campaign.status = "active"
+        try {
+            const allReleasedEscrows = await Escrow.find({
+                campaign: campaignId,
+                request_status: "released",
+                update_required_by: { $ne: null },
+                released_at: { $ne: null }
+            });
+
+            // Kiểm tra xem tất cả escrow đã fulfilled chưa
+            const allFulfilled = allReleasedEscrows.every(escrow => escrow.update_fulfilled_at !== null);
+
+            // Nếu campaign đang ở trạng thái "voting" và tất cả escrow đã fulfilled, chuyển sang "active"
+            if (campaign.status === "voting" && allFulfilled && allReleasedEscrows.length > 0) {
+                campaign.status = "active";
+                await campaign.save();
+                
+                console.log(`[Campaign Update] Campaign ${campaignId} status changed from "voting" to "active" after all escrow requirements fulfilled`);
+                
+                // Invalidate cache
+                await redisClient.del(`campaign:${campaignId}`);
+                await redisClient.del('campaigns');
+            }
+        } catch (statusError) {
+            // Log error nhưng không fail createCampaignUpdate
+            console.error(`[Campaign Update] Error checking campaign status change for update ${update._id}:`, statusError);
+        }
     } catch (error) {
         // Log error nhưng không fail createCampaignUpdate
         console.error(`[Campaign Update] Error checking escrow fulfillment for update ${update._id}:`, error);

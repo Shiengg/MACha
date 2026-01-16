@@ -18,6 +18,7 @@ import './jobs/processExpiredCampaigns.job.js';
 import './jobs/processExpiredEvents.job.js';
 import './jobs/processStartedEvents.job.js';
 import './jobs/checkOverduePostReleaseUpdates.job.js';
+import './jobs/autoCancelOverdueCampaigns.job.js';
 
 dotenv.config();
 
