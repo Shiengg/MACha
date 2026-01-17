@@ -1495,16 +1495,40 @@ export const getOwnerDonations = async (filters = {}, page = 1, limit = 20) => {
     // Format donations for response
     const formattedDonations = donations.map(donation => ({
         _id: donation._id,
-        campaign: {
-            _id: donation.campaign._id,
-            title: donation.campaign.title,
-            creator: donation.campaign.creator
+        campaign: donation.campaign ? {
+            _id: donation.campaign._id || null,
+            title: donation.campaign.title || 'Chiến dịch đã bị xóa',
+            creator: donation.campaign.creator ? {
+                _id: donation.campaign.creator._id || null,
+                username: donation.campaign.creator.username || 'Người dùng đã bị xóa',
+                email: donation.campaign.creator.email || null,
+                fullname: donation.campaign.creator.fullname || null
+            } : {
+                _id: null,
+                username: 'Người dùng đã bị xóa',
+                email: null,
+                fullname: null
+            }
+        } : {
+            _id: null,
+            title: 'Chiến dịch đã bị xóa',
+            creator: {
+                _id: null,
+                username: 'Người dùng đã bị xóa',
+                email: null,
+                fullname: null
+            }
         },
-        donor: {
-            _id: donation.donor._id,
-            username: donation.donor.username,
-            email: donation.donor.email,
-            fullname: donation.donor.fullname
+        donor: donation.donor ? {
+            _id: donation.donor._id || null,
+            username: donation.donor.username || 'Người dùng đã bị xóa',
+            email: donation.donor.email || null,
+            fullname: donation.donor.fullname || null
+        } : {
+            _id: null,
+            username: 'Người dùng đã bị xóa',
+            email: null,
+            fullname: null
         },
         amount: donation.amount,
         currency: donation.currency || 'VND',
