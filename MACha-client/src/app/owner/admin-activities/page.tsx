@@ -395,7 +395,7 @@ function OwnerDonationDashboardContent() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       ID Quyên Góp
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider max-w-[200px]">
                       Chiến Dịch
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -431,13 +431,15 @@ function OwnerDonationDashboardContent() {
                         <td className="px-4 py-3 text-sm text-gray-900 font-mono">
                           {donation._id?.substring(0, 8) || 'N/A'}...
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          <div>
-                            <div className="font-medium">{donation.campaign?.title || 'Chiến dịch đã bị xóa'}</div>
-                            <div className="text-xs text-gray-500 font-mono">
+                        <td className="px-4 py-3 text-sm text-gray-900 max-w-[200px]">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate" title={donation.campaign?.title || 'Chiến dịch đã bị xóa'}>
+                              {donation.campaign?.title || 'Chiến dịch đã bị xóa'}
+                            </div>
+                            <div className="text-xs text-gray-500 font-mono truncate">
                               {donation.campaign?._id?.substring(0, 8) || 'N/A'}...
-                    </div>
-                  </div>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900">
                           <div>
