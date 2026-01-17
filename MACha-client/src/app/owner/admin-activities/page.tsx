@@ -429,30 +429,30 @@ function OwnerDonationDashboardContent() {
                     donations.map((donation) => (
                       <tr key={donation._id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 text-sm text-gray-900 font-mono">
-                          {donation._id.substring(0, 8)}...
+                          {donation._id?.substring(0, 8) || 'N/A'}...
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900">
                           <div>
-                            <div className="font-medium">{donation.campaign.title}</div>
+                            <div className="font-medium">{donation.campaign?.title || 'Chiến dịch đã bị xóa'}</div>
                             <div className="text-xs text-gray-500 font-mono">
-                              {donation.campaign._id.substring(0, 8)}...
+                              {donation.campaign?._id?.substring(0, 8) || 'N/A'}...
                     </div>
                   </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900">
                           <div>
-                            <div className="font-medium">{donation.campaign.creator.username}</div>
-                            <div className="text-xs text-gray-500">{donation.campaign.creator.email}</div>
+                            <div className="font-medium">{donation.campaign?.creator?.username || 'Người dùng đã bị xóa'}</div>
+                            <div className="text-xs text-gray-500">{donation.campaign?.creator?.email || 'N/A'}</div>
                 </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900">
                           <div>
-                            <div className="font-medium">{donation.donor.username}</div>
+                            <div className="font-medium">{donation.donor?.username || 'Người dùng đã bị xóa'}</div>
                             <div className="text-xs text-gray-500">
-                              {donation.donor.email}
+                              {donation.donor?.email || 'N/A'}
           </div>
                             <div className="text-xs text-gray-400 font-mono mt-1">
-                              {donation.donor._id.substring(0, 8)}...
+                              {donation.donor?._id?.substring(0, 8) || 'N/A'}...
                 </div>
               </div>
                         </td>
@@ -555,16 +555,16 @@ function OwnerDonationDashboardContent() {
                     <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                       <div>
                         <div className="text-sm font-medium text-gray-500">Tiêu đề</div>
-                        <div className="text-base text-gray-900">{selectedDonation.campaign.title}</div>
+                        <div className="text-base text-gray-900">{selectedDonation.campaign?.title || 'Chiến dịch đã bị xóa'}</div>
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-500">ID Chiến Dịch</div>
-                        <div className="text-sm font-mono text-gray-700">{selectedDonation.campaign._id}</div>
+                        <div className="text-sm font-mono text-gray-700">{selectedDonation.campaign?._id || 'N/A'}</div>
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-500">Người Tạo</div>
-                        <div className="text-base text-gray-900">{selectedDonation.campaign.creator.username}</div>
-                        <div className="text-sm text-gray-600">{selectedDonation.campaign.creator.email}</div>
+                        <div className="text-base text-gray-900">{selectedDonation.campaign?.creator?.username || 'Người dùng đã bị xóa'}</div>
+                        <div className="text-sm text-gray-600">{selectedDonation.campaign?.creator?.email || 'N/A'}</div>
                       </div>
                     </div>
                   </div>
@@ -575,13 +575,13 @@ function OwnerDonationDashboardContent() {
                     <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                       <div>
                         <div className="text-sm font-medium text-gray-500">Tên đăng nhập</div>
-                        <div className="text-base text-gray-900">{selectedDonation.donor.username}</div>
+                        <div className="text-base text-gray-900">{selectedDonation.donor?.username || 'Người dùng đã bị xóa'}</div>
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-500">Email</div>
-                        <div className="text-base text-gray-900">{selectedDonation.donor.email}</div>
+                        <div className="text-base text-gray-900">{selectedDonation.donor?.email || 'N/A'}</div>
                       </div>
-                      {selectedDonation.donor.fullname && (
+                      {selectedDonation.donor?.fullname && (
                         <div>
                           <div className="text-sm font-medium text-gray-500">Họ tên</div>
                           <div className="text-base text-gray-900">{selectedDonation.donor.fullname}</div>
@@ -589,7 +589,7 @@ function OwnerDonationDashboardContent() {
                       )}
                       <div>
                         <div className="text-sm font-medium text-gray-500">ID Người Quyên Góp</div>
-                        <div className="text-sm font-mono text-gray-700">{selectedDonation.donor._id}</div>
+                        <div className="text-sm font-mono text-gray-700">{selectedDonation.donor?._id || 'N/A'}</div>
                       </div>
                       {selectedDonation.is_anonymous && (
                         <div className="mt-2">
