@@ -158,46 +158,65 @@ const removeReportedItem = async (reportedType, reportedId, resolutionDetails, a
                 console.error('Error pushing CAMPAIGN_REMOVED job:', error);
             }
 
-            try {
-                const refundServiceModule = await import('./refund.service.js');
-                const recoveryServiceModule = await import('./recovery.service.js');
-                const escrowServiceModule = await import('./escrow.service.js');
-                
-                await escrowServiceModule.cancelPendingWithdrawalRequests(reportedId);
-                
-                const totalReleasedAmount = await escrowServiceModule.getTotalReleasedAmount(reportedId);
-                
-                if (reportedItem.current_amount > 0) {
-                    const refundResult = await refundServiceModule.processProportionalRefund(reportedId, adminId, resolutionDetails);
+            // Move refund processing to background to avoid blocking response
+            // This allows the admin to see the resolution immediately while refunds process
+            setImmediate(async () => {
+                try {
+                    const refundServiceModule = await import('./refund.service.js');
+                    const recoveryServiceModule = await import('./recovery.service.js');
+                    const escrowServiceModule = await import('./escrow.service.js');
                     
-                    if (!refundResult.success) {
-                        const errorMsg = `Refund failed: ${refundResult.error || refundResult.message}`;
-                        console.error(errorMsg);
-                        throw new Error(errorMsg);
+                    // Reload campaign to get latest data for background processing
+                    const campaignForBackground = await Campaign.findById(reportedId);
+                    if (!campaignForBackground) {
+                        console.error(`[Remove Campaign] Campaign ${reportedId} not found for background refund processing`);
+                        return;
                     }
                     
-                    if (totalReleasedAmount > 0) {
-                        const recoveryResult = await recoveryServiceModule.createRecoveryCase(reportedId, adminId, 30);
-                        if (!recoveryResult.success) {
-                            const errorMsg = `Failed to create recovery case: ${recoveryResult.error || 'Unknown error'}`;
-                            console.error(errorMsg);
-                            throw new Error(errorMsg);
+                    await escrowServiceModule.cancelPendingWithdrawalRequests(reportedId);
+                    
+                    const totalReleasedAmount = await escrowServiceModule.getTotalReleasedAmount(reportedId);
+                    
+                    if (campaignForBackground.current_amount > 0) {
+                        const refundResult = await refundServiceModule.processProportionalRefund(reportedId, adminId, resolutionDetails);
+                        
+                        if (!refundResult.success) {
+                            const errorMsg = `Refund failed: ${refundResult.error || refundResult.message}`;
+                            console.error(`[Remove Campaign] ${errorMsg}`);
+                            // Don't throw - log error but continue processing
+                        } else {
+                            console.log(`[Remove Campaign] Refund processed successfully for campaign ${reportedId}`);
+                        }
+                        
+                        if (totalReleasedAmount > 0) {
+                            const recoveryResult = await recoveryServiceModule.createRecoveryCase(reportedId, adminId, 30);
+                            if (!recoveryResult.success) {
+                                const errorMsg = `Failed to create recovery case: ${recoveryResult.error || 'Unknown error'}`;
+                                console.error(`[Remove Campaign] ${errorMsg}`);
+                                // Don't throw - log error but continue
+                            } else {
+                                console.log(`[Remove Campaign] Recovery case created for campaign ${reportedId}`);
+                            }
+                        }
+                    } else {
+                        if (totalReleasedAmount > 0) {
+                            const recoveryResult = await recoveryServiceModule.createRecoveryCase(reportedId, adminId, 30);
+                            if (!recoveryResult.success) {
+                                const errorMsg = `Failed to create recovery case: ${recoveryResult.error || 'Unknown error'}`;
+                                console.error(`[Remove Campaign] ${errorMsg}`);
+                                // Don't throw - log error but continue
+                            } else {
+                                console.log(`[Remove Campaign] Recovery case created for campaign ${reportedId}`);
+                            }
                         }
                     }
-                } else {
-                    if (totalReleasedAmount > 0) {
-                        const recoveryResult = await recoveryServiceModule.createRecoveryCase(reportedId, adminId, 30);
-                        if (!recoveryResult.success) {
-                            const errorMsg = `Failed to create recovery case: ${recoveryResult.error || 'Unknown error'}`;
-                            console.error(errorMsg);
-                            throw new Error(errorMsg);
-                        }
-                    }
+                    
+                    console.log(`[Remove Campaign] Background refund processing completed for campaign ${reportedId}`);
+                } catch (refundError) {
+                    // Log error but don't fail - campaign is already cancelled
+                    console.error(`[Remove Campaign] Error processing refund for cancelled campaign ${reportedId}:`, refundError);
                 }
-            } catch (refundError) {
-                console.error('Error processing refund for cancelled campaign:', refundError);
-                throw refundError;
-            }
+            });
             break;
         case 'event':
             creatorId = reportedItem.creator;
