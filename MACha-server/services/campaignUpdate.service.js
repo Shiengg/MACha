@@ -41,25 +41,42 @@ export const createCampaignUpdate = async (campaignId, userId, updateData) => {
         const updateCreatedAt = update.createdAt;
         
         // Query escrows với điều kiện:
-        // - request_status = "released"
+        // - released_at != null (đã được release - không cần kiểm tra request_status)
         // - campaign = campaignId
         // - update_fulfilled_at == null (chưa được fulfill)
         // - update_required_by != null (có deadline)
-        // - released_at != null (đã được release)
         const pendingEscrows = await Escrow.find({
             campaign: campaignId,
-            request_status: "released",
             update_fulfilled_at: null,
             update_required_by: { $ne: null },
             released_at: { $ne: null }
         });
 
+        let hasFulfilledEscrowBeforeDeadline = false;
+        let hasUpdateBeforeDeadline = false;
+
+        // Kiểm tra xem có escrow nào đã được released không
+        // Lưu ý: Escrow được coi là "released" nếu có released_at != null
+        // (không nhất thiết phải có request_status = "released")
+        const allReleasedEscrows = await Escrow.find({
+            campaign: campaignId,
+            released_at: { $ne: null }
+        });
+
+        // Kiểm tra xem có escrow nào có deadline chưa đến không
+        for (const escrow of allReleasedEscrows) {
+            if (escrow.update_required_by && updateCreatedAt <= escrow.update_required_by) {
+                hasUpdateBeforeDeadline = true;
+                break;
+            }
+        }
+
         for (const escrow of pendingEscrows) {
             // Check nếu update nằm trong khoảng [released_at, update_required_by]
-            if (
-                updateCreatedAt >= escrow.released_at &&
-                updateCreatedAt <= escrow.update_required_by
-            ) {
+            const isBeforeDeadline = updateCreatedAt <= escrow.update_required_by;
+            const isAfterRelease = updateCreatedAt >= escrow.released_at;
+            
+            if (isAfterRelease && isBeforeDeadline) {
                 // Update fulfills requirement → set update_fulfilled_at
                 // Không rollback nếu đã set (idempotency)
                 if (!escrow.update_fulfilled_at) {
@@ -67,34 +84,55 @@ export const createCampaignUpdate = async (campaignId, userId, updateData) => {
                     await escrow.save();
                     
                     console.log(`[Campaign Update] Update ${update._id} fulfills escrow ${escrow._id} requirement (milestone ${escrow.milestone_percentage}%, deadline: ${escrow.update_required_by.toISOString()})`);
+                    
+                    // Đánh dấu đã fulfill một escrow trước deadline
+                    hasFulfilledEscrowBeforeDeadline = true;
                 }
             }
         }
 
         // ✅ YÊU CẦU 3: Chuyển campaign.status từ "voting" → "active" khi creator update hợp lệ
-        // Kiểm tra xem có escrow nào khác đang pending update không
-        // Nếu tất cả escrow đã fulfilled, chuyển campaign.status = "active"
+        // Logic: Nếu campaign đang ở trạng thái "voting" và có escrow đã released,
+        // và có update trước thời hạn cam kết (update_required_by), chuyển về "active" ngay
         try {
-            const allReleasedEscrows = await Escrow.find({
+            // Reload campaign để đảm bảo có status mới nhất
+            const currentCampaign = await Campaign.findById(campaignId);
+            
+            // Kiểm tra xem có escrow nào đang trong quá trình voting không
+            const votingEscrows = await Escrow.find({
                 campaign: campaignId,
-                request_status: "released",
-                update_required_by: { $ne: null },
-                released_at: { $ne: null }
+                request_status: { $in: ["voting_in_progress", "voting_extended", "voting_completed", "admin_approved"] }
             });
-
-            // Kiểm tra xem tất cả escrow đã fulfilled chưa
-            const allFulfilled = allReleasedEscrows.every(escrow => escrow.update_fulfilled_at !== null);
-
-            // Nếu campaign đang ở trạng thái "voting" và tất cả escrow đã fulfilled, chuyển sang "active"
-            if (campaign.status === "voting" && allFulfilled && allReleasedEscrows.length > 0) {
-                campaign.status = "active";
-                await campaign.save();
+            
+            // Nếu campaign đang ở trạng thái "voting"
+            if (currentCampaign.status === "voting") {
+                let shouldChangeToActive = false;
                 
-                console.log(`[Campaign Update] Campaign ${campaignId} status changed from "voting" to "active" after all escrow requirements fulfilled`);
+                // Trường hợp 1: Có escrow đã released và có update trước deadline
+                if (allReleasedEscrows.length > 0 && hasUpdateBeforeDeadline) {
+                    shouldChangeToActive = true;
+                }
+                // Trường hợp 2: Có escrow đã released và không có escrow nào đang voting
+                // (tất cả escrow đã xong voting và released)
+                else if (allReleasedEscrows.length > 0 && votingEscrows.length === 0) {
+                    shouldChangeToActive = true;
+                }
+                // Trường hợp 3: Có escrow đã released và có update (bất kỳ update nào)
+                // Đây là trường hợp đơn giản nhất: sau khi release, chỉ cần có update là chuyển về active
+                else if (allReleasedEscrows.length > 0) {
+                    shouldChangeToActive = true;
+                }
                 
-                // Invalidate cache
-                await redisClient.del(`campaign:${campaignId}`);
-                await redisClient.del('campaigns');
+                if (shouldChangeToActive) {
+                    currentCampaign.status = "active";
+                    await currentCampaign.save();
+                    
+                    console.log(`[Campaign Update] Campaign ${campaignId} status changed from "voting" to "active" after campaign update`);
+                    
+                    // Invalidate cache
+                    await redisClient.del(`campaign:${campaignId}`);
+                    await redisClient.del('campaigns');
+                }
             }
         } catch (statusError) {
             // Log error nhưng không fail createCampaignUpdate
