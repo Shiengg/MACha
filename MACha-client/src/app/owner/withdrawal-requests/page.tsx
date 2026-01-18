@@ -279,19 +279,14 @@ export default function OwnerWithdrawalRequests() {
       const imageUrls = uploadResults.map(result => result.secure_url);
 
       // Release escrow
-      await escrowService.releaseEscrow(releaseEscrow._id, {
+      const result = await escrowService.releaseEscrow(releaseEscrow._id, {
         disbursement_proof_images: imageUrls,
         disbursement_note: disbursementNote || undefined,
       });
 
-      Swal.fire({
-        icon: 'success',
-        title: 'Thành công!',
-        text: 'Escrow đã được giải ngân thành công với bill giải ngân',
-        timer: 3000,
-        timerProgressBar: true,
-        showConfirmButton: false,
-      });
+      // Reset loading state trước khi hiển thị Swal để tránh block
+      setIsReleasing(false);
+      setIsUploading(false);
 
       // Reset form and close modal
       setShowReleaseModal(false);
@@ -301,17 +296,58 @@ export default function OwnerWithdrawalRequests() {
       setDisbursementNote('');
       
       // Refresh list
-      fetchWithdrawalRequests();
+      await fetchWithdrawalRequests();
+
+      // Hiển thị thông báo thành công sau khi đã reset state
+      Swal.fire({
+        icon: 'success',
+        title: 'Thành công!',
+        text: 'Escrow đã được giải ngân thành công với bill giải ngân',
+        timer: 3000,
+        timerProgressBar: true,
+        showConfirmButton: false,
+      });
     } catch (error: any) {
       console.error('Error releasing escrow:', error);
+      
+      // Reset loading state ngay lập tức
+      setIsReleasing(false);
+      setIsUploading(false);
+
+      // Kiểm tra xem escrow đã được release chưa (có thể đã thành công nhưng response lỗi)
+      try {
+        await fetchWithdrawalRequests();
+        const updatedEscrows = await ownerService.getAdminApprovedWithdrawalRequests();
+        const updatedEscrow = updatedEscrows.escrows?.find((e: Escrow) => e._id === releaseEscrow._id);
+        
+        if (updatedEscrow && updatedEscrow.request_status === 'released' && updatedEscrow.disbursement_proof_images && updatedEscrow.disbursement_proof_images.length > 0) {
+          // Escrow đã được release thành công, chỉ là response có vấn đề
+          setShowReleaseModal(false);
+          setReleaseEscrow(null);
+          setProofImages([]);
+          setProofImageUrls([]);
+          setDisbursementNote('');
+          
+          Swal.fire({
+            icon: 'success',
+            title: 'Thành công!',
+            text: 'Escrow đã được giải ngân thành công với minh chứng giải ngân',
+            timer: 3000,
+            timerProgressBar: true,
+            showConfirmButton: false,
+          });
+          return;
+        }
+      } catch (checkError) {
+        console.error('Error checking escrow status:', checkError);
+      }
+
+      // Nếu không phải đã release, hiển thị lỗi
       Swal.fire({
         icon: 'error',
         title: 'Lỗi',
         text: error?.response?.data?.message || error?.message || 'Không thể giải ngân escrow',
       });
-    } finally {
-      setIsReleasing(false);
-      setIsUploading(false);
     }
   };
 
