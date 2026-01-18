@@ -60,7 +60,6 @@ const CATEGORIES = [
   { value: 'disability', label: 'Người khuyết tật' },
   { value: 'animal', label: 'Động vật' },
   { value: 'environment', label: 'Môi trường' },
-  { value: 'community', label: 'Cộng đồng' },
   { value: 'other', label: 'Khác' },
 ];
 
