@@ -534,7 +534,6 @@ export default function OwnerWithdrawalRequests() {
                           </button>
                           {request.request_status === 'admin_approved' && (
                             <>
-                              
                               <button
                                 onClick={() => handleProcessPayment(request)}
                                 disabled={isProcessing}
