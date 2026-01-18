@@ -668,7 +668,8 @@ export const sepayWithdrawalSuccess = async (req, res) => {
         if (order_invoice_number) {
             const result = await escrowService.updateSepayWithdrawalStatus(order_invoice_number, 'completed', {});
             if (result && result.escrow) {
-                return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=success`);
+                // Redirect với escrowId để frontend tự động mở modal upload bill
+                return res.redirect(`${frontendUrl}/owner/withdrawal-requests?payment=success&escrowId=${result.escrow._id}`);
             }
         }
 

@@ -1416,15 +1416,14 @@ export const updateSepayWithdrawalStatus = async (orderInvoiceNumber, status, se
         return null;
     }
 
+    // Nếu đã released, không cần update nữa
     if (escrow.request_status === 'released') {
         return { escrow, campaign: escrow.campaign };
     }
     
-    let newStatus = escrow.request_status;
-    if (status === 'completed' && escrow.request_status === 'admin_approved') {
-        newStatus = 'released';
-    }
-    
+    // SePay SUCCESS chỉ lưu thông tin thanh toán, KHÔNG tự động release escrow
+    // Release escrow chỉ xảy ra khi owner gọi releaseEscrow() với disbursement proof
+    // Phân biệt rõ: "Owner paid successfully" ≠ "Escrow released"
     const updateData = {
         sepay_response_data: sepayData
     };
@@ -1432,102 +1431,13 @@ export const updateSepayWithdrawalStatus = async (orderInvoiceNumber, status, se
     if (sepayData?.transaction_id) {
         updateData.sepay_transaction_id = sepayData.transaction_id;
     }
-    
-    const now = new Date();
-    if (newStatus === 'released') {
-        updateData.released_at = now;
-        escrow.request_status = 'released';
-    }
 
     Object.assign(escrow, updateData);
     await escrow.save();
     
-    // Set post-release update tracking fields (nếu có milestone)
-    // Reload escrow với populated campaign để ensure có latest data
-    if (newStatus === 'released') {
-        const escrowWithCampaign = await Escrow.findById(escrow._id).populate("campaign");
-        if (escrowWithCampaign) {
-            const trackingResult = await setPostReleaseUpdateTracking(escrowWithCampaign, now);
-            if (!trackingResult.success && !trackingResult.skipped) {
-                // Log warning nhưng không fail release
-                console.warn(`[Update Sepay Status] Warning: Could not set post-release tracking fields for escrow ${escrow._id}:`, trackingResult.error || trackingResult.message);
-            }
-        }
-    }
+    console.log(`[Update Sepay Status] Escrow ${escrow._id} payment info updated. Status: ${escrow.request_status}, SePay transaction: ${updateData.sepay_transaction_id || 'N/A'}`);
     
-    const campaign = escrow.campaign;
-    if (campaign && newStatus === 'released') {
-        await redisClient.del(`campaign:${campaign._id}`);
-        await redisClient.del('campaigns');
-        
-        try {
-            await escrow.populate("requested_by", "username email fullname");
-            const creator = escrow.requested_by;
-            
-            if (creator && creator.email) {
-                try {
-                    await mailerService.sendWithdrawalReleasedEmail(creator.email, {
-                        username: creator.username || creator.fullname || 'Người dùng',
-                        campaignTitle: campaign.title,
-                        campaignId: campaign._id.toString(),
-                        withdrawalAmount: escrow.withdrawal_request_amount
-                    });
-                } catch (emailError) {
-                    console.error('[Withdrawal] Error sending email to creator:', emailError);
-                }
-            }
-            
-            const donorIds = await getUniqueDonorsByCampaign(campaign._id);
-            
-            if (donorIds.length > 0) {
-                const notifications = donorIds.map(donorId => ({
-                    receiver: donorId,
-                    sender: creator._id,
-                    type: 'withdrawal_released',
-                    campaign: campaign._id,
-                    message: `Chiến dịch "${campaign.title}" đã giải ngân thành công số tiền ${escrow.withdrawal_request_amount.toLocaleString('vi-VN')} VND`,
-                    is_read: false
-                }));
-                
-                const createdNotifications = await Notification.insertMany(notifications);
-                
-                for (let i = 0; i < createdNotifications.length; i++) {
-                    try {
-                        const notification = createdNotifications[i];
-                        const donorId = donorIds[i];
-                        
-                        await redisClient.publish('notification:new', JSON.stringify({
-                            recipientId: donorId.toString(),
-                            notification: {
-                                _id: notification._id.toString(),
-                                type: 'withdrawal_released',
-                                message: notifications[i].message,
-                                sender: {
-                                    _id: creator._id.toString(),
-                                    username: creator.username,
-                                    fullname: creator.fullname
-                                },
-                                campaign: {
-                                    _id: campaign._id.toString(),
-                                    title: campaign.title
-                                },
-                                is_read: false,
-                                createdAt: notification.createdAt
-                            }
-                        }));
-                    } catch (notifError) {
-                        console.error('[Withdrawal] Error publishing notification:', notifError);
-                    }
-                }
-                
-                await redisClient.del(donorIds.map(id => `notifications:${id}`));
-            }
-        } catch (error) {
-            console.error('[Withdrawal] Error sending email/notifications:', error);
-        }
-    }
-    
-    return { escrow, campaign };
+    return { escrow, campaign: escrow.campaign };
 };
 
 /**
@@ -1606,7 +1516,7 @@ export const releaseEscrow = async (escrowId, ownerId, releaseData) => {
         };
     }
     
-    // Validate: owner phải là creator của campaign
+    // Validate: campaign phải tồn tại
     const campaign = escrow.campaign;
     if (!campaign) {
         return {
@@ -1616,13 +1526,7 @@ export const releaseEscrow = async (escrowId, ownerId, releaseData) => {
         };
     }
     
-    if (campaign.creator.toString() !== ownerId.toString()) {
-        return {
-            success: false,
-            error: "UNAUTHORIZED",
-            message: "Chỉ owner của campaign mới có thể release escrow"
-        };
-    }
+    // Note: Authorization đã được check ở middleware checkOwner (user phải có role = "owner")
     
     // Idempotency check: nếu đã released, không cho release lại
     if (escrow.request_status === "released") {
@@ -1667,6 +1571,74 @@ export const releaseEscrow = async (escrowId, ownerId, releaseData) => {
     await redisClient.del(`campaign:${campaign._id}`);
     await redisClient.del('campaigns');
     await redisClient.del(`escrow:${escrowId}`);
+    
+    // Gửi email và notification cho creator và donors khi escrow được release
+    try {
+        await escrow.populate("requested_by", "username email fullname");
+        const creator = escrow.requested_by;
+        
+        if (creator && creator.email) {
+            try {
+                await mailerService.sendWithdrawalReleasedEmail(creator.email, {
+                    username: creator.username || creator.fullname || 'Người dùng',
+                    campaignTitle: campaign.title,
+                    campaignId: campaign._id.toString(),
+                    withdrawalAmount: escrow.withdrawal_request_amount
+                });
+            } catch (emailError) {
+                console.error('[Release Escrow] Error sending email to creator:', emailError);
+            }
+        }
+        
+        const donorIds = await getUniqueDonorsByCampaign(campaign._id);
+        
+        if (donorIds.length > 0) {
+            const notifications = donorIds.map(donorId => ({
+                receiver: donorId,
+                sender: creator._id,
+                type: 'withdrawal_released',
+                campaign: campaign._id,
+                message: `Chiến dịch "${campaign.title}" đã giải ngân thành công số tiền ${escrow.withdrawal_request_amount.toLocaleString('vi-VN')} VND`,
+                is_read: false
+            }));
+            
+            const createdNotifications = await Notification.insertMany(notifications);
+            
+            for (let i = 0; i < createdNotifications.length; i++) {
+                try {
+                    const notification = createdNotifications[i];
+                    const donorId = donorIds[i];
+                    
+                    await redisClient.publish('notification:new', JSON.stringify({
+                        recipientId: donorId.toString(),
+                        notification: {
+                            _id: notification._id.toString(),
+                            type: 'withdrawal_released',
+                            message: notifications[i].message,
+                            sender: {
+                                _id: creator._id.toString(),
+                                username: creator.username,
+                                fullname: creator.fullname
+                            },
+                            campaign: {
+                                _id: campaign._id.toString(),
+                                title: campaign.title
+                            },
+                            is_read: false,
+                            createdAt: notification.createdAt
+                        }
+                    }));
+                } catch (notifError) {
+                    console.error('[Release Escrow] Error publishing notification:', notifError);
+                }
+            }
+            
+            await redisClient.del(donorIds.map(id => `notifications:${id}`));
+        }
+    } catch (error) {
+        console.error('[Release Escrow] Error sending email/notifications:', error);
+        // Không fail release nếu email/notification lỗi
+    }
     
     console.log(`[Release Escrow] Escrow ${escrowId} released successfully by owner ${ownerId} with ${disbursement_proof_images.length} proof images`);
     
