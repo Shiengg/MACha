@@ -1556,95 +1556,118 @@ export const releaseEscrow = async (escrowId, ownerId, releaseData) => {
     
     await escrow.save();
     
-    // Set post-release update tracking fields (nếu có milestone)
-    // Reload escrow với populated campaign để ensure có latest data
-    const escrowWithCampaign = await Escrow.findById(escrowId).populate("campaign");
-    if (escrowWithCampaign) {
-        const trackingResult = await setPostReleaseUpdateTracking(escrowWithCampaign, now);
-        if (!trackingResult.success && !trackingResult.skipped) {
-            // Log warning nhưng không fail release
-            console.warn(`[Release Escrow] Warning: Could not set post-release tracking fields for escrow ${escrowId}:`, trackingResult.error || trackingResult.message);
-        }
-    }
+    // Populate escrow với các fields cần thiết trước khi return response
+    await escrow.populate("requested_by", "username email fullname");
+    await escrow.populate("campaign", "title");
     
-    // Invalidate cache liên quan
-    await redisClient.del(`campaign:${campaign._id}`);
-    await redisClient.del('campaigns');
-    await redisClient.del(`escrow:${escrowId}`);
+    // Return response NGAY LẬP TỨC để frontend không bị treo
+    // Các async operations không quan trọng sẽ được chạy trong background
+    const responseEscrow = escrow;
     
-    // Gửi email và notification cho creator và donors khi escrow được release
-    try {
-        await escrow.populate("requested_by", "username email fullname");
-        const creator = escrow.requested_by;
-        
-        if (creator && creator.email) {
-            try {
-                await mailerService.sendWithdrawalReleasedEmail(creator.email, {
-                    username: creator.username || creator.fullname || 'Người dùng',
-                    campaignTitle: campaign.title,
-                    campaignId: campaign._id.toString(),
-                    withdrawalAmount: escrow.withdrawal_request_amount
-                });
-            } catch (emailError) {
-                console.error('[Release Escrow] Error sending email to creator:', emailError);
+    // Chạy các async operations không quan trọng trong background (không block response)
+    // Sử dụng setImmediate để đảm bảo response được return trước
+    setImmediate(async () => {
+        try {
+            // Reload escrow với populated data cho background tasks
+            const escrowForBackground = await Escrow.findById(escrowId)
+                .populate("requested_by", "username email fullname")
+                .populate("campaign", "title");
+            
+            if (!escrowForBackground) {
+                console.error(`[Release Escrow] Could not reload escrow ${escrowId} for background tasks`);
+                return;
             }
-        }
-        
-        const donorIds = await getUniqueDonorsByCampaign(campaign._id);
-        
-        if (donorIds.length > 0) {
-            const notifications = donorIds.map(donorId => ({
-                receiver: donorId,
-                sender: creator._id,
-                type: 'withdrawal_released',
-                campaign: campaign._id,
-                message: `Chiến dịch "${campaign.title}" đã giải ngân thành công số tiền ${escrow.withdrawal_request_amount.toLocaleString('vi-VN')} VND`,
-                is_read: false
-            }));
             
-            const createdNotifications = await Notification.insertMany(notifications);
+            const campaignForBackground = escrowForBackground.campaign;
+            const creator = escrowForBackground.requested_by;
             
-            for (let i = 0; i < createdNotifications.length; i++) {
-                try {
-                    const notification = createdNotifications[i];
-                    const donorId = donorIds[i];
-                    
-                    await redisClient.publish('notification:new', JSON.stringify({
-                        recipientId: donorId.toString(),
-                        notification: {
-                            _id: notification._id.toString(),
-                            type: 'withdrawal_released',
-                            message: notifications[i].message,
-                            sender: {
-                                _id: creator._id.toString(),
-                                username: creator.username,
-                                fullname: creator.fullname
-                            },
-                            campaign: {
-                                _id: campaign._id.toString(),
-                                title: campaign.title
-                            },
-                            is_read: false,
-                            createdAt: notification.createdAt
-                        }
-                    }));
-                } catch (notifError) {
-                    console.error('[Release Escrow] Error publishing notification:', notifError);
+            // Set post-release update tracking fields (nếu có milestone)
+            const escrowWithCampaign = await Escrow.findById(escrowId).populate("campaign");
+            if (escrowWithCampaign) {
+                const trackingResult = await setPostReleaseUpdateTracking(escrowWithCampaign, now);
+                if (!trackingResult.success && !trackingResult.skipped) {
+                    // Log warning nhưng không fail release
+                    console.warn(`[Release Escrow] Warning: Could not set post-release tracking fields for escrow ${escrowId}:`, trackingResult.error || trackingResult.message);
                 }
             }
             
-            await redisClient.del(donorIds.map(id => `notifications:${id}`));
+            // Invalidate cache liên quan
+            await redisClient.del(`campaign:${campaignForBackground._id}`);
+            await redisClient.del('campaigns');
+            await redisClient.del(`escrow:${escrowId}`);
+            
+            // Gửi email và notification cho creator và donors khi escrow được release
+            if (creator && creator.email) {
+                try {
+                    await mailerService.sendWithdrawalReleasedEmail(creator.email, {
+                        username: creator.username || creator.fullname || 'Người dùng',
+                        campaignTitle: campaignForBackground.title,
+                        campaignId: campaignForBackground._id.toString(),
+                        withdrawalAmount: escrowForBackground.withdrawal_request_amount
+                    });
+                } catch (emailError) {
+                    console.error('[Release Escrow] Error sending email to creator:', emailError);
+                }
+            }
+            
+            const donorIds = await getUniqueDonorsByCampaign(campaignForBackground._id);
+            
+            if (donorIds.length > 0) {
+                const notifications = donorIds.map(donorId => ({
+                    receiver: donorId,
+                    sender: creator._id,
+                    type: 'withdrawal_released',
+                    campaign: campaignForBackground._id,
+                    message: `Chiến dịch "${campaignForBackground.title}" đã giải ngân thành công số tiền ${escrowForBackground.withdrawal_request_amount.toLocaleString('vi-VN')} VND`,
+                    is_read: false
+                }));
+                
+                const createdNotifications = await Notification.insertMany(notifications);
+                
+                for (let i = 0; i < createdNotifications.length; i++) {
+                    try {
+                        const notification = createdNotifications[i];
+                        const donorId = donorIds[i];
+                        
+                        await redisClient.publish('notification:new', JSON.stringify({
+                            recipientId: donorId.toString(),
+                            notification: {
+                                _id: notification._id.toString(),
+                                type: 'withdrawal_released',
+                                message: notifications[i].message,
+                                sender: {
+                                    _id: creator._id.toString(),
+                                    username: creator.username,
+                                    fullname: creator.fullname
+                                },
+                                campaign: {
+                                    _id: campaignForBackground._id.toString(),
+                                    title: campaignForBackground.title
+                                },
+                                is_read: false,
+                                createdAt: notification.createdAt
+                            }
+                        }));
+                    } catch (notifError) {
+                        console.error('[Release Escrow] Error publishing notification:', notifError);
+                    }
+                }
+                
+                await redisClient.del(donorIds.map(id => `notifications:${id}`));
+            }
+            
+            console.log(`[Release Escrow] Background tasks completed for escrow ${escrowId}`);
+        } catch (error) {
+            console.error('[Release Escrow] Error in background tasks:', error);
+            // Không fail release nếu background tasks lỗi
         }
-    } catch (error) {
-        console.error('[Release Escrow] Error sending email/notifications:', error);
-        // Không fail release nếu email/notification lỗi
-    }
+    });
     
     console.log(`[Release Escrow] Escrow ${escrowId} released successfully by owner ${ownerId} with ${disbursement_proof_images.length} proof images`);
     
     return {
         success: true,
-        escrow: escrow,
+        escrow: responseEscrow,
         message: "Escrow đã được release thành công với bill giải ngân"
     };
 };
