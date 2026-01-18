@@ -15,6 +15,7 @@ export default function MapPage() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const currentPopupRef = useRef<mapboxgl.Popup | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredCampaigns, setFilteredCampaigns] = useState<Campaign[]>([]);
@@ -90,6 +91,9 @@ export default function MapPage() {
             margin: 8px !important;
             color: #666 !important;
             opacity: 0.8 !important;
+            cursor: pointer !important;
+            pointer-events: auto !important;
+            z-index: 10 !important;
           }
           .mapboxgl-popup-close-button:hover {
             opacity: 1 !important;
@@ -162,6 +166,12 @@ export default function MapPage() {
     }
 
     return () => {
+      // Clean up popup
+      if (currentPopupRef.current) {
+        currentPopupRef.current.remove();
+        currentPopupRef.current = null;
+      }
+      // Clean up map
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -204,6 +214,11 @@ export default function MapPage() {
   const clearMarkers = () => {
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
+    // Close any open popup when clearing markers
+    if (currentPopupRef.current) {
+      currentPopupRef.current.remove();
+      currentPopupRef.current = null;
+    }
   };
 
   const addMarkersToMap = (campaignsToShow: Campaign[], eventsToShow: Event[] = []) => {
@@ -370,7 +385,19 @@ export default function MapPage() {
       const props = e.features![0].properties!;
       const isEvent = props.type === 'event';
       
-      new mapboxgl.Popup({ maxWidth: '300px' })
+      // Close existing popup if any
+      if (currentPopupRef.current) {
+        currentPopupRef.current.remove();
+        currentPopupRef.current = null;
+      }
+      
+      // Create new popup
+      const popup = new mapboxgl.Popup({ 
+        maxWidth: '300px',
+        closeOnClick: true,
+        closeButton: true,
+        closeOnMove: false
+      })
         .setLngLat(coordinates)
         .setHTML(`
           <div style="min-width: 250px; max-width: 300px; overflow: hidden;">
@@ -398,8 +425,15 @@ export default function MapPage() {
             `}
             <a href="${isEvent ? '/events' : '/campaigns'}/${props.id}" style="display: inline-block; padding: 8px 16px; background-color: ${isEvent ? '#22c55e' : '#3b82f6'}; color: white; text-decoration: none; border-radius: 6px; font-size: 12px; text-align: center; width: 100%; box-sizing: border-box;">Xem chi tiết →</a>
           </div>
-        `)
-        .addTo(map.current!);
+        `);
+      
+      // Store popup reference and add event listener for cleanup
+      currentPopupRef.current = popup;
+      popup.on('close', () => {
+        currentPopupRef.current = null;
+      });
+      
+      popup.addTo(map.current!);
     };
 
     map.current.on('click', 'campaign-point', handlePointClick);
@@ -535,7 +569,7 @@ export default function MapPage() {
                         {campaign.title}
                       </h4>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                        {campaign.creator.fullname || campaign.creator.username}
+                        {campaign.creator?.fullname || campaign.creator?.username || 'Không xác định'}
                       </p>
                       {campaign.location && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
@@ -580,7 +614,7 @@ export default function MapPage() {
                       </h4>
                       {event.creator && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                          {event.creator.fullname || event.creator.username}
+                          {event.creator?.fullname || event.creator?.username || 'Không xác định'}
                         </p>
                       )}
                       {event.location && (

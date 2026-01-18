@@ -154,20 +154,22 @@ export default function RecommendedCampaigns({
               </h3>
 
               {/* Creator */}
-              <div className="flex items-center gap-2 mb-3">
-                {campaign.creator.avatar ? (
-                  <img
-                    src={campaign.creator.avatar}
-                    alt={campaign.creator.username}
-                    className="w-6 h-6 rounded-full"
-                  />
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-gray-300" />
-                )}
-                <span className="text-sm text-gray-600">
-                  {campaign.creator.fullname || campaign.creator.username}
-                </span>
-              </div>
+              {campaign.creator && (
+                <div className="flex items-center gap-2 mb-3">
+                  {campaign.creator.avatar ? (
+                    <img
+                      src={campaign.creator.avatar}
+                      alt={campaign.creator.username}
+                      className="w-6 h-6 rounded-full"
+                    />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-gray-300" />
+                  )}
+                  <span className="text-sm text-gray-600">
+                    {campaign.creator?.fullname || campaign.creator?.username || 'Không xác định'}
+                  </span>
+                </div>
+              )}
 
               {/* Progress Bar */}
               <div className="mb-3">
