@@ -72,18 +72,61 @@ export default function OwnerWithdrawalRequests() {
 
   useEffect(() => {
     const payment = searchParams.get('payment');
+    const escrowId = searchParams.get('escrowId');
+    
     if (payment === 'success') {
-      Swal.fire({
-        icon: 'success',
-        title: 'Thanh toán thành công!',
-        text: 'Yêu cầu rút tiền đã được chuyển trạng thái thành released.',
-        timer: 3000,
-        timerProgressBar: true,
-        showConfirmButton: false,
-        toast: true,
-        position: 'top-end',
-      });
-      fetchWithdrawalRequests();
+      // Nếu có escrowId, tự động mở modal upload bill giải ngân
+      if (escrowId) {
+        // Fetch lại danh sách và tìm escrow từ response (tránh closure issue)
+        ownerService.getAdminApprovedWithdrawalRequests()
+          .then((data) => {
+            const escrows = data.escrows || [];
+            const escrow = escrows.find((e: Escrow) => e._id === escrowId);
+            
+            // Update state
+            setWithdrawalRequests(escrows);
+            
+            if (escrow) {
+              // Mở modal sau một chút để đảm bảo state đã update
+              setTimeout(() => {
+                handleReleaseEscrow(escrow);
+                // Xóa params khỏi URL
+                const newUrl = new URL(window.location.href);
+                newUrl.searchParams.delete('payment');
+                newUrl.searchParams.delete('escrowId');
+                window.history.replaceState({}, '', newUrl.toString());
+              }, 100);
+            }
+          })
+          .catch((error) => {
+            console.error('Error fetching withdrawal requests:', error);
+            fetchWithdrawalRequests();
+          });
+        
+        Swal.fire({
+          icon: 'success',
+          title: 'Thanh toán thành công!',
+          text: 'Vui lòng upload bill giải ngân để hoàn tất quá trình.',
+          timer: 3000,
+          timerProgressBar: true,
+          showConfirmButton: false,
+          toast: true,
+          position: 'top-end',
+        });
+      } else {
+        // Không có escrowId, chỉ hiển thị thông báo
+        Swal.fire({
+          icon: 'success',
+          title: 'Thanh toán thành công!',
+          text: 'Thanh toán đã được ghi nhận.',
+          timer: 3000,
+          timerProgressBar: true,
+          showConfirmButton: false,
+          toast: true,
+          position: 'top-end',
+        });
+        fetchWithdrawalRequests();
+      }
     } else if (payment === 'error') {
       Swal.fire({
         icon: 'error',
@@ -491,15 +534,7 @@ export default function OwnerWithdrawalRequests() {
                           </button>
                           {request.request_status === 'admin_approved' && (
                             <>
-                              <button
-                                onClick={() => handleReleaseEscrow(request)}
-                                disabled={isReleasing}
-                                className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-1 sm:flex-none justify-center"
-                              >
-                                <Upload className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span className="hidden sm:inline">Giải ngân</span>
-                                <span className="sm:hidden">Giải ngân</span>
-                              </button>
+                              
                               <button
                                 onClick={() => handleProcessPayment(request)}
                                 disabled={isProcessing}
@@ -667,24 +702,20 @@ export default function OwnerWithdrawalRequests() {
 
       {/* Release Escrow Modal */}
       {showReleaseModal && releaseEscrow && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[95vh] overflow-y-auto">
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4"
+          onClick={(e) => {
+            // Ngăn đóng modal khi click outside
+            e.stopPropagation();
+          }}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[95vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-center">
                 <h2 className="text-lg sm:text-2xl font-bold text-gray-900">Giải ngân Escrow</h2>
-                <button
-                  onClick={() => {
-                    setShowReleaseModal(false);
-                    setReleaseEscrow(null);
-                    setProofImages([]);
-                    setProofImageUrls([]);
-                    setDisbursementNote('');
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                  disabled={isReleasing}
-                >
-                  <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />
-                </button>
               </div>
             </div>
 
@@ -795,24 +826,11 @@ export default function OwnerWithdrawalRequests() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3 sticky bottom-0 bg-white">
-              <button
-                onClick={() => {
-                  setShowReleaseModal(false);
-                  setReleaseEscrow(null);
-                  setProofImages([]);
-                  setProofImageUrls([]);
-                  setDisbursementNote('');
-                }}
-                disabled={isReleasing}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Hủy
-              </button>
+            <div className="p-6 border-t border-gray-200 flex justify-center gap-3 sticky bottom-0 bg-white">
               <button
                 onClick={handleSubmitRelease}
                 disabled={isReleasing || isUploading || proofImages.length === 0}
-                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isReleasing || isUploading ? (
                   <>
