@@ -27,7 +27,7 @@ export interface Campaign {
     fullname?: string;
     avatar?: string;
     role?: string;
-  };
+  } | null;
   contact_info: {
     fullname: string;
     phone: string;
