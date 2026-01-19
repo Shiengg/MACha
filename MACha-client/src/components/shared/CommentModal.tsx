@@ -171,47 +171,77 @@ export default function CommentModal({ postId, isOpen, onClose, onCommentAdded, 
               Chưa có bình luận nào. Hãy là người đầu tiên bình luận!
             </div>
           ) : (
-            comments.map((comment) => (
-              <div key={comment._id} className="flex gap-3">
-                <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
-                  {comment.user.avatar ? (
-                    <Image
-                      src={comment.user.avatar}
-                      alt={comment.user.username || 'User'}
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 font-semibold text-sm">
-                      {comment.user.username?.charAt(0).toUpperCase() || 'U'}
+            comments.map((comment) => {
+              // Guard clause: Skip comments with null user
+              if (!comment.user) {
+                return (
+                  <div key={comment._id} className="flex gap-3">
+                    <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
+                      <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 font-semibold text-sm">
+                        U
+                      </div>
                     </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <h4 className="font-semibold text-sm text-gray-900 dark:text-white">
-                        {comment.user.fullname || comment.user.username}
-                      </h4>
-                      {user && (user.id === comment.user._id || user._id === comment.user._id) && (
-                        <button
-                          onClick={() => handleDeleteComment(comment._id)}
-                          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </button>
-                      )}
+                    <div className="flex-1">
+                      <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-semibold text-sm text-gray-900 dark:text-white">
+                            Unknown User
+                          </h4>
+                        </div>
+                        <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
+                          {comment.content_text}
+                        </p>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-3">
+                        {formatTimeAgo(comment.createdAt)}
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
-                      {comment.content_text}
+                  </div>
+                );
+              }
+
+              return (
+                <div key={comment._id} className="flex gap-3">
+                  <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
+                    {comment.user.avatar ? (
+                      <Image
+                        src={comment.user.avatar}
+                        alt={comment.user.username || 'User'}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 font-semibold text-sm">
+                        {comment.user.username?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <h4 className="font-semibold text-sm text-gray-900 dark:text-white">
+                          {comment.user.fullname || comment.user.username || 'Unknown User'}
+                        </h4>
+                        {user && (user.id === comment.user._id || user._id === comment.user._id) && (
+                          <button
+                            onClick={() => handleDeleteComment(comment._id)}
+                            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
+                        {comment.content_text}
+                      </p>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-3">
+                      {formatTimeAgo(comment.createdAt)}
                     </p>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-3">
-                    {formatTimeAgo(comment.createdAt)}
-                  </p>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
